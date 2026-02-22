@@ -4,14 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import Colors from '@/constants/colors';
-import { getScoreColor, getScoreLabel } from '@/lib/storage';
+import { getScoreColor } from '@/lib/storage';
 import * as Haptics from 'expo-haptics';
 
 const SCORES = [
-  { value: 1, desc: 'Fully achieved, exceeded expectations' },
-  { value: 0.7, desc: 'Mostly achieved, minor gaps' },
-  { value: 0.3, desc: 'Partially achieved, significant gaps' },
-  { value: 0, desc: 'Not achieved, no meaningful progress' },
+  { value: 1, label: '完全达成', desc: '目标完全达成，执行质量优秀，超出预期' },
+  { value: 0.7, label: '基本达成', desc: '基本达成目标，执行质量良好，轻微未达预期' },
+  { value: 0.3, label: '部分达成', desc: '部分达成目标，存在明显差距，影响整体目标' },
+  { value: 0, label: '未达成', desc: '未达成目标，无实质性进展，严重影响目标' },
 ];
 
 export default function ScoreKRScreen() {
@@ -35,7 +35,7 @@ export default function ScoreKRScreen() {
   if (!kr) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.errorText}>Key result not found</Text>
+        <Text style={styles.errorText}>关键结果未找到</Text>
       </View>
     );
   }
@@ -43,13 +43,13 @@ export default function ScoreKRScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Self Assessment</Text>
+        <Text style={styles.headerTitle}>自评打分</Text>
       </View>
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.krName} numberOfLines={2}>{kr.title}</Text>
-        <Text style={styles.krProgress}>Current progress: {kr.progress}%</Text>
+        <Text style={styles.krProgress}>当前进度：{kr.progress}%</Text>
 
-        <Text style={styles.label}>Score</Text>
+        <Text style={styles.label}>评分</Text>
         {SCORES.map(s => (
           <Pressable
             key={s.value}
@@ -66,7 +66,7 @@ export default function ScoreKRScreen() {
               <Text style={styles.scoreDotText}>{s.value}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.scoreTitle}>{getScoreLabel(s.value)}</Text>
+              <Text style={styles.scoreTitle}>{s.label}</Text>
               <Text style={styles.scoreDesc}>{s.desc}</Text>
             </View>
             {selectedScore === s.value && (
@@ -75,12 +75,12 @@ export default function ScoreKRScreen() {
           </Pressable>
         ))}
 
-        <Text style={styles.label}>Assessment Notes</Text>
+        <Text style={styles.label}>自评说明</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={note}
           onChangeText={setNote}
-          placeholder="Explain your score, lessons learned..."
+          placeholder="说明得分原因、未达成的改进方向..."
           placeholderTextColor={Colors.textTertiary}
           multiline
           numberOfLines={3}
@@ -96,7 +96,7 @@ export default function ScoreKRScreen() {
           ]}
         >
           <Ionicons name="star" size={20} color={Colors.white} />
-          <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Submit Score'}</Text>
+          <Text style={styles.saveBtnText}>{saving ? '提交中...' : '提交评分'}</Text>
         </Pressable>
       </ScrollView>
     </View>

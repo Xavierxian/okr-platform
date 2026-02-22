@@ -64,7 +64,7 @@ export default function OKRsScreen() {
         <View style={styles.cardMeta}>
           <View style={styles.metaChip}>
             <Ionicons name="business-outline" size={12} color={Colors.textSecondary} />
-            <Text style={styles.metaText}>{dept?.name || 'Unknown'}</Text>
+            <Text style={styles.metaText}>{dept?.name || '未知'}</Text>
           </View>
           <View style={styles.metaChip}>
             <Ionicons name="calendar-outline" size={12} color={Colors.textSecondary} />
@@ -72,7 +72,7 @@ export default function OKRsScreen() {
           </View>
           <View style={styles.metaChip}>
             <Ionicons name="key-outline" size={12} color={Colors.textSecondary} />
-            <Text style={styles.metaText}>{objKRs.length} KRs</Text>
+            <Text style={styles.metaText}>{objKRs.length} 个 KR</Text>
           </View>
         </View>
         <View style={styles.cardProgress}>
@@ -84,7 +84,7 @@ export default function OKRsScreen() {
           </View>
           <View style={styles.progressInfo}>
             <Text style={styles.progressPercent}>{avgProg}%</Text>
-            <Text style={styles.progressCount}>{completedCount}/{objKRs.length} completed</Text>
+            <Text style={styles.progressCount}>{completedCount}/{objKRs.length} 已完成</Text>
           </View>
         </View>
       </Pressable>
@@ -94,7 +94,7 @@ export default function OKRsScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
-        <Text style={styles.headerTitle}>Objectives</Text>
+        <Text style={styles.headerTitle}>目标管理</Text>
         <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
           <Ionicons name="add" size={24} color={Colors.white} />
         </Pressable>
@@ -105,7 +105,7 @@ export default function OKRsScreen() {
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
-            data={[{ id: null, label: 'All' }, ...usedDepts.map(d => ({ id: d.id, label: d.name }))]}
+            data={[{ id: null, label: '全部' }, ...usedDepts.map(d => ({ id: d.id, label: d.name }))]}
             keyExtractor={item => item.id || 'all'}
             contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
             renderItem={({ item }) => (
@@ -121,7 +121,7 @@ export default function OKRsScreen() {
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
-              data={[{ id: null, label: 'All Cycles' }, ...cycles.map(c => ({ id: c, label: c }))]}
+              data={[{ id: null, label: '全部周期' }, ...cycles.map(c => ({ id: c, label: c }))]}
               keyExtractor={item => item.id || 'all-cycles'}
               contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginTop: 8 }}
               renderItem={({ item }) => (
@@ -147,8 +147,8 @@ export default function OKRsScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="flag-outline" size={48} color={Colors.textTertiary} />
-            <Text style={styles.emptyTitle}>No objectives found</Text>
-            <Text style={styles.emptyText}>Create your first objective to start tracking goals</Text>
+            <Text style={styles.emptyTitle}>暂无目标</Text>
+            <Text style={styles.emptyText}>创建你的第一个目标，开始追踪进展</Text>
           </View>
         }
       />

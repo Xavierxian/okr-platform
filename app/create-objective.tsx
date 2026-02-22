@@ -35,32 +35,32 @@ export default function CreateObjectiveScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>New Objective</Text>
+        <Text style={styles.headerTitle}>新建目标</Text>
       </View>
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>Title</Text>
+        <Text style={styles.label}>目标名称</Text>
         <TextInput
           style={styles.input}
           value={title}
           onChangeText={setTitle}
-          placeholder="What do you want to achieve?"
+          placeholder="你想要达成什么目标？"
           placeholderTextColor={Colors.textTertiary}
           autoFocus
         />
 
-        <Text style={styles.label}>Description</Text>
+        <Text style={styles.label}>目标描述</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={description}
           onChangeText={setDescription}
-          placeholder="Describe the goal and its importance"
+          placeholder="描述目标的意义和达成价值"
           placeholderTextColor={Colors.textTertiary}
           multiline
           numberOfLines={3}
           textAlignVertical="top"
         />
 
-        <Text style={styles.label}>Department</Text>
+        <Text style={styles.label}>所属部门</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
           <View style={styles.chipRow}>
             {departments.map(dept => (
@@ -77,7 +77,7 @@ export default function CreateObjectiveScreen() {
           </View>
         </ScrollView>
 
-        <Text style={styles.label}>Cycle</Text>
+        <Text style={styles.label}>所属周期</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
           <View style={styles.chipRow}>
             {getCycleOptions().map(cycle => (
@@ -101,7 +101,7 @@ export default function CreateObjectiveScreen() {
           ]}
         >
           <Ionicons name="checkmark" size={20} color={Colors.white} />
-          <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Create Objective'}</Text>
+          <Text style={styles.saveBtnText}>{saving ? '保存中...' : '创建目标'}</Text>
         </Pressable>
       </ScrollView>
     </View>

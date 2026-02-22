@@ -9,6 +9,14 @@ import { getStatusColor, getScoreColor, getScoreLabel } from '@/lib/storage';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+const STATUS_LABELS: Record<string, string> = {
+  normal: '正常',
+  behind: '滞后',
+  completed: '已完成',
+  overdue: '已逾期',
+  paused: '已暂停',
+};
+
 export default function ObjectiveDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,9 +38,9 @@ export default function ObjectiveDetailScreen() {
       <View style={[styles.container, { paddingTop: topPadding }]}>
         <View style={styles.notFound}>
           <Ionicons name="alert-circle-outline" size={48} color={Colors.textTertiary} />
-          <Text style={styles.notFoundText}>Objective not found</Text>
+          <Text style={styles.notFoundText}>目标未找到</Text>
           <Pressable onPress={() => router.back()} style={styles.backBtnFallback}>
-            <Text style={styles.backBtnText}>Go Back</Text>
+            <Text style={styles.backBtnText}>返回</Text>
           </Pressable>
         </View>
       </View>
@@ -41,10 +49,10 @@ export default function ObjectiveDetailScreen() {
 
   const handleDeleteObjective = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('Delete Objective', 'This will remove this objective and all its key results.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('删除目标', '此操作将删除该目标及其所有关键结果。', [
+      { text: '取消', style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: '删除', style: 'destructive',
         onPress: async () => {
           await removeObjective(objective.id);
           router.back();
@@ -55,10 +63,10 @@ export default function ObjectiveDetailScreen() {
 
   const handleDeleteKR = (krId: string, krTitle: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('Delete Key Result', `Remove "${krTitle}"?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('删除关键结果', `确定删除"${krTitle}"吗？`, [
+      { text: '取消', style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: '删除', style: 'destructive',
         onPress: () => removeKeyResult(krId),
       },
     ]);
@@ -87,7 +95,7 @@ export default function ObjectiveDetailScreen() {
             </View>
             <View style={styles.deptBadge}>
               <Ionicons name="business-outline" size={12} color={Colors.textSecondary} />
-              <Text style={styles.deptBadgeText}>{dept?.name || 'Unknown'}</Text>
+              <Text style={styles.deptBadgeText}>{dept?.name || '未知'}</Text>
             </View>
           </View>
 
@@ -98,7 +106,7 @@ export default function ObjectiveDetailScreen() {
 
           <View style={styles.progressCard}>
             <View style={styles.progressTop}>
-              <Text style={styles.progressLabel}>Overall Progress</Text>
+              <Text style={styles.progressLabel}>整体进度</Text>
               <Text style={[styles.progressValue, {
                 color: avgProgress >= 70 ? Colors.success : avgProgress >= 40 ? Colors.warning : Colors.danger
               }]}>{avgProgress}%</Text>
@@ -114,7 +122,7 @@ export default function ObjectiveDetailScreen() {
 
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
           <View style={styles.krHeader}>
-            <Text style={styles.krSectionTitle}>Key Results ({objKRs.length})</Text>
+            <Text style={styles.krSectionTitle}>关键结果 ({objKRs.length})</Text>
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -123,14 +131,14 @@ export default function ObjectiveDetailScreen() {
               style={({ pressed }) => [styles.addKRBtn, { opacity: pressed ? 0.8 : 1 }]}
             >
               <Ionicons name="add" size={18} color={Colors.primary} />
-              <Text style={styles.addKRText}>Add KR</Text>
+              <Text style={styles.addKRText}>添加 KR</Text>
             </Pressable>
           </View>
 
           {objKRs.length === 0 ? (
             <View style={styles.emptyKR}>
               <Ionicons name="key-outline" size={32} color={Colors.textTertiary} />
-              <Text style={styles.emptyKRText}>No key results yet</Text>
+              <Text style={styles.emptyKRText}>暂无关键结果</Text>
             </View>
           ) : (
             objKRs.map((kr, idx) => (
@@ -149,10 +157,10 @@ export default function ObjectiveDetailScreen() {
                   </View>
                   <View style={styles.krMetaItem}>
                     <Ionicons name="calendar-outline" size={12} color={Colors.textSecondary} />
-                    <Text style={styles.krMetaText}>{new Date(kr.endDate).toLocaleDateString()}</Text>
+                    <Text style={styles.krMetaText}>{new Date(kr.endDate).toLocaleDateString('zh-CN')}</Text>
                   </View>
                   <View style={[styles.statusChip, { backgroundColor: getStatusColor(kr.status) + '20' }]}>
-                    <Text style={[styles.statusChipText, { color: getStatusColor(kr.status) }]}>{kr.status}</Text>
+                    <Text style={[styles.statusChipText, { color: getStatusColor(kr.status) }]}>{STATUS_LABELS[kr.status] || kr.status}</Text>
                   </View>
                 </View>
                 <View style={styles.krProgressRow}>
@@ -181,7 +189,7 @@ export default function ObjectiveDetailScreen() {
                     style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
                   >
                     <Ionicons name="create-outline" size={16} color={Colors.primary} />
-                    <Text style={styles.actionText}>Update</Text>
+                    <Text style={styles.actionText}>更新进度</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => {
@@ -191,7 +199,7 @@ export default function ObjectiveDetailScreen() {
                     style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
                   >
                     <Ionicons name="star-outline" size={16} color={Colors.accent} />
-                    <Text style={[styles.actionText, { color: Colors.accent }]}>Score</Text>
+                    <Text style={[styles.actionText, { color: Colors.accent }]}>自评</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => handleDeleteKR(kr.id, kr.title)}
@@ -202,14 +210,14 @@ export default function ObjectiveDetailScreen() {
                 </View>
                 {kr.progressHistory && kr.progressHistory.length > 0 && (
                   <View style={styles.historySection}>
-                    <Text style={styles.historyTitle}>Recent Updates</Text>
+                    <Text style={styles.historyTitle}>最近更新</Text>
                     {kr.progressHistory.slice(-3).reverse().map(entry => (
                       <View key={entry.id} style={styles.historyItem}>
                         <View style={styles.historyDot} />
                         <View style={{ flex: 1 }}>
                           <View style={styles.historyTop}>
                             <Text style={styles.historyProgress}>{entry.progress}%</Text>
-                            <Text style={styles.historyDate}>{new Date(entry.date).toLocaleDateString()}</Text>
+                            <Text style={styles.historyDate}>{new Date(entry.date).toLocaleDateString('zh-CN')}</Text>
                           </View>
                           {entry.note ? <Text style={styles.historyNote} numberOfLines={2}>{entry.note}</Text> : null}
                         </View>
@@ -262,7 +270,7 @@ const styles = StyleSheet.create({
   krMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   krMetaText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textSecondary },
   statusChip: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  statusChipText: { fontFamily: 'Inter_500Medium', fontSize: 11, textTransform: 'capitalize' },
+  statusChipText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   krProgressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, marginLeft: 18 },
   krProgressBar: { flex: 1, height: 4, backgroundColor: Colors.backgroundTertiary, borderRadius: 2, overflow: 'hidden' },
   krProgressFill: { height: 4, borderRadius: 2 },

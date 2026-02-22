@@ -20,18 +20,18 @@ export default function ProfileScreen() {
     const scored = keyResults.filter(kr => kr.selfScore !== null);
     const avgScore = scored.length > 0
       ? (scored.reduce((s, kr) => s + (kr.selfScore || 0), 0) / scored.length).toFixed(2)
-      : 'N/A';
+      : '暂无';
     return { totalKR, completed, avgProgress, avgScore, scored: scored.length };
   }, [keyResults]);
 
   const handleClearData = () => {
     Alert.alert(
-      'Clear All Data',
-      'This will remove all objectives and key results. This action cannot be undone.',
+      '清除所有数据',
+      '此操作将删除所有目标和关键结果，且不可恢复。',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: '取消', style: 'cancel' },
         {
-          text: 'Clear',
+          text: '清除',
           style: 'destructive',
           onPress: async () => {
             await AsyncStorage.multiRemove(['okr_departments', 'okr_objectives', 'okr_key_results']);
@@ -50,57 +50,57 @@ export default function ProfileScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 16, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Profile</Text>
+        <Text style={styles.title}>我的</Text>
 
         <Animated.View entering={FadeInDown.duration(400)} style={styles.avatarSection}>
           <View style={styles.avatar}>
             <Ionicons name="person" size={36} color={Colors.primary} />
           </View>
-          <Text style={styles.userName}>OKR Manager</Text>
-          <Text style={styles.userRole}>Administrator</Text>
+          <Text style={styles.userName}>OKR 管理员</Text>
+          <Text style={styles.userRole}>超级管理员</Text>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>My Statistics</Text>
+          <Text style={styles.sectionTitle}>我的统计</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{objectives.length}</Text>
-              <Text style={styles.statLabel}>Objectives</Text>
+              <Text style={styles.statLabel}>目标数</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{personalStats.totalKR}</Text>
-              <Text style={styles.statLabel}>Key Results</Text>
+              <Text style={styles.statLabel}>关键结果</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: Colors.success }]}>{personalStats.completed}</Text>
-              <Text style={styles.statLabel}>Completed</Text>
+              <Text style={styles.statLabel}>已完成</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: Colors.primary }]}>{personalStats.avgProgress}%</Text>
-              <Text style={styles.statLabel}>Avg Progress</Text>
+              <Text style={styles.statLabel}>平均进度</Text>
             </View>
           </View>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>Assessment</Text>
+          <Text style={styles.sectionTitle}>自评情况</Text>
           <View style={styles.assessRow}>
-            <Text style={styles.assessLabel}>Scored KRs</Text>
+            <Text style={styles.assessLabel}>已评分 KR</Text>
             <Text style={styles.assessValue}>{personalStats.scored} / {personalStats.totalKR}</Text>
           </View>
           <View style={styles.assessRow}>
-            <Text style={styles.assessLabel}>Average Score</Text>
+            <Text style={styles.assessLabel}>平均分</Text>
             <Text style={[styles.assessValue, { color: Colors.primary }]}>{personalStats.avgScore}</Text>
           </View>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>Settings</Text>
+          <Text style={styles.sectionTitle}>设置</Text>
           <Pressable onPress={handleClearData} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
             <View style={[styles.settingIcon, { backgroundColor: Colors.danger + '20' }]}>
               <Ionicons name="trash-outline" size={18} color={Colors.danger} />
             </View>
-            <Text style={[styles.settingText, { color: Colors.danger }]}>Clear All Data</Text>
+            <Text style={[styles.settingText, { color: Colors.danger }]}>清除所有数据</Text>
             <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
           </Pressable>
         </Animated.View>

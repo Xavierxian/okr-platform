@@ -29,7 +29,7 @@ export default function UpdateProgressScreen() {
   if (!kr) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.errorText}>Key result not found</Text>
+        <Text style={styles.errorText}>关键结果未找到</Text>
       </View>
     );
   }
@@ -37,12 +37,12 @@ export default function UpdateProgressScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Update Progress</Text>
+        <Text style={styles.headerTitle}>更新进度</Text>
       </View>
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.krName} numberOfLines={2}>{kr.title}</Text>
 
-        <Text style={styles.label}>Progress (%)</Text>
+        <Text style={styles.label}>进度 (%)</Text>
         <View style={styles.progressRow}>
           <Pressable
             onPress={() => setProgress(String(Math.max(0, progressNum - 10)))}
@@ -75,12 +75,12 @@ export default function UpdateProgressScreen() {
           <Text style={styles.progressPercent}>{progressNum}%</Text>
         </View>
 
-        <Text style={styles.label}>Notes</Text>
+        <Text style={styles.label}>执行说明</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={note}
           onChangeText={setNote}
-          placeholder="What did you accomplish? Any blockers?"
+          placeholder="已完成工作、遇到的问题、下一步计划..."
           placeholderTextColor={Colors.textTertiary}
           multiline
           numberOfLines={3}
@@ -96,7 +96,7 @@ export default function UpdateProgressScreen() {
           ]}
         >
           <Ionicons name="checkmark" size={20} color={Colors.white} />
-          <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Progress'}</Text>
+          <Text style={styles.saveBtnText}>{saving ? '保存中...' : '保存进度'}</Text>
         </Pressable>
       </ScrollView>
     </View>

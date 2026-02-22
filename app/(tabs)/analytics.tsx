@@ -50,7 +50,7 @@ export default function AnalyticsScreen() {
         const avg = Math.round(deptKRs.reduce((s, kr) => s + kr.progress, 0) / deptKRs.length);
         const completed = deptKRs.filter(kr => kr.status === 'completed').length;
         stats.push({
-          name: dept?.name || 'Unknown',
+          name: dept?.name || '未知',
           avgProgress: avg,
           count: deptKRs.length,
           completedRate: Math.round((completed / deptKRs.length) * 100),
@@ -98,27 +98,27 @@ export default function AnalyticsScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 16, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Analytics</Text>
+        <Text style={styles.title}>数据分析</Text>
 
         {!hasData ? (
           <View style={styles.empty}>
             <Ionicons name="analytics-outline" size={48} color={Colors.textTertiary} />
-            <Text style={styles.emptyTitle}>No data yet</Text>
-            <Text style={styles.emptyText}>Create objectives and key results to see analytics</Text>
+            <Text style={styles.emptyTitle}>暂无数据</Text>
+            <Text style={styles.emptyText}>创建目标和关键结果后即可查看分析报表</Text>
           </View>
         ) : (
           <>
             <Animated.View entering={FadeInDown.duration(400)} style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="pie-chart" size={18} color={Colors.primary} />
-                <Text style={styles.sectionTitle}>Status Breakdown</Text>
+                <Text style={styles.sectionTitle}>状态分布</Text>
               </View>
               <View style={styles.pieList}>
-                <PieSegment label="On Track" value={statusBreakdown.normal} total={statusBreakdown.total} color={Colors.success} />
-                <PieSegment label="Completed" value={statusBreakdown.completed} total={statusBreakdown.total} color={Colors.info} />
-                <PieSegment label="Behind" value={statusBreakdown.behind} total={statusBreakdown.total} color={Colors.warning} />
-                <PieSegment label="Overdue" value={statusBreakdown.overdue} total={statusBreakdown.total} color={Colors.danger} />
-                <PieSegment label="Paused" value={statusBreakdown.paused} total={statusBreakdown.total} color={Colors.textTertiary} />
+                <PieSegment label="正常推进" value={statusBreakdown.normal} total={statusBreakdown.total} color={Colors.success} />
+                <PieSegment label="已完成" value={statusBreakdown.completed} total={statusBreakdown.total} color={Colors.info} />
+                <PieSegment label="进度滞后" value={statusBreakdown.behind} total={statusBreakdown.total} color={Colors.warning} />
+                <PieSegment label="已逾期" value={statusBreakdown.overdue} total={statusBreakdown.total} color={Colors.danger} />
+                <PieSegment label="已暂停" value={statusBreakdown.paused} total={statusBreakdown.total} color={Colors.textTertiary} />
               </View>
             </Animated.View>
 
@@ -126,7 +126,7 @@ export default function AnalyticsScreen() {
               <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="bar-chart" size={18} color={Colors.primary} />
-                  <Text style={styles.sectionTitle}>Department Progress</Text>
+                  <Text style={styles.sectionTitle}>部门进度</Text>
                 </View>
                 {deptStats.map((dept, idx) => (
                   <Bar
@@ -145,7 +145,7 @@ export default function AnalyticsScreen() {
               <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Ionicons name="star" size={18} color={Colors.accent} />
-                  <Text style={styles.sectionTitle}>Self-Assessment Distribution</Text>
+                  <Text style={styles.sectionTitle}>自评分布</Text>
                 </View>
                 {scoreStats.map(s => (
                   <View key={s.score} style={styles.scoreRow}>
@@ -163,28 +163,28 @@ export default function AnalyticsScreen() {
             <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="trending-up" size={18} color={Colors.primary} />
-                <Text style={styles.sectionTitle}>Summary</Text>
+                <Text style={styles.sectionTitle}>汇总概览</Text>
               </View>
               <View style={styles.summaryGrid}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryValue}>{objectives.length}</Text>
-                  <Text style={styles.summaryLabel}>Objectives</Text>
+                  <Text style={styles.summaryLabel}>目标数</Text>
                 </View>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryValue}>{keyResults.length}</Text>
-                  <Text style={styles.summaryLabel}>Key Results</Text>
+                  <Text style={styles.summaryLabel}>关键结果</Text>
                 </View>
                 <View style={styles.summaryItem}>
                   <Text style={[styles.summaryValue, { color: Colors.success }]}>
                     {keyResults.length > 0 ? Math.round((statusBreakdown.completed / statusBreakdown.total) * 100) : 0}%
                   </Text>
-                  <Text style={styles.summaryLabel}>Completion Rate</Text>
+                  <Text style={styles.summaryLabel}>完成率</Text>
                 </View>
                 <View style={styles.summaryItem}>
                   <Text style={[styles.summaryValue, { color: Colors.danger }]}>
                     {statusBreakdown.overdue + statusBreakdown.behind}
                   </Text>
-                  <Text style={styles.summaryLabel}>At Risk</Text>
+                  <Text style={styles.summaryLabel}>风险项</Text>
                 </View>
               </View>
             </Animated.View>

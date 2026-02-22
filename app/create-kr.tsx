@@ -44,43 +44,43 @@ export default function CreateKRScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>New Key Result</Text>
+        <Text style={styles.headerTitle}>新建关键结果</Text>
       </View>
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>Title</Text>
+        <Text style={styles.label}>KR 名称</Text>
         <TextInput
           style={styles.input}
           value={title}
           onChangeText={setTitle}
-          placeholder="Measurable outcome"
+          placeholder="可衡量的关键成果"
           placeholderTextColor={Colors.textTertiary}
           autoFocus
         />
 
-        <Text style={styles.label}>Description</Text>
+        <Text style={styles.label}>描述</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={description}
           onChangeText={setDescription}
-          placeholder="How will you measure success?"
+          placeholder="如何衡量成功？执行路径是什么？"
           placeholderTextColor={Colors.textTertiary}
           multiline
           numberOfLines={3}
           textAlignVertical="top"
         />
 
-        <Text style={styles.label}>Assignee</Text>
+        <Text style={styles.label}>执行人</Text>
         <TextInput
           style={styles.input}
           value={assignee}
           onChangeText={setAssignee}
-          placeholder="Who is responsible?"
+          placeholder="谁来负责？"
           placeholderTextColor={Colors.textTertiary}
         />
 
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Due Date</Text>
+            <Text style={styles.label}>截止日期</Text>
             <TextInput
               style={styles.input}
               value={endDate}
@@ -90,7 +90,7 @@ export default function CreateKRScreen() {
             />
           </View>
           <View style={{ width: 80 }}>
-            <Text style={styles.label}>Weight</Text>
+            <Text style={styles.label}>权重</Text>
             <TextInput
               style={styles.input}
               value={weight}
@@ -111,7 +111,7 @@ export default function CreateKRScreen() {
           ]}
         >
           <Ionicons name="checkmark" size={20} color={Colors.white} />
-          <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Create Key Result'}</Text>
+          <Text style={styles.saveBtnText}>{saving ? '保存中...' : '创建关键结果'}</Text>
         </Pressable>
       </ScrollView>
     </View>

@@ -12,19 +12,19 @@ function NativeTabLayout() {
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
-        <Label>Dashboard</Label>
+        <Label>仪表盘</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="okrs">
         <Icon sf={{ default: "target", selected: "target" }} />
-        <Label>OKRs</Label>
+        <Label>OKR</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="analytics">
         <Icon sf={{ default: "chart.pie", selected: "chart.pie.fill" }} />
-        <Label>Analytics</Label>
+        <Label>分析</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
-        <Label>Profile</Label>
+        <Label>我的</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -63,7 +63,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Dashboard",
+          title: "仪表盘",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stats-chart" size={size} color={color} />
           ),
@@ -72,7 +72,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="okrs"
         options={{
-          title: "OKRs",
+          title: "OKR",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="flag" size={size} color={color} />
           ),
@@ -81,7 +81,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="analytics"
         options={{
-          title: "Analytics",
+          title: "分析",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="pie-chart" size={size} color={color} />
           ),
@@ -90,7 +90,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: "我的",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),

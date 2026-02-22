@@ -10,8 +10,6 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 function ProgressRing({ progress, size = 80, strokeWidth = 8, color }: { progress: number; size?: number; strokeWidth?: number; color: string }) {
   const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -86,8 +84,8 @@ export default function DashboardScreen() {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>OKR Dashboard</Text>
-            <Text style={styles.subtitle}>{objectives.length} objectives, {keyResults.length} key results</Text>
+            <Text style={styles.greeting}>OKR 仪表盘</Text>
+            <Text style={styles.subtitle}>{objectives.length} 个目标，{keyResults.length} 个关键结果</Text>
           </View>
           <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
             <Ionicons name="add" size={24} color={Colors.white} />
@@ -97,11 +95,11 @@ export default function DashboardScreen() {
         {objectives.length === 0 ? (
           <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyState}>
             <Ionicons name="flag-outline" size={48} color={Colors.textTertiary} />
-            <Text style={styles.emptyTitle}>No OKRs yet</Text>
-            <Text style={styles.emptyText}>Create your first objective to get started tracking goals</Text>
+            <Text style={styles.emptyTitle}>暂无 OKR</Text>
+            <Text style={styles.emptyText}>创建你的第一个目标，开始追踪团队目标进展</Text>
             <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.emptyBtn, { opacity: pressed ? 0.8 : 1 }]}>
               <Ionicons name="add" size={20} color={Colors.white} />
-              <Text style={styles.emptyBtnText}>Create Objective</Text>
+              <Text style={styles.emptyBtnText}>创建目标</Text>
             </Pressable>
           </Animated.View>
         ) : (
@@ -114,20 +112,20 @@ export default function DashboardScreen() {
                   strokeWidth={10}
                   color={stats.avgProgress >= 70 ? Colors.success : stats.avgProgress >= 40 ? Colors.warning : Colors.danger}
                 />
-                <Text style={styles.progressLabel}>Overall Progress</Text>
+                <Text style={styles.progressLabel}>整体进度</Text>
               </View>
             </Animated.View>
 
             <View style={styles.statsGrid}>
-              <StatCard title="Total KRs" value={stats.totalKRs} subtitle="Key Results" icon="layers" color={Colors.info} delay={100} />
-              <StatCard title="Completed" value={stats.completedKRs} subtitle={`${stats.totalKRs > 0 ? Math.round((stats.completedKRs / stats.totalKRs) * 100) : 0}% done`} icon="checkmark-circle" color={Colors.success} delay={200} />
-              <StatCard title="Behind" value={stats.behindKRs} subtitle="Need attention" icon="warning" color={Colors.warning} delay={300} />
-              <StatCard title="Overdue" value={stats.overdueKRs} subtitle="Past deadline" icon="alert-circle" color={Colors.danger} delay={400} />
+              <StatCard title="关键结果" value={stats.totalKRs} subtitle="KR 总数" icon="layers" color={Colors.info} delay={100} />
+              <StatCard title="已完成" value={stats.completedKRs} subtitle={`${stats.totalKRs > 0 ? Math.round((stats.completedKRs / stats.totalKRs) * 100) : 0}% 完成`} icon="checkmark-circle" color={Colors.success} delay={200} />
+              <StatCard title="进度滞后" value={stats.behindKRs} subtitle="需要关注" icon="warning" color={Colors.warning} delay={300} />
+              <StatCard title="已逾期" value={stats.overdueKRs} subtitle="超过截止日期" icon="alert-circle" color={Colors.danger} delay={400} />
             </View>
 
             {stats.atRiskKRs.length > 0 && (
               <Animated.View entering={FadeInDown.delay(500).duration(400)}>
-                <Text style={styles.sectionTitle}>At Risk</Text>
+                <Text style={styles.sectionTitle}>存在风险</Text>
                 {stats.atRiskKRs.slice(0, 5).map(kr => {
                   const obj = objectives.find(o => o.id === kr.objectiveId);
                   return (
@@ -151,7 +149,7 @@ export default function DashboardScreen() {
             )}
 
             <Animated.View entering={FadeInDown.delay(600).duration(400)}>
-              <Text style={styles.sectionTitle}>Recent Objectives</Text>
+              <Text style={styles.sectionTitle}>最近目标</Text>
               {objectives.slice(0, 3).map(obj => {
                 const objKRs = keyResults.filter(kr => kr.objectiveId === obj.id);
                 const dept = departments.find(d => d.id === obj.departmentId);
@@ -171,13 +169,13 @@ export default function DashboardScreen() {
                       </View>
                     </View>
                     <View style={styles.objMeta}>
-                      <Text style={styles.objDept}>{dept?.name || 'Unknown'}</Text>
-                      <Text style={styles.objKRCount}>{objKRs.length} KRs</Text>
+                      <Text style={styles.objDept}>{dept?.name || '未知'}</Text>
+                      <Text style={styles.objKRCount}>{objKRs.length} 个 KR</Text>
                     </View>
                     <View style={styles.objProgressBar}>
                       <View style={[styles.objProgressFill, { width: `${avgProg}%`, backgroundColor: avgProg >= 70 ? Colors.success : avgProg >= 40 ? Colors.warning : Colors.danger }]} />
                     </View>
-                    <Text style={styles.objProgressText}>{avgProg}% complete</Text>
+                    <Text style={styles.objProgressText}>已完成 {avgProg}%</Text>
                   </Pressable>
                 );
               })}

@@ -50,13 +50,13 @@ const KEYS = {
 };
 
 const DEFAULT_DEPARTMENTS: Department[] = [
-  { id: 'dept_1', name: 'Engineering', parentId: null, level: 0 },
-  { id: 'dept_2', name: 'Product', parentId: null, level: 0 },
-  { id: 'dept_3', name: 'Marketing', parentId: null, level: 0 },
-  { id: 'dept_4', name: 'Sales', parentId: null, level: 0 },
-  { id: 'dept_5', name: 'Frontend', parentId: 'dept_1', level: 1 },
-  { id: 'dept_6', name: 'Backend', parentId: 'dept_1', level: 1 },
-  { id: 'dept_7', name: 'Design', parentId: 'dept_2', level: 1 },
+  { id: 'dept_1', name: '技术部', parentId: null, level: 0 },
+  { id: 'dept_2', name: '产品部', parentId: null, level: 0 },
+  { id: 'dept_3', name: '市场部', parentId: null, level: 0 },
+  { id: 'dept_4', name: '销售部', parentId: null, level: 0 },
+  { id: 'dept_5', name: '前端组', parentId: 'dept_1', level: 1 },
+  { id: 'dept_6', name: '后端组', parentId: 'dept_1', level: 1 },
+  { id: 'dept_7', name: '设计组', parentId: 'dept_2', level: 1 },
 ];
 
 async function getItem<T>(key: string): Promise<T[]> {
@@ -208,13 +208,13 @@ export async function deleteKeyResult(id: string): Promise<void> {
 export function getCycleOptions(): string[] {
   const year = new Date().getFullYear();
   return [
-    `${year} Q1`,
-    `${year} Q2`,
-    `${year} Q3`,
-    `${year} Q4`,
-    `${year} Annual`,
-    `${year + 1} Q1`,
-    `${year + 1} Q2`,
+    `${year} 第一季度`,
+    `${year} 第二季度`,
+    `${year} 第三季度`,
+    `${year} 第四季度`,
+    `${year} 年度`,
+    `${year + 1} 第一季度`,
+    `${year + 1} 第二季度`,
   ];
 }
 
@@ -230,10 +230,10 @@ export function getStatusColor(status: string): string {
 }
 
 export function getScoreLabel(score: number): string {
-  if (score === 1) return 'Excellent';
-  if (score === 0.7) return 'Good';
-  if (score === 0.3) return 'Fair';
-  return 'Not Met';
+  if (score === 1) return '完全达成';
+  if (score === 0.7) return '基本达成';
+  if (score === 0.3) return '部分达成';
+  return '未达成';
 }
 
 export function getScoreColor(score: number): string {
