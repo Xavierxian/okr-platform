@@ -31,6 +31,8 @@ export interface KeyResult {
   description: string;
   assigneeId: string | null;
   assigneeName: string;
+  collaboratorId: string | null;
+  collaboratorName: string;
   startDate: string;
   endDate: string;
   progress: number;
@@ -42,10 +44,17 @@ export interface KeyResult {
   createdAt: string;
 }
 
+export interface AssignedKRItem {
+  kr: KeyResult;
+  objective: Objective;
+}
+
 interface OKRContextValue {
   departments: Department[];
   objectives: Objective[];
   keyResults: KeyResult[];
+  assignedKRs: AssignedKRItem[];
+  collaboratingKRs: AssignedKRItem[];
   isLoading: boolean;
   refresh: () => Promise<void>;
   addObjective: (data: any) => Promise<Objective>;
@@ -65,25 +74,33 @@ export function OKRProvider({ children }: { children: ReactNode }) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
+  const [assignedKRs, setAssignedKRs] = useState<AssignedKRItem[]>([]);
+  const [collaboratingKRs, setCollaboratingKRs] = useState<AssignedKRItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const lastUserId = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [depsRes, objsRes, krsRes] = await Promise.all([
+      const [depsRes, objsRes, krsRes, assignedRes, collabRes] = await Promise.all([
         apiRequest("GET", "/api/departments"),
         apiRequest("GET", "/api/objectives"),
         apiRequest("GET", "/api/key-results"),
+        apiRequest("GET", "/api/key-results/assigned-to-me"),
+        apiRequest("GET", "/api/key-results/collaborating"),
       ]);
-      const [deps, objs, krs] = await Promise.all([
+      const [deps, objs, krs, assigned, collab] = await Promise.all([
         depsRes.json(),
         objsRes.json(),
         krsRes.json(),
+        assignedRes.json(),
+        collabRes.json(),
       ]);
       setDepartments(deps);
       setObjectives(objs);
       setKeyResults(krs);
+      setAssignedKRs(assigned);
+      setCollaboratingKRs(collab);
     } catch (err) {
       console.log("OKR refresh error:", err);
     } finally {
@@ -101,6 +118,8 @@ export function OKRProvider({ children }: { children: ReactNode }) {
         setDepartments([]);
         setObjectives([]);
         setKeyResults([]);
+        setAssignedKRs([]);
+        setCollaboratingKRs([]);
         setIsLoading(false);
       }
     }
@@ -145,20 +164,22 @@ export function OKRProvider({ children }: { children: ReactNode }) {
     const res = await apiRequest("PUT", `/api/key-results/${id}/progress`, { progress, note });
     const updatedKR = await res.json();
     setKeyResults(prev => prev.map(kr => kr.id === id ? updatedKR : kr));
-  }, []);
+    await refresh();
+  }, [refresh]);
 
   const submitScore = useCallback(async (id: string, score: number, note: string) => {
     const res = await apiRequest("PUT", `/api/key-results/${id}/score`, { score, note });
     const updatedKR = await res.json();
     setKeyResults(prev => prev.map(kr => kr.id === id ? updatedKR : kr));
-  }, []);
+    await refresh();
+  }, [refresh]);
 
   const value = useMemo(() => ({
-    departments, objectives, keyResults, isLoading,
+    departments, objectives, keyResults, assignedKRs, collaboratingKRs, isLoading,
     refresh, addObjective, editObjective, removeObjective,
     addKeyResult, editKeyResult, removeKeyResult,
     reportProgress, submitScore,
-  }), [departments, objectives, keyResults, isLoading, refresh, addObjective, editObjective, removeObjective, addKeyResult, editKeyResult, removeKeyResult, reportProgress, submitScore]);
+  }), [departments, objectives, keyResults, assignedKRs, collaboratingKRs, isLoading, refresh, addObjective, editObjective, removeObjective, addKeyResult, editKeyResult, removeKeyResult, reportProgress, submitScore]);
 
   return (
     <OKRContext.Provider value={value}>

@@ -85,19 +85,43 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
 
   const allObjs = await db.select().from(objectives);
   const allKRs = await db.select().from(keyResults);
-  const assignedObjIds = new Set(
-    allKRs.filter(kr => kr.assigneeId === user.id).map(kr => kr.objectiveId)
+  const relatedObjIds = new Set(
+    allKRs
+      .filter(kr => kr.assigneeId === user.id || kr.collaboratorId === user.id)
+      .map(kr => kr.objectiveId)
   );
 
   return allObjs.filter(obj => {
     if (deptIds.includes(obj.departmentId)) return true;
-    if (assignedObjIds.has(obj.id)) return true;
+    if (relatedObjIds.has(obj.id)) return true;
     if (obj.isCollaborative) {
       if ((obj.collaborativeDeptIds as string[] || []).some(id => deptIds.includes(id))) return true;
       if ((obj.collaborativeUserIds as string[] || []).includes(user.id)) return true;
     }
     return false;
   });
+}
+
+export async function getKRsAssignedToUser(userId: string): Promise<{ kr: KeyResult; objective: Objective }[]> {
+  const allKRs = await db.select().from(keyResults).where(eq(keyResults.assigneeId, userId));
+  if (allKRs.length === 0) return [];
+  const objIds = [...new Set(allKRs.map(kr => kr.objectiveId))];
+  const objs = await db.select().from(objectives).where(inArray(objectives.id, objIds));
+  const objMap = new Map(objs.map(o => [o.id, o]));
+  return allKRs
+    .filter(kr => objMap.has(kr.objectiveId))
+    .map(kr => ({ kr, objective: objMap.get(kr.objectiveId)! }));
+}
+
+export async function getKRsCollaboratingUser(userId: string): Promise<{ kr: KeyResult; objective: Objective }[]> {
+  const allKRs = await db.select().from(keyResults).where(eq(keyResults.collaboratorId, userId));
+  if (allKRs.length === 0) return [];
+  const objIds = [...new Set(allKRs.map(kr => kr.objectiveId))];
+  const objs = await db.select().from(objectives).where(inArray(objectives.id, objIds));
+  const objMap = new Map(objs.map(o => [o.id, o]));
+  return allKRs
+    .filter(kr => objMap.has(kr.objectiveId))
+    .map(kr => ({ kr, objective: objMap.get(kr.objectiveId)! }));
 }
 
 export async function getCollaborativeKRsForUser(userId: string): Promise<KeyResult[]> {
@@ -156,12 +180,16 @@ export async function createKeyResultInDb(data: {
   description: string;
   assigneeId: string | null;
   assigneeName: string;
+  collaboratorId?: string | null;
+  collaboratorName?: string;
   startDate: string;
   endDate: string;
   weight: number;
 }): Promise<KeyResult> {
   const [kr] = await db.insert(keyResults).values({
     ...data,
+    collaboratorId: data.collaboratorId || null,
+    collaboratorName: data.collaboratorName || "",
     progress: 0,
     status: "normal",
     selfScore: null,

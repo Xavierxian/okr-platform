@@ -167,10 +167,18 @@ export default function ObjectiveDetailScreen() {
                 </View>
                 {kr.description ? <Text style={styles.krDesc} numberOfLines={2}>{kr.description}</Text> : null}
                 <View style={styles.krMeta}>
-                  <View style={styles.krMetaItem}>
-                    <Ionicons name="person-outline" size={12} color={Colors.textSecondary} />
-                    <Text style={styles.krMetaText}>{kr.assigneeName}</Text>
-                  </View>
+                  {kr.assigneeName ? (
+                    <View style={styles.krMetaItem}>
+                      <Ionicons name="person-outline" size={12} color={Colors.textSecondary} />
+                      <Text style={styles.krMetaText}>{kr.assigneeName}</Text>
+                    </View>
+                  ) : null}
+                  {kr.collaboratorName ? (
+                    <View style={styles.krMetaItem}>
+                      <Ionicons name="people-outline" size={12} color={Colors.info} />
+                      <Text style={[styles.krMetaText, { color: Colors.info }]}>协同: {kr.collaboratorName}</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.krMetaItem}>
                     <Ionicons name="calendar-outline" size={12} color={Colors.textSecondary} />
                     <Text style={styles.krMetaText}>{new Date(kr.endDate).toLocaleDateString('zh-CN')}</Text>

@@ -50,6 +50,8 @@ export const keyResults = pgTable("key_results", {
   description: text("description").notNull().default(""),
   assigneeId: varchar("assignee_id"),
   assigneeName: text("assignee_name").notNull().default(""),
+  collaboratorId: varchar("collaborator_id"),
+  collaboratorName: text("collaborator_name").notNull().default(""),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   progress: integer("progress").notNull().default(0),

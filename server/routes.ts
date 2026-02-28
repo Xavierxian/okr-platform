@@ -9,6 +9,7 @@ import {
   getObjectivesForUser, getAllObjectives, createObjectiveInDb, updateObjectiveInDb, deleteObjectiveInDb,
   getKeyResultsForObjectives, getAllKeyResults, createKeyResultInDb, updateKeyResultInDb, deleteKeyResultInDb,
   updateKRProgressInDb, scoreKRInDb, getUsersByDepartment,
+  getKRsAssignedToUser, getKRsCollaboratingUser,
 } from "./storage";
 
 declare module "express-session" {
@@ -265,15 +266,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/key-results/assigned-to-me", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const results = await getKRsAssignedToUser(req.session.userId!);
+      return res.json(results);
+    } catch (err) {
+      return res.status(500).json({ message: "获取协同KR失败" });
+    }
+  });
+
+  app.get("/api/key-results/collaborating", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const results = await getKRsCollaboratingUser(req.session.userId!);
+      return res.json(results);
+    } catch (err) {
+      return res.status(500).json({ message: "获取跨部门协同KR失败" });
+    }
+  });
+
   app.post("/api/key-results", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { objectiveId, title, description, assigneeId, assigneeName, startDate, endDate, weight } = req.body;
+      const { objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, weight } = req.body;
       const kr = await createKeyResultInDb({
         objectiveId,
         title,
         description: description || "",
         assigneeId: assigneeId || null,
         assigneeName: assigneeName || "",
+        collaboratorId: collaboratorId || null,
+        collaboratorName: collaboratorName || "",
         startDate,
         endDate,
         weight: weight || 1,
@@ -325,10 +346,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/import/template", requireAuth, (_req: Request, res: Response) => {
-    const csvContent = `目标名称,目标描述,所属部门,周期,是否跨部门协同(是/否),KR名称,KR描述,执行人用户名,截止日期,权重
-提高产品质量,通过测试覆盖率和代码审查提升质量,技术部,2026 第一季度,否,单元测试覆盖率达到80%,提升核心模块测试覆盖,zhangsan,2026-03-31,1
-提高产品质量,通过测试覆盖率和代码审查提升质量,技术部,2026 第一季度,否,代码审查通过率95%,确保每次PR都经过审查,lisi,2026-03-31,1
-提升用户满意度,改善用户体验和客户服务质量,产品部,2026 第一季度,是,NPS分数提升到8.5,用户调查和反馈分析,wangwu,2026-03-31,1`;
+    const csvContent = `目标名称,目标描述,KR名称,KR描述
+提高产品质量,通过测试覆盖率和代码审查提升质量,单元测试覆盖率达到80%,提升核心模块测试覆盖
+提高产品质量,通过测试覆盖率和代码审查提升质量,代码审查通过率95%,确保每次PR都经过审查
+提升用户满意度,改善用户体验和客户服务质量,NPS分数提升到8.5,用户调查和反馈分析`;
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=okr_import_template.csv");
@@ -347,7 +368,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const allDepts = await getDepartments();
-      const allUsers = await getAllUsers();
+      let deptId = user.departmentId || "";
+      if (!deptId) {
+        if (user.role === "super_admin" && allDepts.length > 0) {
+          deptId = allDepts[0].id;
+        } else {
+          return res.status(400).json({ message: "您未分配部门，无法导入" });
+        }
+      }
+
+      const now = new Date();
+      const quarter = Math.ceil((now.getMonth() + 1) / 3);
+      const defaultCycle = `${now.getFullYear()} 第${quarter === 1 ? '一' : quarter === 2 ? '二' : quarter === 3 ? '三' : '四'}季度`;
+      const defaultEndDate = new Date(now.getFullYear(), quarter * 3, 0).toISOString().split("T")[0];
 
       const objectiveMap = new Map<string, any>();
       const errors: string[] = [];
@@ -358,44 +391,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const row = rows[i];
         const objTitle = row["目标名称"]?.trim();
         const objDesc = row["目标描述"]?.trim() || "";
-        const deptName = row["所属部门"]?.trim();
-        const cycle = row["周期"]?.trim();
-        const isCollab = row["是否跨部门协同(是/否)"]?.trim() === "是";
         const krTitle = row["KR名称"]?.trim();
         const krDesc = row["KR描述"]?.trim() || "";
-        const assigneeUsername = row["执行人用户名"]?.trim();
-        const endDate = row["截止日期"]?.trim();
-        const weight = parseFloat(row["权重"]) || 1;
 
         if (!objTitle) {
           errors.push(`第${i + 2}行: 目标名称不能为空`);
           continue;
         }
-        if (!deptName) {
-          errors.push(`第${i + 2}行: 所属部门不能为空`);
-          continue;
-        }
 
-        const dept = allDepts.find(d => d.name === deptName);
-        if (!dept) {
-          errors.push(`第${i + 2}行: 部门"${deptName}"不存在`);
-          continue;
-        }
-
-        if (user.role !== "super_admin" && dept.id !== user.departmentId) {
-          errors.push(`第${i + 2}行: 无权限为"${deptName}"创建目标`);
-          continue;
-        }
-
-        const objKey = `${objTitle}|${dept.id}|${cycle}`;
+        const objKey = `${objTitle}|${deptId}`;
         if (!objectiveMap.has(objKey)) {
           const obj = await createObjectiveInDb({
             title: objTitle,
             description: objDesc,
-            departmentId: dept.id,
-            cycle: cycle || "2026 第一季度",
+            departmentId: deptId,
+            cycle: defaultCycle,
             parentObjectiveId: null,
-            isCollaborative: isCollab,
+            isCollaborative: false,
             collaborativeDeptIds: [],
             collaborativeUserIds: [],
             createdBy: user.id,
@@ -406,25 +418,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (krTitle) {
           const obj = objectiveMap.get(objKey);
-          let assigneeId: string | null = null;
-          let assigneeName = assigneeUsername || "";
-          if (assigneeUsername) {
-            const assigneeUser = allUsers.find(u => u.username === assigneeUsername);
-            if (assigneeUser) {
-              assigneeId = assigneeUser.id;
-              assigneeName = assigneeUser.displayName;
-            }
-          }
-
           await createKeyResultInDb({
             objectiveId: obj.id,
             title: krTitle,
             description: krDesc,
-            assigneeId,
-            assigneeName,
-            startDate: new Date().toISOString().split("T")[0],
-            endDate: endDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-            weight,
+            assigneeId: null,
+            assigneeName: "",
+            startDate: now.toISOString().split("T")[0],
+            endDate: defaultEndDate,
+            weight: 1,
           });
           importedKRs++;
         }

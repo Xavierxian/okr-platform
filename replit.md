@@ -46,32 +46,53 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Layer
 - **Database**: PostgreSQL via Drizzle ORM (`shared/schema.ts`)
-- **Tables**: `users`, `departments`, `objectives` (with isCollaborative, collaborativeDeptIds), `key_results` (with progressHistory JSONB)
+- **Tables**: `users`, `departments`, `objectives` (with isCollaborative, collaborativeDeptIds), `key_results` (with progressHistory JSONB, collaboratorId, collaboratorName)
 - **Default departments**: 技术部, 产品部, 设计部, 市场部, 运营部, 人力资源部
 - **Schema Validation**: drizzle-zod for generating Zod schemas
 
 ### Key Data Models
 - **Department**: id, name, parentId, level (hierarchical)
 - **Objective**: id, title, description, departmentId, cycle, status, isCollaborative, collaborativeDeptIds, collaborativeUserIds, createdBy
-- **KeyResult**: id, objectiveId, title, description, assigneeId, assigneeName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory
+- **KeyResult**: id, objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory
 - **User**: id, username, password (hashed), displayName, role, departmentId
+
+### Dashboard Structure (3 Sections)
+1. **我的目标** — Objectives created by the user or belonging to user's department
+2. **本部门协同 KR** — KRs where the user is assigned as the executor (assigneeId). User can update progress, add notes, and self-evaluate.
+3. **跨部门协同 KR** — KRs where the user is set as the cross-department collaborator (collaboratorId). View-only: user can see progress and notes but cannot modify.
+
+### KR Collaboration Model
+- **Assignee (执行人)**: Single-select from same-department users only. Shown with radio buttons.
+- **Collaborator (跨部门协同人)**: Single-select from other-department users only. Shown with radio buttons in blue/info color.
+- Both are optional when creating a KR.
+
+### CSV Import (Simplified)
+- Template only requires: 目标名称, 目标描述, KR名称, KR描述
+- Other fields (department, cycle, dates) auto-filled from current user's department and current quarter
+- Same-named objectives are auto-merged
+- Assignee/collaborator can be set manually after import
 
 ### Key Screens
 - `app/login.tsx` — Login screen with username/password
-- `app/(tabs)/index.tsx` — Dashboard with progress ring, stats, at-risk items
+- `app/(tabs)/index.tsx` — Dashboard with 3 sections: 我的目标, 本部门协同KR, 跨部门协同KR
 - `app/(tabs)/okrs.tsx` — OKR list with department/cycle filters
 - `app/(tabs)/analytics.tsx` — Status distribution, department progress, score stats
 - `app/(tabs)/profile.tsx` — User info, stats, admin management links, logout
-- `app/objective/[id].tsx` — Objective detail with KR list and actions
+- `app/objective/[id].tsx` — Objective detail with KR list showing assignee and collaborator info
 - `app/create-objective.tsx` — Create objective (dept-scoped for non-admins)
-- `app/create-kr.tsx` — Create key result with user picker for assignee
-- `app/import-okr.tsx` — Import OKR data from CSV template
+- `app/create-kr.tsx` — Create key result with same-dept assignee picker and cross-dept collaborator picker
+- `app/import-okr.tsx` — Simplified CSV import (title + description only)
 - `app/update-progress.tsx` — Update KR progress
 - `app/score-kr.tsx` — Self-score KR
 - `app/manage-departments.tsx` — Department CRUD (admin only)
 - `app/manage-users.tsx` — User list and management (admin only)
 - `app/create-department.tsx` — Create new department
 - `app/create-user.tsx` — Create new user with role/department assignment
+
+### API Endpoints
+- `GET /api/key-results/assigned-to-me` — KRs where current user is assignee (returns {kr, objective} pairs)
+- `GET /api/key-results/collaborating` — KRs where current user is collaborator (returns {kr, objective} pairs)
+- Standard CRUD endpoints for objectives, key-results, departments, users
 
 ### Build & Development
 - **Development**: Two workflows — `Start Frontend` (Expo on port 8081) and `Start Backend` (Express on port 5000)

@@ -21,6 +21,8 @@ export default function CreateKRScreen() {
   const [description, setDescription] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUserName, setSelectedUserName] = useState('');
+  const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<string | null>(null);
+  const [selectedCollaboratorName, setSelectedCollaboratorName] = useState('');
   const [weight, setWeight] = useState('1');
   const [saving, setSaving] = useState(false);
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
@@ -35,29 +37,46 @@ export default function CreateKRScreen() {
   const [startDate] = useState(today.toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(endDefault.toISOString().split('T')[0]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await apiRequest("GET", "/api/users/all-safe");
-        const data = await res.json();
-        setAllUsers(data);
-      } catch {
-        setUserLoadError(true);
-      }
-      setLoadingUsers(false);
-    })();
-  }, []);
+  const loadUsers = async () => {
+    setUserLoadError(false);
+    setLoadingUsers(true);
+    try {
+      const res = await apiRequest("GET", "/api/users/all-safe");
+      const data = await res.json();
+      setAllUsers(data);
+    } catch {
+      setUserLoadError(true);
+    }
+    setLoadingUsers(false);
+  };
+
+  useEffect(() => { loadUsers(); }, []);
 
   const deptUsers = objective?.departmentId
     ? allUsers.filter(u => u.departmentId === objective.departmentId)
-    : allUsers;
-  const otherUsers = allUsers.filter(u => !deptUsers.some(du => du.id === u.id));
+    : [];
+  const otherDeptUsers = allUsers.filter(u => u.departmentId !== objective?.departmentId);
 
-  const canSave = title.trim().length > 0 && (selectedUserId || selectedUserName.trim().length > 0);
+  const canSave = title.trim().length > 0;
 
   const handleSelectUser = (u: SimpleUser) => {
-    setSelectedUserId(u.id);
-    setSelectedUserName(u.displayName);
+    if (selectedUserId === u.id) {
+      setSelectedUserId(null);
+      setSelectedUserName('');
+    } else {
+      setSelectedUserId(u.id);
+      setSelectedUserName(u.displayName);
+    }
+  };
+
+  const handleSelectCollaborator = (u: SimpleUser) => {
+    if (selectedCollaboratorId === u.id) {
+      setSelectedCollaboratorId(null);
+      setSelectedCollaboratorName('');
+    } else {
+      setSelectedCollaboratorId(u.id);
+      setSelectedCollaboratorName(u.displayName);
+    }
   };
 
   const handleSave = async () => {
@@ -70,6 +89,8 @@ export default function CreateKRScreen() {
       description: description.trim(),
       assigneeId: selectedUserId,
       assigneeName: selectedUserName.trim(),
+      collaboratorId: selectedCollaboratorId,
+      collaboratorName: selectedCollaboratorName.trim(),
       startDate,
       endDate,
       weight: parseFloat(weight) || 1,
@@ -113,75 +134,61 @@ export default function CreateKRScreen() {
           textAlignVertical="top"
         />
 
-        <Text style={styles.label}>执行人</Text>
+        <Text style={styles.label}>执行人（本部门，单选）</Text>
         {loadingUsers ? (
           <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 10 }} />
+        ) : userLoadError ? (
+          <Pressable onPress={loadUsers} style={styles.retryRow}>
+            <Ionicons name="alert-circle" size={16} color={Colors.danger} />
+            <Text style={styles.retryText}>加载用户列表失败，点击重试</Text>
+          </Pressable>
         ) : (
           <>
-            {deptUsers.length > 0 && (
-              <>
-                <Text style={styles.subLabel}>{deptName || '本部门'}（单选）</Text>
-                <View style={styles.chipRow}>
-                  {deptUsers.map(u => {
-                    const isSelected = selectedUserId === u.id;
-                    return (
-                      <Pressable
-                        key={u.id}
-                        onPress={() => handleSelectUser(u)}
-                        style={[styles.userChip, isSelected && styles.userChipActive]}
-                      >
-                        <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={16} color={isSelected ? Colors.white : Colors.textTertiary} />
-                        <Text style={[styles.userChipText, isSelected && styles.userChipTextActive]}>{u.displayName}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </>
+            {deptUsers.length > 0 ? (
+              <View style={styles.chipRow}>
+                {deptUsers.map(u => {
+                  const isSelected = selectedUserId === u.id;
+                  return (
+                    <Pressable
+                      key={u.id}
+                      onPress={() => handleSelectUser(u)}
+                      style={[styles.userChip, isSelected && styles.userChipActive]}
+                    >
+                      <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={16} color={isSelected ? Colors.white : Colors.textTertiary} />
+                      <Text style={[styles.userChipText, isSelected && styles.userChipTextActive]}>{u.displayName}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.emptyHint}>该部门暂无用户</Text>
             )}
-            {otherUsers.length > 0 && (
-              <>
-                <Text style={styles.subLabel}>其他部门</Text>
-                <View style={styles.chipRow}>
-                  {otherUsers.map(u => {
-                    const isSelected = selectedUserId === u.id;
-                    return (
-                      <Pressable
-                        key={u.id}
-                        onPress={() => handleSelectUser(u)}
-                        style={[styles.userChip, isSelected && styles.userChipActive]}
-                      >
-                        <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={16} color={isSelected ? Colors.white : Colors.textTertiary} />
-                        <Text style={[styles.userChipText, isSelected && styles.userChipTextActive]}>{u.displayName}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </>
-            )}
-            {userLoadError && (
-              <Pressable onPress={() => {
-                setUserLoadError(false);
-                setLoadingUsers(true);
-                (async () => {
-                  try {
-                    const res = await apiRequest("GET", "/api/users/all-safe");
-                    setAllUsers(await res.json());
-                  } catch { setUserLoadError(true); }
-                  setLoadingUsers(false);
-                })();
-              }} style={styles.retryRow}>
-                <Ionicons name="alert-circle" size={16} color={Colors.danger} />
-                <Text style={styles.retryText}>加载用户列表失败，点击重试</Text>
-              </Pressable>
-            )}
-            {!userLoadError && allUsers.length === 0 && !loadingUsers && (
-              <TextInput
-                style={styles.input}
-                value={selectedUserName}
-                onChangeText={(text) => { setSelectedUserName(text); setSelectedUserId(null); }}
-                placeholder="输入执行人名称"
-                placeholderTextColor={Colors.textTertiary}
-              />
+          </>
+        )}
+
+        <Text style={[styles.label, { marginTop: 20 }]}>跨部门协同人（其他部门，单选，可选）</Text>
+        {loadingUsers ? (
+          <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 10 }} />
+        ) : userLoadError ? null : (
+          <>
+            {otherDeptUsers.length > 0 ? (
+              <View style={styles.chipRow}>
+                {otherDeptUsers.map(u => {
+                  const isSelected = selectedCollaboratorId === u.id;
+                  return (
+                    <Pressable
+                      key={u.id}
+                      onPress={() => handleSelectCollaborator(u)}
+                      style={[styles.userChip, isSelected && styles.collabChipActive]}
+                    >
+                      <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={16} color={isSelected ? Colors.white : Colors.textTertiary} />
+                      <Text style={[styles.userChipText, isSelected && styles.collabChipTextActive]}>{u.displayName}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.emptyHint}>无其他部门用户</Text>
             )}
           </>
         )}
@@ -232,15 +239,17 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, color: Colors.text },
   form: { paddingHorizontal: 20, paddingBottom: 40, gap: 4 },
   label: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textSecondary, marginTop: 16, marginBottom: 8 },
-  subLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginBottom: 6, marginTop: 4 },
   input: { backgroundColor: Colors.backgroundTertiary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.text },
   textArea: { minHeight: 80 },
   row: { flexDirection: 'row', gap: 12 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   userChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.backgroundTertiary },
   userChipActive: { backgroundColor: Colors.primary },
+  collabChipActive: { backgroundColor: Colors.info },
   userChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
   userChipTextActive: { color: Colors.white },
+  collabChipTextActive: { color: Colors.white },
+  emptyHint: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textTertiary, paddingVertical: 8 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
   retryText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.danger },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 28 },

@@ -7,7 +7,7 @@ import { apiRequest, getApiUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
-const REQUIRED_HEADERS = ['目标名称', '所属部门'];
+const REQUIRED_HEADERS = ['目标名称'];
 
 function parseCSVLine(line: string): string[] {
   const fields: string[] = [];
@@ -238,7 +238,7 @@ export default function ImportOKRScreen() {
               <View key={idx} style={styles.previewRow}>
                 <Text style={styles.previewObj} numberOfLines={1}>O: {row['目标名称'] || '-'}</Text>
                 <Text style={styles.previewKR} numberOfLines={1}>KR: {row['KR名称'] || '-'}</Text>
-                <Text style={styles.previewMeta}>{row['所属部门'] || '-'} · {row['执行人用户名'] || '未指定'}</Text>
+                <Text style={styles.previewMeta}>{row['目标描述'] || '-'}</Text>
               </View>
             ))}
             {parsedRows.length > 5 && <Text style={styles.moreText}>还有 {parsedRows.length - 5} 行...</Text>}
@@ -277,11 +277,10 @@ export default function ImportOKRScreen() {
 
         <View style={styles.tipsCard}>
           <Text style={styles.tipsTitle}>模板说明</Text>
-          <Text style={styles.tipsItem}>• 目标名称、所属部门为必填项</Text>
-          <Text style={styles.tipsItem}>• 同名目标+同部门+同周期会自动合并</Text>
-          <Text style={styles.tipsItem}>• 执行人用户名需与系统用户名一致</Text>
-          <Text style={styles.tipsItem}>• 是否跨部门协同填"是"或"否"</Text>
-          <Text style={styles.tipsItem}>• 日期格式: YYYY-MM-DD</Text>
+          <Text style={styles.tipsItem}>• 只需填写：目标名称、目标描述、KR名称、KR描述</Text>
+          <Text style={styles.tipsItem}>• 所属部门、周期、截止日期等由系统自动填充</Text>
+          <Text style={styles.tipsItem}>• 同名目标会自动合并为一个目标</Text>
+          <Text style={styles.tipsItem}>• 导入后可在详情页手动指派执行人和协同人</Text>
         </View>
       </ScrollView>
     </View>
