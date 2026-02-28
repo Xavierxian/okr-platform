@@ -120,6 +120,16 @@ export default function ObjectiveDetailScreen() {
               <Ionicons name="business-outline" size={12} color={Colors.textSecondary} />
               <Text style={styles.deptBadgeText}>{dept?.name || '未知'}</Text>
             </View>
+            <View style={[styles.deptBadge, { backgroundColor: (objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6') + '20' }]}>
+              <Ionicons name={objective.okrType === '挑战型' ? "flash-outline" : "shield-checkmark-outline"} size={12} color={objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6'} />
+              <Text style={[styles.deptBadgeText, { color: objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6' }]}>{objective.okrType || '承诺型'}</Text>
+            </View>
+            {objective.linkedToParent && (
+              <View style={[styles.deptBadge, { backgroundColor: '#8B5CF6' + '20' }]}>
+                <Ionicons name="git-merge-outline" size={12} color="#8B5CF6" />
+                <Text style={[styles.deptBadgeText, { color: '#8B5CF6' }]}>关联上级</Text>
+              </View>
+            )}
             {objective.isCollaborative && (
               <View style={[styles.deptBadge, { backgroundColor: Colors.accent + '20' }]}>
                 <Ionicons name="people-outline" size={12} color={Colors.accent} />
@@ -194,6 +204,9 @@ export default function ObjectiveDetailScreen() {
                   </View>
                   <View style={[styles.statusChip, { backgroundColor: getStatusColor(kr.status) + '20' }]}>
                     <Text style={[styles.statusChipText, { color: getStatusColor(kr.status) }]}>{STATUS_LABELS[kr.status] || kr.status}</Text>
+                  </View>
+                  <View style={[styles.statusChip, { backgroundColor: (kr.okrType === '挑战型' ? '#F59E0B' : '#3B82F6') + '15' }]}>
+                    <Text style={[styles.statusChipText, { color: kr.okrType === '挑战型' ? '#F59E0B' : '#3B82F6' }]}>{kr.okrType || '承诺型'}</Text>
                   </View>
                 </View>
                 <View style={styles.krProgressRow}>

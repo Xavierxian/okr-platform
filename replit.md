@@ -52,8 +52,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Data Models
 - **Department**: id, name, parentId, level (hierarchical)
-- **Objective**: id, title, description, departmentId, cycle, status, isCollaborative, collaborativeDeptIds, collaborativeUserIds, createdBy
-- **KeyResult**: id, objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory
+- **Objective**: id, title, description, departmentId, cycle, status, isCollaborative, collaborativeDeptIds, collaborativeUserIds, createdBy, linkedToParent (boolean), okrType (text: '承诺型'|'挑战型')
+- **KeyResult**: id, objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory, okrType (text: '承诺型'|'挑战型')
 - **User**: id, username, password (hashed), displayName, role, departmentId
 
 ### Dashboard Structure (3 Sections)
@@ -76,8 +76,9 @@ Preferred communication style: Simple, everyday language.
 - `app/login.tsx` — Login screen with username/password
 - `app/(tabs)/index.tsx` — Dashboard with 3 sections: 我的目标, 本部门协同KR, 跨部门协同KR
 - `app/(tabs)/okrs.tsx` — OKR list with department/cycle filters
-- `app/(tabs)/analytics.tsx` — Status distribution, department progress, score stats
-- `app/(tabs)/profile.tsx` — User info, stats, admin management links, logout
+- `app/(tabs)/analytics.tsx` — Enhanced analytics with cycle/dept filtering, department rankings (progress, self-eval, completion rate), AI analysis
+- `app/(tabs)/profile.tsx` — User info, stats, admin management links, password change, logout
+- `app/change-password.tsx` — Password change screen
 - `app/objective/[id].tsx` — Objective detail with KR list showing assignee and collaborator info
 - `app/create-objective.tsx` — Create objective (dept-scoped for non-admins)
 - `app/create-kr.tsx` — Create key result with same-dept assignee picker and cross-dept collaborator picker
@@ -92,6 +93,9 @@ Preferred communication style: Simple, everyday language.
 ### API Endpoints
 - `GET /api/key-results/assigned-to-me` — KRs where current user is assignee (returns {kr, objective} pairs)
 - `GET /api/key-results/collaborating` — KRs where current user is collaborator (returns {kr, objective} pairs)
+- `PUT /api/auth/change-password` — Change password (requires currentPassword, newPassword)
+- `GET /api/analytics/department-rankings?cycle=` — Department rankings with progress, score, completion rate
+- `POST /api/analytics/ai-analysis` — AI-powered OKR analysis (requires cycle, optional departmentId)
 - Standard CRUD endpoints for objectives, key-results, departments, users
 
 ### Build & Development

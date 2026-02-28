@@ -37,6 +37,8 @@ export const objectives = pgTable("objectives", {
   isCollaborative: boolean("is_collaborative").notNull().default(false),
   collaborativeDeptIds: jsonb("collaborative_dept_ids").$type<string[]>().default([]),
   collaborativeUserIds: jsonb("collaborative_user_ids").$type<string[]>().default([]),
+  linkedToParent: boolean("linked_to_parent").notNull().default(false),
+  okrType: text("okr_type").notNull().default("承诺型"),
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -57,6 +59,7 @@ export const keyResults = pgTable("key_results", {
   progress: integer("progress").notNull().default(0),
   weight: real("weight").notNull().default(1),
   status: text("status").notNull().default("normal"),
+  okrType: text("okr_type").notNull().default("承诺型"),
   selfScore: real("self_score"),
   selfScoreNote: text("self_score_note").notNull().default(""),
   progressHistory: jsonb("progress_history").$type<ProgressEntry[]>().default([]),

@@ -34,6 +34,7 @@ export default function CreateKRScreen() {
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<string | null>(null);
   const [selectedCollaboratorName, setSelectedCollaboratorName] = useState('');
   const [weight, setWeight] = useState('1');
+  const [okrType, setOkrType] = useState<string>('承诺型');
   const [saving, setSaving] = useState(false);
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -53,6 +54,7 @@ export default function CreateKRScreen() {
       setSelectedCollaboratorId(existingKR.collaboratorId || null);
       setSelectedCollaboratorName(existingKR.collaboratorName || '');
       setWeight(String(existingKR.weight ?? 1));
+      setOkrType(existingKR.okrType || '承诺型');
       setEndDate(existingKR.endDate?.split('T')[0] || endDefault.toISOString().split('T')[0]);
       setHydrated(true);
     }
@@ -115,6 +117,7 @@ export default function CreateKRScreen() {
         collaboratorName: selectedCollaboratorName.trim(),
         endDate,
         weight: parseFloat(weight) || 1,
+        okrType,
       });
     } else {
       await addKeyResult({
@@ -128,6 +131,7 @@ export default function CreateKRScreen() {
         startDate,
         endDate,
         weight: parseFloat(weight) || 1,
+        okrType,
       });
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -228,6 +232,15 @@ export default function CreateKRScreen() {
           </>
         )}
 
+        <Text style={styles.label}>KR 类型</Text>
+        <View style={styles.chipRow}>
+          {['承诺型', '挑战型'].map(t => (
+            <Pressable key={t} onPress={() => setOkrType(t)} style={[styles.typeChip, okrType === t && styles.typeChipActive]}>
+              <Text style={[styles.typeChipText, okrType === t && styles.typeChipTextActive]}>{t}</Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>截止日期</Text>
@@ -287,6 +300,10 @@ const styles = StyleSheet.create({
   emptyHint: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textTertiary, paddingVertical: 8 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
   retryText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.danger },
+  typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.backgroundTertiary },
+  typeChipActive: { backgroundColor: Colors.primary },
+  typeChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
+  typeChipTextActive: { color: Colors.white },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 28 },
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },
 });

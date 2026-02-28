@@ -98,7 +98,6 @@ export default function LoginScreen() {
             )}
           </Pressable>
 
-          <Text style={styles.hint}>默认管理员账号: admin / admin123</Text>
         </View>
       </View>
     </KeyboardAvoidingView>

@@ -147,6 +147,8 @@ export async function createObjectiveInDb(data: {
   collaborativeDeptIds: string[];
   collaborativeUserIds?: string[];
   createdBy: string | null;
+  linkedToParent?: boolean;
+  okrType?: string;
 }): Promise<Objective> {
   const [obj] = await db.insert(objectives).values({
     ...data,
@@ -185,6 +187,7 @@ export async function createKeyResultInDb(data: {
   startDate: string;
   endDate: string;
   weight: number;
+  okrType?: string;
 }): Promise<KeyResult> {
   const [kr] = await db.insert(keyResults).values({
     ...data,

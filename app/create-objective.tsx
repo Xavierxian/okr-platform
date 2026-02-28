@@ -38,6 +38,8 @@ export default function CreateObjectiveScreen() {
   const [selectedDept, setSelectedDept] = useState(defaultDeptId);
   const [selectedCycle, setSelectedCycle] = useState(getCycleOptions()[0]);
   const [isCollaborative, setIsCollaborative] = useState(false);
+  const [linkedToParent, setLinkedToParent] = useState(false);
+  const [okrType, setOkrType] = useState<string>('承诺型');
   const [collabDeptIds, setCollabDeptIds] = useState<string[]>([]);
   const [collabUserIds, setCollabUserIds] = useState<string[]>([]);
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
@@ -52,6 +54,8 @@ export default function CreateObjectiveScreen() {
       setSelectedDept(existingObj.departmentId || defaultDeptId);
       setSelectedCycle(existingObj.cycle || getCycleOptions()[0]);
       setIsCollaborative(existingObj.isCollaborative || false);
+      setLinkedToParent(existingObj.linkedToParent || false);
+      setOkrType(existingObj.okrType || '承诺型');
       setCollabDeptIds(existingObj.collaborativeDeptIds || []);
       setCollabUserIds(existingObj.collaborativeUserIds || []);
       setHydrated(true);
@@ -95,6 +99,8 @@ export default function CreateObjectiveScreen() {
       cycle: selectedCycle,
       parentObjectiveId: null,
       isCollaborative,
+      linkedToParent,
+      okrType,
       collaborativeDeptIds: isCollaborative ? collabDeptIds : [],
       collaborativeUserIds: isCollaborative ? collabUserIds : [],
     };
@@ -144,6 +150,23 @@ export default function CreateObjectiveScreen() {
             ))}
           </View>
         </ScrollView>
+
+        <Text style={styles.label}>OKR 类型</Text>
+        <View style={styles.chipRow}>
+          {['承诺型', '挑战型'].map(t => (
+            <Pressable key={t} onPress={() => setOkrType(t)} style={[styles.chip, okrType === t && styles.chipActive]}>
+              <Text style={[styles.chipText, okrType === t && styles.chipTextActive]}>{t}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchLabel}>关联上级目标</Text>
+            <Text style={styles.switchDesc}>标记此目标是否承接上级目标</Text>
+          </View>
+          <Switch value={linkedToParent} onValueChange={setLinkedToParent} trackColor={{ false: Colors.backgroundTertiary, true: Colors.primary + '80' }} thumbColor={linkedToParent ? Colors.primary : Colors.textTertiary} />
+        </View>
 
         <View style={styles.switchRow}>
           <View style={{ flex: 1 }}>

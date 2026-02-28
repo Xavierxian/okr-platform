@@ -102,6 +102,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json({ user: safeUser });
   });
 
+  app.put("/api/auth/change-password", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "请填写当前密码和新密码" });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "新密码至少6个字符" });
+      }
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const valid = await verifyPassword(currentPassword, user.password);
+      if (!valid) return res.status(400).json({ message: "当前密码不正确" });
+      await updateUser(user.id, { password: newPassword } as any);
+      return res.json({ message: "密码修改成功" });
+    } catch (err) {
+      return res.status(500).json({ message: "修改密码失败" });
+    }
+  });
+
   app.get("/api/departments", requireAuth, async (_req: Request, res: Response) => {
     const deps = await getDepartments();
     return res.json(deps);
@@ -214,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getUser(req.session.userId!);
       if (!user) return res.status(401).json({ message: "用户不存在" });
-      const { title, description, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds } = req.body;
+      const { title, description, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds, linkedToParent, okrType } = req.body;
       if (user.role !== "super_admin" && departmentId !== user.departmentId) {
         return res.status(403).json({ message: "只能为自己部门创建目标" });
       }
@@ -228,6 +248,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         collaborativeDeptIds: collaborativeDeptIds || [],
         collaborativeUserIds: collaborativeUserIds || [],
         createdBy: req.session.userId || null,
+        linkedToParent: linkedToParent || false,
+        okrType: okrType || '承诺型',
       });
       return res.json(obj);
     } catch (err) {
@@ -286,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/key-results", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, weight } = req.body;
+      const { objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, weight, okrType } = req.body;
       const kr = await createKeyResultInDb({
         objectiveId,
         title,
@@ -298,6 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate,
         endDate,
         weight: weight || 1,
+        okrType: okrType || '承诺型',
       });
       return res.json(kr);
     } catch (err) {
@@ -441,6 +464,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error("Import error:", err);
       return res.status(500).json({ message: "导入失败" });
+    }
+  });
+
+  app.get("/api/analytics/department-rankings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const cycle = req.query.cycle as string || '';
+      const allDepts = await getDepartments();
+      const allObjs = await getAllObjectives();
+      const filteredObjs = cycle ? allObjs.filter(o => o.cycle === cycle) : allObjs;
+      const objIds = filteredObjs.map(o => o.id);
+      const allKRs = objIds.length > 0 ? await getKeyResultsForObjectives(objIds) : [];
+
+      const rankings = allDepts.map(dept => {
+        const deptObjs = filteredObjs.filter(o => o.departmentId === dept.id);
+        const deptKRs = allKRs.filter(kr => deptObjs.some(o => o.id === kr.objectiveId));
+        const avgProgress = deptKRs.length > 0 ? Math.round(deptKRs.reduce((s, kr) => s + kr.progress, 0) / deptKRs.length) : 0;
+        const scored = deptKRs.filter(kr => kr.selfScore !== null && kr.selfScore !== undefined);
+        const avgScore = scored.length > 0 ? parseFloat((scored.reduce((s, kr) => s + (kr.selfScore || 0), 0) / scored.length).toFixed(2)) : 0;
+        const completed = deptKRs.filter(kr => kr.status === 'completed').length;
+        const completionRate = deptKRs.length > 0 ? Math.round((completed / deptKRs.length) * 100) : 0;
+        return {
+          departmentId: dept.id,
+          departmentName: dept.name,
+          objectiveCount: deptObjs.length,
+          krCount: deptKRs.length,
+          avgProgress,
+          avgScore,
+          completionRate,
+          completedCount: completed,
+          behindCount: deptKRs.filter(kr => kr.status === 'behind').length,
+          overdueCount: deptKRs.filter(kr => kr.status === 'overdue').length,
+        };
+      }).filter(d => d.krCount > 0).sort((a, b) => b.avgProgress - a.avgProgress);
+
+      const cycles = [...new Set(allObjs.map(o => o.cycle))].sort();
+      return res.json({ rankings, cycles });
+    } catch (err) {
+      console.error("Rankings error:", err);
+      return res.status(500).json({ message: "获取排名失败" });
+    }
+  });
+
+  app.post("/api/analytics/ai-analysis", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { cycle, departmentId } = req.body;
+      if (!cycle) return res.status(400).json({ message: "请选择周期" });
+
+      const { generateOKRAnalysis } = await import("./ai-analysis");
+      const allDepts = await getDepartments();
+      let allObjs = await getAllObjectives();
+      allObjs = allObjs.filter(o => o.cycle === cycle);
+      if (departmentId) {
+        allObjs = allObjs.filter(o => o.departmentId === departmentId);
+      }
+      const objIds = allObjs.map(o => o.id);
+      const allKRs = objIds.length > 0 ? await getKeyResultsForObjectives(objIds) : [];
+
+      if (allObjs.length === 0) {
+        return res.json({ analysis: '该周期暂无OKR数据，无法生成分析报告。' });
+      }
+
+      const deptName = departmentId ? allDepts.find(d => d.id === departmentId)?.name : undefined;
+      const analysis = await generateOKRAnalysis({
+        objectives: allObjs,
+        keyResults: allKRs,
+        departments: allDepts,
+        cycle,
+        departmentName: deptName,
+      });
+      return res.json({ analysis });
+    } catch (err) {
+      console.error("AI analysis error:", err);
+      return res.status(500).json({ message: "AI 分析生成失败" });
     }
   });
 
