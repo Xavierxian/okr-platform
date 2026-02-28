@@ -77,13 +77,18 @@ export default function ManageDepartmentsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>部门管理</Text>
-        <Pressable
-          onPress={() => router.push('/create-department')}
-          style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}
-        >
-          <Ionicons name="add" size={20} color={Colors.white} />
-          <Text style={styles.addBtnText}>新增</Text>
-        </Pressable>
+        <View style={styles.headerRight}>
+          <Pressable
+            onPress={() => router.push('/create-department')}
+            style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="add" size={20} color={Colors.white} />
+            <Text style={styles.addBtnText}>新增</Text>
+          </Pressable>
+          <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            <Ionicons name="close" size={24} color={Colors.textSecondary} />
+          </Pressable>
+        </View>
       </View>
       <FlatList
         data={departments}
@@ -106,6 +111,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.card },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, color: Colors.text },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   addBtnText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.white },
   list: { paddingHorizontal: 20, paddingBottom: 40 },

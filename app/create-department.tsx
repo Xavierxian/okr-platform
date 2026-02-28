@@ -39,6 +39,9 @@ export default function CreateDepartmentScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>新增部门</Text>
+        <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+          <Ionicons name="close" size={24} color={Colors.textSecondary} />
+        </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>部门名称</Text>
@@ -88,7 +91,7 @@ export default function CreateDepartmentScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.card },
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, color: Colors.text },
   form: { paddingHorizontal: 20, paddingBottom: 40 },
   label: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textSecondary, marginTop: 16, marginBottom: 8 },
