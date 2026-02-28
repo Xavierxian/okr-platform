@@ -199,3 +199,37 @@ export async function scoreKRInDb(id: string, score: number, note: string): Prom
   }).where(eq(keyResults.id, id)).returning();
   return kr;
 }
+
+const DEFAULT_DEPARTMENTS = [
+  { name: "技术部", parentId: null, level: 0 },
+  { name: "产品部", parentId: null, level: 0 },
+  { name: "设计部", parentId: null, level: 0 },
+  { name: "市场部", parentId: null, level: 0 },
+  { name: "运营部", parentId: null, level: 0 },
+  { name: "人力资源部", parentId: null, level: 0 },
+];
+
+export async function seedDatabase(): Promise<void> {
+  const existingAdmin = await getUserByUsername("admin");
+  if (!existingAdmin) {
+    console.log("Seeding default admin user...");
+    await createUser({
+      id: "admin_1",
+      username: "admin",
+      password: "admin123",
+      displayName: "超级管理员",
+      role: "super_admin",
+      departmentId: null,
+    });
+    console.log("Default admin created: admin / admin123");
+  }
+
+  const existingDepts = await getDepartments();
+  if (existingDepts.length === 0) {
+    console.log("Seeding default departments...");
+    for (const dept of DEFAULT_DEPARTMENTS) {
+      await createDepartment(dept);
+    }
+    console.log(`Seeded ${DEFAULT_DEPARTMENTS.length} departments`);
+  }
+}
