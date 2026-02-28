@@ -15,8 +15,18 @@ interface SimpleUser {
 }
 
 export default function CreateKRScreen() {
-  const { objectiveId } = useLocalSearchParams<{ objectiveId: string }>();
-  const { addKeyResult, objectives, departments } = useOKR();
+  const { objectiveId, editId } = useLocalSearchParams<{ objectiveId: string; editId?: string }>();
+  const { addKeyResult, editKeyResult, objectives, keyResults, departments } = useOKR();
+
+  const existingKR = editId ? keyResults.find(kr => kr.id === editId) : null;
+  const isEditMode = !!editId;
+
+  const effectiveObjectiveId = existingKR?.objectiveId || objectiveId || '';
+
+  const today = new Date();
+  const endDefault = new Date(today);
+  endDefault.setMonth(endDefault.getMonth() + 3);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -28,14 +38,25 @@ export default function CreateKRScreen() {
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [userLoadError, setUserLoadError] = useState(false);
-
-  const objective = objectives.find(o => o.id === objectiveId);
-
-  const today = new Date();
-  const endDefault = new Date(today);
-  endDefault.setMonth(endDefault.getMonth() + 3);
   const [startDate] = useState(today.toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(endDefault.toISOString().split('T')[0]);
+  const [hydrated, setHydrated] = useState(!isEditMode);
+
+  const objective = objectives.find(o => o.id === effectiveObjectiveId);
+
+  useEffect(() => {
+    if (isEditMode && existingKR && !hydrated) {
+      setTitle(existingKR.title);
+      setDescription(existingKR.description || '');
+      setSelectedUserId(existingKR.assigneeId || null);
+      setSelectedUserName(existingKR.assigneeName || '');
+      setSelectedCollaboratorId(existingKR.collaboratorId || null);
+      setSelectedCollaboratorName(existingKR.collaboratorName || '');
+      setWeight(String(existingKR.weight ?? 1));
+      setEndDate(existingKR.endDate?.split('T')[0] || endDefault.toISOString().split('T')[0]);
+      setHydrated(true);
+    }
+  }, [isEditMode, existingKR, hydrated]);
 
   const loadUsers = async () => {
     setUserLoadError(false);
@@ -57,7 +78,7 @@ export default function CreateKRScreen() {
     : [];
   const otherDeptUsers = allUsers.filter(u => u.departmentId !== objective?.departmentId);
 
-  const canSave = title.trim().length > 0;
+  const canSave = title.trim().length > 0 && hydrated;
 
   const handleSelectUser = (u: SimpleUser) => {
     if (selectedUserId === u.id) {
@@ -83,18 +104,32 @@ export default function CreateKRScreen() {
     if (!canSave || saving) return;
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await addKeyResult({
-      objectiveId: objectiveId || '',
-      title: title.trim(),
-      description: description.trim(),
-      assigneeId: selectedUserId,
-      assigneeName: selectedUserName.trim(),
-      collaboratorId: selectedCollaboratorId,
-      collaboratorName: selectedCollaboratorName.trim(),
-      startDate,
-      endDate,
-      weight: parseFloat(weight) || 1,
-    });
+
+    if (isEditMode) {
+      await editKeyResult(existingKR.id, {
+        title: title.trim(),
+        description: description.trim(),
+        assigneeId: selectedUserId,
+        assigneeName: selectedUserName.trim(),
+        collaboratorId: selectedCollaboratorId,
+        collaboratorName: selectedCollaboratorName.trim(),
+        endDate,
+        weight: parseFloat(weight) || 1,
+      });
+    } else {
+      await addKeyResult({
+        objectiveId: effectiveObjectiveId,
+        title: title.trim(),
+        description: description.trim(),
+        assigneeId: selectedUserId,
+        assigneeName: selectedUserName.trim(),
+        collaboratorId: selectedCollaboratorId,
+        collaboratorName: selectedCollaboratorName.trim(),
+        startDate,
+        endDate,
+        weight: parseFloat(weight) || 1,
+      });
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
   };
@@ -106,7 +141,7 @@ export default function CreateKRScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>新建关键结果</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? '编辑关键结果' : '新建关键结果'}</Text>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <Ionicons name="close" size={24} color={Colors.textSecondary} />
         </Pressable>
@@ -119,7 +154,7 @@ export default function CreateKRScreen() {
           onChangeText={setTitle}
           placeholder="可衡量的关键成果"
           placeholderTextColor={Colors.textTertiary}
-          autoFocus
+          autoFocus={!isEditMode}
         />
 
         <Text style={styles.label}>描述</Text>
@@ -226,7 +261,7 @@ export default function CreateKRScreen() {
           ]}
         >
           <Ionicons name="checkmark" size={20} color={Colors.white} />
-          <Text style={styles.saveBtnText}>{saving ? '保存中...' : '创建关键结果'}</Text>
+          <Text style={styles.saveBtnText}>{saving ? '保存中...' : isEditMode ? '保存修改' : '创建关键结果'}</Text>
         </Pressable>
       </ScrollView>
     </View>

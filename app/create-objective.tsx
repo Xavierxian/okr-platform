@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
 import { apiRequest } from '@/lib/query-client';
@@ -24,9 +24,13 @@ function getCycleOptions(): string[] {
 }
 
 export default function CreateObjectiveScreen() {
-  const { departments, addObjective } = useOKR();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { departments, objectives, addObjective, editObjective } = useOKR();
   const { user } = useAuth();
   const isAdmin = user?.role === 'super_admin';
+
+  const existingObj = editId ? objectives.find(o => o.id === editId) : null;
+  const isEditMode = !!editId;
 
   const defaultDeptId = isAdmin ? (departments[0]?.id || '') : (user?.departmentId || departments[0]?.id || '');
   const [title, setTitle] = useState('');
@@ -39,6 +43,20 @@ export default function CreateObjectiveScreen() {
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [hydrated, setHydrated] = useState(!isEditMode);
+
+  useEffect(() => {
+    if (isEditMode && existingObj && !hydrated) {
+      setTitle(existingObj.title);
+      setDescription(existingObj.description || '');
+      setSelectedDept(existingObj.departmentId || defaultDeptId);
+      setSelectedCycle(existingObj.cycle || getCycleOptions()[0]);
+      setIsCollaborative(existingObj.isCollaborative || false);
+      setCollabDeptIds(existingObj.collaborativeDeptIds || []);
+      setCollabUserIds(existingObj.collaborativeUserIds || []);
+      setHydrated(true);
+    }
+  }, [isEditMode, existingObj, hydrated]);
 
   useEffect(() => {
     if (isCollaborative && allUsers.length === 0) {
@@ -53,7 +71,7 @@ export default function CreateObjectiveScreen() {
     }
   }, [isCollaborative]);
 
-  const canSave = title.trim().length > 0 && selectedDept && selectedCycle;
+  const canSave = title.trim().length > 0 && selectedDept && selectedCycle && hydrated;
 
   const toggleCollabDept = (id: string) => {
     setCollabDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
@@ -69,7 +87,8 @@ export default function CreateObjectiveScreen() {
     if (!canSave || saving) return;
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await addObjective({
+
+    const payload = {
       title: title.trim(),
       description: description.trim(),
       departmentId: selectedDept,
@@ -78,7 +97,13 @@ export default function CreateObjectiveScreen() {
       isCollaborative,
       collaborativeDeptIds: isCollaborative ? collabDeptIds : [],
       collaborativeUserIds: isCollaborative ? collabUserIds : [],
-    });
+    };
+
+    if (isEditMode) {
+      await editObjective(existingObj.id, payload);
+    } else {
+      await addObjective(payload);
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
   };
@@ -86,14 +111,14 @@ export default function CreateObjectiveScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>新建目标</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? '编辑目标' : '新建目标'}</Text>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <Ionicons name="close" size={24} color={Colors.textSecondary} />
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>目标名称</Text>
-        <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="你想要达成什么目标？" placeholderTextColor={Colors.textTertiary} autoFocus />
+        <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="你想要达成什么目标？" placeholderTextColor={Colors.textTertiary} autoFocus={!isEditMode} />
 
         <Text style={styles.label}>目标描述</Text>
         <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="描述目标的意义和达成价值" placeholderTextColor={Colors.textTertiary} multiline numberOfLines={3} textAlignVertical="top" />
@@ -166,7 +191,7 @@ export default function CreateObjectiveScreen() {
 
         <Pressable onPress={handleSave} disabled={!canSave || saving} style={({ pressed }) => [styles.saveBtn, { opacity: (!canSave || saving) ? 0.5 : pressed ? 0.9 : 1 }]}>
           <Ionicons name="checkmark" size={20} color={Colors.white} />
-          <Text style={styles.saveBtnText}>{saving ? '保存中...' : '创建目标'}</Text>
+          <Text style={styles.saveBtnText}>{saving ? '保存中...' : isEditMode ? '保存修改' : '创建目标'}</Text>
         </Pressable>
       </ScrollView>
     </View>

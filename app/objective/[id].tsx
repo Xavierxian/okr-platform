@@ -96,6 +96,15 @@ export default function ObjectiveDetailScreen() {
           <Ionicons name="chevron-back" size={28} color={Colors.text} />
         </Pressable>
         <View style={{ flex: 1 }} />
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push({ pathname: '/create-objective', params: { editId: objective.id } });
+          }}
+          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, marginRight: 16 })}
+        >
+          <Ionicons name="pencil-outline" size={22} color={Colors.primary} />
+        </Pressable>
         <Pressable onPress={handleDeleteObjective} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <Ionicons name="trash-outline" size={22} color={Colors.danger} />
         </Pressable>
@@ -202,6 +211,13 @@ export default function ObjectiveDetailScreen() {
                   </View>
                 )}
                 <View style={styles.krActions}>
+                  <Pressable
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/create-kr', params: { objectiveId: objective.id, editId: kr.id } }); }}
+                    style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
+                  >
+                    <Ionicons name="pencil-outline" size={16} color={Colors.info} />
+                    <Text style={[styles.actionText, { color: Colors.info }]}>编辑</Text>
+                  </Pressable>
                   <Pressable
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/update-progress', params: { krId: kr.id } }); }}
                     style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
