@@ -39,10 +39,16 @@ export default function ProfileScreen() {
   }, [keyResults]);
 
   const handleLogout = () => {
-    Alert.alert('退出登录', '确定要退出当前账号吗？', [
-      { text: '取消', style: 'cancel' },
-      { text: '退出', style: 'destructive', onPress: logout },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('确定要退出当前账号吗？')) {
+        logout();
+      }
+    } else {
+      Alert.alert('退出登录', '确定要退出当前账号吗？', [
+        { text: '取消', style: 'cancel' },
+        { text: '退出', style: 'destructive', onPress: logout },
+      ]);
+    }
   };
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;

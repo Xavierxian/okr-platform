@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { StyleSheet, Text, View, Pressable, ScrollView, Alert, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -6,9 +6,6 @@ import { useOKR } from '@/lib/okr-context';
 import { apiRequest, getApiUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
-import { Linking } from 'react-native';
 
 const REQUIRED_HEADERS = ['目标名称', '所属部门'];
 
@@ -60,6 +57,60 @@ function parseCSV(text: string): { rows: Record<string, string>[]; error: string
   return { rows, error: null };
 }
 
+function WebFileInput({ onFileRead }: { onFileRead: (name: string, content: string) => void }) {
+  if (Platform.OS !== 'web') return null;
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleClick = () => {
+    if (inputRef.current) inputRef.current.click();
+  };
+
+  const handleChange = (e: any) => {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      onFileRead(file.name, text);
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
+
+  return (
+    <View>
+      <input
+        ref={inputRef as any}
+        type="file"
+        accept=".csv,text/csv,text/comma-separated-values"
+        onChange={handleChange}
+        style={{ display: 'none' }}
+      />
+      <Pressable onPress={handleClick} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
+        <Ionicons name="document-outline" size={18} color={Colors.primary} />
+        <Text style={styles.actionBtnText}>选择 CSV 文件</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+async function pickFileNative(): Promise<{ name: string; content: string } | null> {
+  try {
+    const DocumentPicker = await import('expo-document-picker');
+    const FileSystem = await import('expo-file-system');
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', '*/*'],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return null;
+    const file = result.assets[0];
+    const content = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.UTF8 });
+    return { name: file.name, content };
+  } catch {
+    return null;
+  }
+}
+
 export default function ImportOKRScreen() {
   const { refresh } = useOKR();
   const [importing, setImporting] = useState(false);
@@ -70,45 +121,43 @@ export default function ImportOKRScreen() {
 
   const handleDownloadTemplate = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const url = new URL('/api/import/template', getApiUrl()).toString();
-    if (Platform.OS === 'web') {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'okr_import_template.csv';
-      link.click();
-    } else {
-      await Linking.openURL(url);
-    }
-  }, []);
-
-  const handlePickFile = useCallback(async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', '*/*'],
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets?.[0]) return;
-
-      const file = result.assets[0];
-      setFileName(file.name);
-
-      let content = '';
+      const res = await apiRequest("GET", "/api/import/template");
+      const text = await res.text();
       if (Platform.OS === 'web') {
-        const response = await fetch(file.uri);
-        content = await response.text();
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + text], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'okr_import_template.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       } else {
-        content = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.UTF8 });
+        const { Linking } = await import('react-native');
+        const url = new URL('/api/import/template', getApiUrl()).toString();
+        await Linking.openURL(url);
       }
-
-      const { rows, error } = parseCSV(content);
-      setParsedRows(rows);
-      setParseError(error);
-      setResult(null);
-    } catch (err) {
-      Alert.alert('错误', '文件读取失败');
+    } catch {
+      Alert.alert('错误', '下载模板失败');
     }
   }, []);
+
+  const processFileContent = useCallback((name: string, content: string) => {
+    setFileName(name);
+    const { rows, error } = parseCSV(content);
+    setParsedRows(rows);
+    setParseError(error);
+    setResult(null);
+  }, []);
+
+  const handlePickFileNative = useCallback(async () => {
+    const fileData = await pickFileNative();
+    if (!fileData) return;
+    processFileContent(fileData.name, fileData.content);
+  }, [processFileContent]);
 
   const handleImport = useCallback(async () => {
     if (parsedRows.length === 0) return;
@@ -153,10 +202,15 @@ export default function ImportOKRScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.stepTitle}>选择文件</Text>
             <Text style={styles.stepDesc}>选择填写好的 CSV 文件上传</Text>
-            <Pressable onPress={handlePickFile} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
-              <Ionicons name="document-outline" size={18} color={Colors.primary} />
-              <Text style={styles.actionBtnText}>{fileName || '选择 CSV 文件'}</Text>
-            </Pressable>
+            {Platform.OS === 'web' ? (
+              <WebFileInput onFileRead={processFileContent} />
+            ) : (
+              <Pressable onPress={handlePickFileNative} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
+                <Ionicons name="document-outline" size={18} color={Colors.primary} />
+                <Text style={styles.actionBtnText}>{fileName || '选择 CSV 文件'}</Text>
+              </Pressable>
+            )}
+            {fileName ? <Text style={styles.fileInfo}>已选择: {fileName}</Text> : null}
             {parseError && (
               <View style={styles.parseErrorRow}>
                 <Ionicons name="alert-circle" size={14} color={Colors.danger} />
