@@ -122,6 +122,16 @@ function RootLayoutNav() {
         }}
       />
       <Stack.Screen
+        name="manage-cycles"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.9],
+          sheetGrabberVisible: true,
+          headerShown: false,
+          contentStyle: { backgroundColor: "#FFFFFF" },
+        }}
+      />
+      <Stack.Screen
         name="import-okr"
         options={{
           presentation: "formSheet",

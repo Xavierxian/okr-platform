@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, View, FlatList, Pressable, Alert, TextInput } from 'react-native';
+import { StyleSheet, Text, View, FlatList, Pressable, Alert, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
@@ -14,18 +14,23 @@ export default function ManageDepartmentsScreen() {
 
   const handleDelete = (id: string, name: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('删除部门', `确定删除"${name}"吗？该操作不可恢复。`, [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除', style: 'destructive',
-        onPress: async () => {
-          try {
-            await apiRequest("DELETE", `/api/departments/${id}`);
-            await refresh();
-          } catch { Alert.alert('错误', '删除失败'); }
-        },
-      },
-    ]);
+    const doDelete = async () => {
+      try {
+        await apiRequest("DELETE", `/api/departments/${id}`);
+        await refresh();
+      } catch {
+        if (Platform.OS === 'web') window.alert('删除失败');
+        else Alert.alert('错误', '删除失败');
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`确定删除部门"${name}"吗？该操作不可恢复。`)) doDelete();
+    } else {
+      Alert.alert('删除部门', `确定删除"${name}"吗？该操作不可恢复。`, [
+        { text: '取消', style: 'cancel' },
+        { text: '删除', style: 'destructive', onPress: doDelete },
+      ]);
+    }
   };
 
   const handleEdit = async (id: string) => {

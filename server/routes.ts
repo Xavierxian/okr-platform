@@ -10,6 +10,7 @@ import {
   getKeyResultsForObjectives, getAllKeyResults, createKeyResultInDb, updateKeyResultInDb, deleteKeyResultInDb,
   updateKRProgressInDb, scoreKRInDb, getUsersByDepartment,
   getKRsAssignedToUser, getKRsCollaboratingUser,
+  getCycles, createCycle, updateCycle, deleteCycle,
 } from "./storage";
 
 declare module "express-session" {
@@ -152,6 +153,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ message: "已删除" });
     } catch (err) {
       return res.status(500).json({ message: "删除部门失败" });
+    }
+  });
+
+  app.get("/api/cycles", requireAuth, async (_req: Request, res: Response) => {
+    const all = await getCycles();
+    return res.json(all);
+  });
+
+  app.post("/api/cycles", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { name, sortOrder } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "周期名称不能为空" });
+      const cycle = await createCycle(name.trim(), sortOrder ?? 0);
+      return res.json(cycle);
+    } catch (err: any) {
+      if (err?.code === '23505') return res.status(400).json({ message: "该周期名称已存在" });
+      return res.status(500).json({ message: "创建周期失败" });
+    }
+  });
+
+  app.put("/api/cycles/:id", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { name, sortOrder } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name.trim();
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      const cycle = await updateCycle(req.params.id, updates);
+      return res.json(cycle);
+    } catch (err: any) {
+      if (err?.code === '23505') return res.status(400).json({ message: "该周期名称已存在" });
+      return res.status(500).json({ message: "更新周期失败" });
+    }
+  });
+
+  app.delete("/api/cycles/:id", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      await deleteCycle(req.params.id);
+      return res.json({ message: "已删除" });
+    } catch (err) {
+      return res.status(500).json({ message: "删除周期失败" });
     }
   });
 

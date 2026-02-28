@@ -121,6 +121,13 @@ export default function ProfileScreen() {
               <Text style={styles.settingText}>用户管理</Text>
               <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
             </Pressable>
+            <Pressable onPress={() => router.push('/manage-cycles')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
+              <View style={[styles.settingIcon, { backgroundColor: Colors.warning + '20' }]}>
+                <Ionicons name="calendar-outline" size={18} color={Colors.warning} />
+              </View>
+              <Text style={styles.settingText}>周期管理</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            </Pressable>
           </Animated.View>
         )}
 

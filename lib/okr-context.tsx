@@ -44,6 +44,13 @@ export interface KeyResult {
   createdAt: string;
 }
 
+export interface Cycle {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface AssignedKRItem {
   kr: KeyResult;
   objective: Objective;
@@ -51,6 +58,7 @@ export interface AssignedKRItem {
 
 interface OKRContextValue {
   departments: Department[];
+  cycles: Cycle[];
   objectives: Objective[];
   keyResults: KeyResult[];
   assignedKRs: AssignedKRItem[];
@@ -72,6 +80,7 @@ const OKRContext = createContext<OKRContextValue | null>(null);
 export function OKRProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [cycles, setCycles] = useState<Cycle[]>([]);
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [keyResults, setKeyResults] = useState<KeyResult[]>([]);
   const [assignedKRs, setAssignedKRs] = useState<AssignedKRItem[]>([]);
@@ -82,21 +91,24 @@ export function OKRProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [depsRes, objsRes, krsRes, assignedRes, collabRes] = await Promise.all([
+      const [depsRes, cyclesRes, objsRes, krsRes, assignedRes, collabRes] = await Promise.all([
         apiRequest("GET", "/api/departments"),
+        apiRequest("GET", "/api/cycles"),
         apiRequest("GET", "/api/objectives"),
         apiRequest("GET", "/api/key-results"),
         apiRequest("GET", "/api/key-results/assigned-to-me"),
         apiRequest("GET", "/api/key-results/collaborating"),
       ]);
-      const [deps, objs, krs, assigned, collab] = await Promise.all([
+      const [deps, cyc, objs, krs, assigned, collab] = await Promise.all([
         depsRes.json(),
+        cyclesRes.json(),
         objsRes.json(),
         krsRes.json(),
         assignedRes.json(),
         collabRes.json(),
       ]);
       setDepartments(deps);
+      setCycles(cyc);
       setObjectives(objs);
       setKeyResults(krs);
       setAssignedKRs(assigned);
@@ -116,6 +128,7 @@ export function OKRProvider({ children }: { children: ReactNode }) {
         refresh();
       } else {
         setDepartments([]);
+        setCycles([]);
         setObjectives([]);
         setKeyResults([]);
         setAssignedKRs([]);
@@ -175,11 +188,11 @@ export function OKRProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const value = useMemo(() => ({
-    departments, objectives, keyResults, assignedKRs, collaboratingKRs, isLoading,
+    departments, cycles, objectives, keyResults, assignedKRs, collaboratingKRs, isLoading,
     refresh, addObjective, editObjective, removeObjective,
     addKeyResult, editKeyResult, removeKeyResult,
     reportProgress, submitScore,
-  }), [departments, objectives, keyResults, assignedKRs, collaboratingKRs, isLoading, refresh, addObjective, editObjective, removeObjective, addKeyResult, editKeyResult, removeKeyResult, reportProgress, submitScore]);
+  }), [departments, cycles, objectives, keyResults, assignedKRs, collaboratingKRs, isLoading, refresh, addObjective, editObjective, removeObjective, addKeyResult, editKeyResult, removeKeyResult, reportProgress, submitScore]);
 
   return (
     <OKRContext.Provider value={value}>

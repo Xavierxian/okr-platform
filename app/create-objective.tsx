@@ -15,17 +15,9 @@ interface SimpleUser {
   departmentId: string | null;
 }
 
-function getCycleOptions(): string[] {
-  const year = new Date().getFullYear();
-  return [
-    `${year} 第一季度`, `${year} 第二季度`, `${year} 第三季度`, `${year} 第四季度`,
-    `${year} 年度`, `${year + 1} 第一季度`, `${year + 1} 第二季度`,
-  ];
-}
-
 export default function CreateObjectiveScreen() {
   const { editId } = useLocalSearchParams<{ editId?: string }>();
-  const { departments, objectives, addObjective, editObjective } = useOKR();
+  const { departments, cycles, objectives, addObjective, editObjective } = useOKR();
   const { user } = useAuth();
   const isAdmin = user?.role === 'super_admin';
 
@@ -36,7 +28,8 @@ export default function CreateObjectiveScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedDept, setSelectedDept] = useState(defaultDeptId);
-  const [selectedCycle, setSelectedCycle] = useState(getCycleOptions()[0]);
+  const cycleOptions = cycles.map(c => c.name);
+  const [selectedCycle, setSelectedCycle] = useState(cycleOptions[0] || '');
   const [isCollaborative, setIsCollaborative] = useState(false);
   const [linkedToParent, setLinkedToParent] = useState(false);
   const [okrType, setOkrType] = useState<string>('承诺型');
@@ -48,11 +41,17 @@ export default function CreateObjectiveScreen() {
   const [hydrated, setHydrated] = useState(!isEditMode);
 
   useEffect(() => {
+    if (!isEditMode && !selectedCycle && cycleOptions.length > 0) {
+      setSelectedCycle(cycleOptions[0]);
+    }
+  }, [cycleOptions, isEditMode, selectedCycle]);
+
+  useEffect(() => {
     if (isEditMode && existingObj && !hydrated) {
       setTitle(existingObj.title);
       setDescription(existingObj.description || '');
       setSelectedDept(existingObj.departmentId || defaultDeptId);
-      setSelectedCycle(existingObj.cycle || getCycleOptions()[0]);
+      setSelectedCycle(existingObj.cycle || cycleOptions[0] || '');
       setIsCollaborative(existingObj.isCollaborative || false);
       setLinkedToParent(existingObj.linkedToParent || false);
       setOkrType(existingObj.okrType || '承诺型');
@@ -143,7 +142,7 @@ export default function CreateObjectiveScreen() {
         <Text style={styles.label}>所属周期</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
           <View style={styles.chipRow}>
-            {getCycleOptions().map(cycle => (
+            {cycleOptions.map(cycle => (
               <Pressable key={cycle} onPress={() => setSelectedCycle(cycle)} style={[styles.chip, selectedCycle === cycle && styles.chipActive]}>
                 <Text style={[styles.chipText, selectedCycle === cycle && styles.chipTextActive]}>{cycle}</Text>
               </Pressable>

@@ -1,8 +1,8 @@
-import { eq, or, inArray, and } from "drizzle-orm";
+import { eq, or, inArray, and, asc } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, departments, objectives, keyResults,
-  type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry,
+  users, departments, objectives, keyResults, cycles,
+  type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry, type Cycle,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -284,4 +284,39 @@ export async function seedDatabase(): Promise<void> {
     }
     console.log(`Seeded ${DEFAULT_DEPARTMENTS.length} departments`);
   }
+
+  const existingCycles = await getCycles();
+  if (existingCycles.length === 0) {
+    console.log("Seeding default cycles...");
+    const year = new Date().getFullYear();
+    const defaultCycles = [
+      { name: `${year} 第一季度`, sortOrder: 1 },
+      { name: `${year} 第二季度`, sortOrder: 2 },
+      { name: `${year} 第三季度`, sortOrder: 3 },
+      { name: `${year} 第四季度`, sortOrder: 4 },
+      { name: `${year} 年度`, sortOrder: 5 },
+    ];
+    for (const c of defaultCycles) {
+      await createCycle(c.name, c.sortOrder);
+    }
+    console.log(`Seeded ${defaultCycles.length} cycles`);
+  }
+}
+
+export async function getCycles(): Promise<Cycle[]> {
+  return db.select().from(cycles).orderBy(asc(cycles.sortOrder));
+}
+
+export async function createCycle(name: string, sortOrder: number): Promise<Cycle> {
+  const [cycle] = await db.insert(cycles).values({ name, sortOrder }).returning();
+  return cycle;
+}
+
+export async function updateCycle(id: string, data: { name?: string; sortOrder?: number }): Promise<Cycle | undefined> {
+  const [cycle] = await db.update(cycles).set(data).where(eq(cycles.id, id)).returning();
+  return cycle;
+}
+
+export async function deleteCycle(id: string): Promise<void> {
+  await db.delete(cycles).where(eq(cycles.id, id));
 }

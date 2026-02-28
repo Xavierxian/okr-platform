@@ -46,8 +46,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Layer
 - **Database**: PostgreSQL via Drizzle ORM (`shared/schema.ts`)
-- **Tables**: `users`, `departments`, `objectives` (with isCollaborative, collaborativeDeptIds), `key_results` (with progressHistory JSONB, collaboratorId, collaboratorName)
+- **Tables**: `users`, `departments`, `cycles`, `objectives` (with isCollaborative, collaborativeDeptIds), `key_results` (with progressHistory JSONB, collaboratorId, collaboratorName)
 - **Default departments**: 技术部, 产品部, 设计部, 市场部, 运营部, 人力资源部
+- **Default cycles**: Auto-seeded with current year's 4 quarters + 年度
 - **Schema Validation**: drizzle-zod for generating Zod schemas
 
 ### Key Data Models
@@ -87,6 +88,7 @@ Preferred communication style: Simple, everyday language.
 - `app/create-objective.tsx` — Create objective (dept-scoped for non-admins)
 - `app/create-kr.tsx` — Create key result with same-dept assignee picker and cross-dept collaborator picker
 - `app/import-okr.tsx` — Enhanced batch import with CSV template or online editable table
+- `app/manage-cycles.tsx` — Cycle CRUD management (admin only)
 - `app/update-progress.tsx` — Update KR progress
 - `app/score-kr.tsx` — Self-score KR
 - `app/manage-departments.tsx` — Department CRUD (admin only)
