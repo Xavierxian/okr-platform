@@ -36,6 +36,7 @@ export const objectives = pgTable("objectives", {
   status: text("status").notNull().default("active"),
   isCollaborative: boolean("is_collaborative").notNull().default(false),
   collaborativeDeptIds: jsonb("collaborative_dept_ids").$type<string[]>().default([]),
+  collaborativeUserIds: jsonb("collaborative_user_ids").$type<string[]>().default([]),
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
 });

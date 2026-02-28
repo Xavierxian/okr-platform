@@ -19,6 +19,7 @@ export interface Objective {
   status: string;
   isCollaborative: boolean;
   collaborativeDeptIds: string[];
+  collaborativeUserIds: string[];
   createdBy: string | null;
   createdAt: string;
 }

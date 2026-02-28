@@ -95,9 +95,14 @@ export default function OKRsScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
         <Text style={styles.headerTitle}>目标管理</Text>
-        <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
-          <Ionicons name="add" size={24} color={Colors.white} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => router.push('/import-okr')} style={({ pressed }) => [styles.importBtn, { opacity: pressed ? 0.8 : 1 }]}>
+            <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} />
+          </Pressable>
+          <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
+            <Ionicons name="add" size={24} color={Colors.white} />
+          </Pressable>
+        </View>
       </View>
 
       {(usedDepts.length > 0 || cycles.length > 0) && (
@@ -160,6 +165,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12 },
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, color: Colors.text },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  importBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary + '20', alignItems: 'center', justifyContent: 'center' },
   addBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   filters: { paddingBottom: 12 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.backgroundTertiary },

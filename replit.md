@@ -52,8 +52,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Data Models
 - **Department**: id, name, parentId, level (hierarchical)
-- **Objective**: id, title, description, departmentId, cycle, status, isCollaborative, collaborativeDeptIds, createdBy
-- **KeyResult**: id, objectiveId, title, description, assigneeName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory
+- **Objective**: id, title, description, departmentId, cycle, status, isCollaborative, collaborativeDeptIds, collaborativeUserIds, createdBy
+- **KeyResult**: id, objectiveId, title, description, assigneeId, assigneeName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory
 - **User**: id, username, password (hashed), displayName, role, departmentId
 
 ### Key Screens
@@ -64,7 +64,8 @@ Preferred communication style: Simple, everyday language.
 - `app/(tabs)/profile.tsx` — User info, stats, admin management links, logout
 - `app/objective/[id].tsx` — Objective detail with KR list and actions
 - `app/create-objective.tsx` — Create objective (dept-scoped for non-admins)
-- `app/create-kr.tsx` — Create key result
+- `app/create-kr.tsx` — Create key result with user picker for assignee
+- `app/import-okr.tsx` — Import OKR data from CSV template
 - `app/update-progress.tsx` — Update KR progress
 - `app/score-kr.tsx` — Self-score KR
 - `app/manage-departments.tsx` — Department CRUD (admin only)

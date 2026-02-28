@@ -121,6 +121,16 @@ function RootLayoutNav() {
           contentStyle: { backgroundColor: "#1E293B" },
         }}
       />
+      <Stack.Screen
+        name="import-okr"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.9],
+          sheetGrabberVisible: true,
+          headerShown: false,
+          contentStyle: { backgroundColor: "#1E293B" },
+        }}
+      />
       <Stack.Screen name="login" options={{ headerShown: false }} />
     </Stack>
   );

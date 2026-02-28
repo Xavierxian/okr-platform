@@ -1,22 +1,25 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
+import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
+
+interface SimpleUser {
+  id: string;
+  username: string;
+  displayName: string;
+  departmentId: string | null;
+}
 
 function getCycleOptions(): string[] {
   const year = new Date().getFullYear();
   return [
-    `${year} 第一季度`,
-    `${year} 第二季度`,
-    `${year} 第三季度`,
-    `${year} 第四季度`,
-    `${year} 年度`,
-    `${year + 1} 第一季度`,
-    `${year + 1} 第二季度`,
+    `${year} 第一季度`, `${year} 第二季度`, `${year} 第三季度`, `${year} 第四季度`,
+    `${year} 年度`, `${year + 1} 第一季度`, `${year + 1} 第二季度`,
   ];
 }
 
@@ -32,15 +35,35 @@ export default function CreateObjectiveScreen() {
   const [selectedCycle, setSelectedCycle] = useState(getCycleOptions()[0]);
   const [isCollaborative, setIsCollaborative] = useState(false);
   const [collabDeptIds, setCollabDeptIds] = useState<string[]>([]);
+  const [collabUserIds, setCollabUserIds] = useState<string[]>([]);
+  const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isCollaborative && allUsers.length === 0) {
+      setLoadingUsers(true);
+      (async () => {
+        try {
+          const res = await apiRequest("GET", "/api/users/all-safe");
+          setAllUsers(await res.json());
+        } catch {}
+        setLoadingUsers(false);
+      })();
+    }
+  }, [isCollaborative]);
 
   const canSave = title.trim().length > 0 && selectedDept && selectedCycle;
 
   const toggleCollabDept = (id: string) => {
-    setCollabDeptIds(prev =>
-      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
-    );
+    setCollabDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
   };
+
+  const toggleCollabUser = (id: string) => {
+    setCollabUserIds(prev => prev.includes(id) ? prev.filter(u => u !== id) : [...prev, id]);
+  };
+
+  const otherDeptUsers = allUsers.filter(u => u.departmentId !== selectedDept);
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -54,6 +77,7 @@ export default function CreateObjectiveScreen() {
       parentObjectiveId: null,
       isCollaborative,
       collaborativeDeptIds: isCollaborative ? collabDeptIds : [],
+      collaborativeUserIds: isCollaborative ? collabUserIds : [],
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
@@ -66,43 +90,19 @@ export default function CreateObjectiveScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>目标名称</Text>
-        <TextInput
-          style={styles.input}
-          value={title}
-          onChangeText={setTitle}
-          placeholder="你想要达成什么目标？"
-          placeholderTextColor={Colors.textTertiary}
-          autoFocus
-        />
+        <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="你想要达成什么目标？" placeholderTextColor={Colors.textTertiary} autoFocus />
 
         <Text style={styles.label}>目标描述</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={description}
-          onChangeText={setDescription}
-          placeholder="描述目标的意义和达成价值"
-          placeholderTextColor={Colors.textTertiary}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
+        <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="描述目标的意义和达成价值" placeholderTextColor={Colors.textTertiary} multiline numberOfLines={3} textAlignVertical="top" />
 
         <Text style={styles.label}>所属部门</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
           <View style={styles.chipRow}>
-            {departments
-              .filter(dept => isAdmin || dept.id === user?.departmentId)
-              .map(dept => (
-                <Pressable
-                  key={dept.id}
-                  onPress={() => setSelectedDept(dept.id)}
-                  style={[styles.chip, selectedDept === dept.id && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, selectedDept === dept.id && styles.chipTextActive]}>
-                    {dept.level > 0 ? '  ' : ''}{dept.name}
-                  </Text>
-                </Pressable>
-              ))}
+            {departments.filter(dept => isAdmin || dept.id === user?.departmentId).map(dept => (
+              <Pressable key={dept.id} onPress={() => setSelectedDept(dept.id)} style={[styles.chip, selectedDept === dept.id && styles.chipActive]}>
+                <Text style={[styles.chipText, selectedDept === dept.id && styles.chipTextActive]}>{dept.name}</Text>
+              </Pressable>
+            ))}
           </View>
         </ScrollView>
 
@@ -110,11 +110,7 @@ export default function CreateObjectiveScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
           <View style={styles.chipRow}>
             {getCycleOptions().map(cycle => (
-              <Pressable
-                key={cycle}
-                onPress={() => setSelectedCycle(cycle)}
-                style={[styles.chip, selectedCycle === cycle && styles.chipActive]}
-              >
+              <Pressable key={cycle} onPress={() => setSelectedCycle(cycle)} style={[styles.chip, selectedCycle === cycle && styles.chipActive]}>
                 <Text style={[styles.chipText, selectedCycle === cycle && styles.chipTextActive]}>{cycle}</Text>
               </Pressable>
             ))}
@@ -124,45 +120,48 @@ export default function CreateObjectiveScreen() {
         <View style={styles.switchRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.switchLabel}>跨部门协同</Text>
-            <Text style={styles.switchDesc}>其他部门也可以看到此目标</Text>
+            <Text style={styles.switchDesc}>关联其他部门和用户可以看到此目标</Text>
           </View>
-          <Switch
-            value={isCollaborative}
-            onValueChange={setIsCollaborative}
-            trackColor={{ false: Colors.backgroundTertiary, true: Colors.primary + '80' }}
-            thumbColor={isCollaborative ? Colors.primary : Colors.textTertiary}
-          />
+          <Switch value={isCollaborative} onValueChange={setIsCollaborative} trackColor={{ false: Colors.backgroundTertiary, true: Colors.primary + '80' }} thumbColor={isCollaborative ? Colors.primary : Colors.textTertiary} />
         </View>
 
         {isCollaborative && (
           <>
             <Text style={styles.label}>协同部门</Text>
             <View style={styles.chipRow}>
-              {departments
-                .filter(d => d.id !== selectedDept)
-                .map(dept => (
-                  <Pressable
-                    key={dept.id}
-                    onPress={() => toggleCollabDept(dept.id)}
-                    style={[styles.chip, collabDeptIds.includes(dept.id) && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, collabDeptIds.includes(dept.id) && styles.chipTextActive]}>
-                      {dept.name}
-                    </Text>
-                  </Pressable>
-                ))}
+              {departments.filter(d => d.id !== selectedDept).map(dept => (
+                <Pressable key={dept.id} onPress={() => toggleCollabDept(dept.id)} style={[styles.chip, collabDeptIds.includes(dept.id) && styles.chipActive]}>
+                  <Text style={[styles.chipText, collabDeptIds.includes(dept.id) && styles.chipTextActive]}>{dept.name}</Text>
+                </Pressable>
+              ))}
             </View>
+
+            <Text style={styles.label}>协同人员</Text>
+            <Text style={styles.subLabel}>选择其他部门的人员，他们也能查看此目标和 KR 进度</Text>
+            {loadingUsers ? (
+              <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 10 }} />
+            ) : otherDeptUsers.length > 0 ? (
+              <View style={styles.chipRow}>
+                {otherDeptUsers.map(u => {
+                  const uDept = departments.find(d => d.id === u.departmentId);
+                  return (
+                    <Pressable key={u.id} onPress={() => toggleCollabUser(u.id)} style={[styles.userChip, collabUserIds.includes(u.id) && styles.userChipActive]}>
+                      <Ionicons name={collabUserIds.includes(u.id) ? "checkmark-circle" : "person-outline"} size={14} color={collabUserIds.includes(u.id) ? Colors.white : Colors.textSecondary} />
+                      <View>
+                        <Text style={[styles.userChipText, collabUserIds.includes(u.id) && styles.userChipTextActive]}>{u.displayName}</Text>
+                        {uDept && <Text style={[styles.userChipDept, collabUserIds.includes(u.id) && { color: Colors.white + '80' }]}>{uDept.name}</Text>}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>暂无其他部门的用户</Text>
+            )}
           </>
         )}
 
-        <Pressable
-          onPress={handleSave}
-          disabled={!canSave || saving}
-          style={({ pressed }) => [
-            styles.saveBtn,
-            { opacity: (!canSave || saving) ? 0.5 : pressed ? 0.9 : 1 }
-          ]}
-        >
+        <Pressable onPress={handleSave} disabled={!canSave || saving} style={({ pressed }) => [styles.saveBtn, { opacity: (!canSave || saving) ? 0.5 : pressed ? 0.9 : 1 }]}>
           <Ionicons name="checkmark" size={20} color={Colors.white} />
           <Text style={styles.saveBtnText}>{saving ? '保存中...' : '创建目标'}</Text>
         </Pressable>
@@ -177,6 +176,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, color: Colors.text },
   form: { paddingHorizontal: 20, paddingBottom: 40, gap: 4 },
   label: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textSecondary, marginTop: 16, marginBottom: 8 },
+  subLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginBottom: 8 },
   input: { backgroundColor: Colors.backgroundTertiary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.text },
   textArea: { minHeight: 80 },
   chipScroll: { marginBottom: 4 },
@@ -185,9 +185,15 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: Colors.primary },
   chipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
   chipTextActive: { color: Colors.white },
+  userChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.backgroundTertiary },
+  userChipActive: { backgroundColor: Colors.primary },
+  userChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
+  userChipTextActive: { color: Colors.white },
+  userChipDept: { fontFamily: 'Inter_400Regular', fontSize: 10, color: Colors.textTertiary, marginTop: 1 },
   switchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, backgroundColor: Colors.backgroundTertiary, borderRadius: 12, padding: 14 },
   switchLabel: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.text },
   switchDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 2 },
+  emptyText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textTertiary },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 28 },
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },
 });

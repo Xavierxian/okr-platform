@@ -72,6 +72,10 @@ function getUserDeptIds(userDeptId: string | null, allDepts: Department[]): stri
   return [...new Set(ids)];
 }
 
+export async function getUsersByDepartment(departmentId: string): Promise<User[]> {
+  return db.select().from(users).where(eq(users.departmentId, departmentId));
+}
+
 export async function getObjectivesForUser(user: User): Promise<Objective[]> {
   if (user.role === "super_admin") {
     return db.select().from(objectives);
@@ -82,11 +86,21 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
   const allObjs = await db.select().from(objectives);
   return allObjs.filter(obj => {
     if (deptIds.includes(obj.departmentId)) return true;
-    if (obj.isCollaborative && obj.collaborativeDeptIds) {
-      return (obj.collaborativeDeptIds as string[]).some(id => deptIds.includes(id));
+    if (obj.isCollaborative) {
+      if ((obj.collaborativeDeptIds as string[] || []).some(id => deptIds.includes(id))) return true;
+      if ((obj.collaborativeUserIds as string[] || []).includes(user.id)) return true;
     }
     return false;
   });
+}
+
+export async function getCollaborativeKRsForUser(userId: string): Promise<KeyResult[]> {
+  const allObjs = await db.select().from(objectives);
+  const collabObjIds = allObjs
+    .filter(obj => obj.isCollaborative && (obj.collaborativeUserIds as string[] || []).includes(userId))
+    .map(obj => obj.id);
+  if (collabObjIds.length === 0) return [];
+  return db.select().from(keyResults).where(inArray(keyResults.objectiveId, collabObjIds));
 }
 
 export async function getAllObjectives(): Promise<Objective[]> {
@@ -101,6 +115,7 @@ export async function createObjectiveInDb(data: {
   parentObjectiveId: string | null;
   isCollaborative: boolean;
   collaborativeDeptIds: string[];
+  collaborativeUserIds?: string[];
   createdBy: string | null;
 }): Promise<Objective> {
   const [obj] = await db.insert(objectives).values({
