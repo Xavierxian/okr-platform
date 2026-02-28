@@ -84,8 +84,14 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
   const deptIds = getUserDeptIds(user.departmentId, allDepts);
 
   const allObjs = await db.select().from(objectives);
+  const allKRs = await db.select().from(keyResults);
+  const assignedObjIds = new Set(
+    allKRs.filter(kr => kr.assigneeId === user.id).map(kr => kr.objectiveId)
+  );
+
   return allObjs.filter(obj => {
     if (deptIds.includes(obj.departmentId)) return true;
+    if (assignedObjIds.has(obj.id)) return true;
     if (obj.isCollaborative) {
       if ((obj.collaborativeDeptIds as string[] || []).some(id => deptIds.includes(id))) return true;
       if ((obj.collaborativeUserIds as string[] || []).includes(user.id)) return true;

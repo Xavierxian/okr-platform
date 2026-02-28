@@ -120,18 +120,21 @@ export default function CreateKRScreen() {
           <>
             {deptUsers.length > 0 && (
               <>
-                <Text style={styles.subLabel}>{deptName || '本部门'}</Text>
+                <Text style={styles.subLabel}>{deptName || '本部门'}（单选）</Text>
                 <View style={styles.chipRow}>
-                  {deptUsers.map(u => (
-                    <Pressable
-                      key={u.id}
-                      onPress={() => handleSelectUser(u)}
-                      style={[styles.userChip, selectedUserId === u.id && styles.userChipActive]}
-                    >
-                      <Ionicons name="person" size={14} color={selectedUserId === u.id ? Colors.white : Colors.textSecondary} />
-                      <Text style={[styles.userChipText, selectedUserId === u.id && styles.userChipTextActive]}>{u.displayName}</Text>
-                    </Pressable>
-                  ))}
+                  {deptUsers.map(u => {
+                    const isSelected = selectedUserId === u.id;
+                    return (
+                      <Pressable
+                        key={u.id}
+                        onPress={() => handleSelectUser(u)}
+                        style={[styles.userChip, isSelected && styles.userChipActive]}
+                      >
+                        <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={16} color={isSelected ? Colors.white : Colors.textTertiary} />
+                        <Text style={[styles.userChipText, isSelected && styles.userChipTextActive]}>{u.displayName}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </>
             )}
@@ -139,16 +142,19 @@ export default function CreateKRScreen() {
               <>
                 <Text style={styles.subLabel}>其他部门</Text>
                 <View style={styles.chipRow}>
-                  {otherUsers.map(u => (
-                    <Pressable
-                      key={u.id}
-                      onPress={() => handleSelectUser(u)}
-                      style={[styles.userChip, selectedUserId === u.id && styles.userChipActive]}
-                    >
-                      <Ionicons name="person-outline" size={14} color={selectedUserId === u.id ? Colors.white : Colors.textTertiary} />
-                      <Text style={[styles.userChipText, selectedUserId === u.id && styles.userChipTextActive]}>{u.displayName}</Text>
-                    </Pressable>
-                  ))}
+                  {otherUsers.map(u => {
+                    const isSelected = selectedUserId === u.id;
+                    return (
+                      <Pressable
+                        key={u.id}
+                        onPress={() => handleSelectUser(u)}
+                        style={[styles.userChip, isSelected && styles.userChipActive]}
+                      >
+                        <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={16} color={isSelected ? Colors.white : Colors.textTertiary} />
+                        <Text style={[styles.userChipText, isSelected && styles.userChipTextActive]}>{u.displayName}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </>
             )}
