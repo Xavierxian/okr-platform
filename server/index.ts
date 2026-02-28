@@ -208,7 +208,7 @@ function configureExpoAndLanding(app: express.Application) {
 
   if (webBuildExists) {
     app.use(express.static(webBuildDir));
-    app.get("*", (req: Request, res: Response, next: NextFunction) => {
+    app.get("/{*splat}", (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith("/api")) return next();
       const platform = req.header("expo-platform");
       if (platform) return next();
