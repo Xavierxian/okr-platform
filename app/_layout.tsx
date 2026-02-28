@@ -45,10 +45,10 @@ function RootLayoutNav() {
         name="create-objective"
         options={{
           presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
+          sheetAllowedDetents: [0.95],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen
@@ -58,7 +58,7 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.85],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen
@@ -68,7 +68,7 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.65],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen
@@ -78,7 +78,7 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.7],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen
@@ -88,7 +88,7 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.9],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen
@@ -98,7 +98,7 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.9],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen
@@ -108,7 +108,7 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.85],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen
@@ -118,7 +118,7 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.7],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen
@@ -128,7 +128,17 @@ function RootLayoutNav() {
           sheetAllowedDetents: [0.9],
           sheetGrabberVisible: true,
           headerShown: false,
-          contentStyle: { backgroundColor: "#1E293B" },
+          contentStyle: { backgroundColor: "#FFFFFF" },
+        }}
+      />
+      <Stack.Screen
+        name="change-password"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.7],
+          sheetGrabberVisible: true,
+          headerShown: false,
+          contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
       <Stack.Screen name="login" options={{ headerShown: false }} />

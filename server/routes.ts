@@ -49,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: undefined,
         httpOnly: true,
         secure: false,
         sameSite: "lax",
