@@ -368,11 +368,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/import/template", requireAuth, (_req: Request, res: Response) => {
-    const csvContent = `目标名称,目标描述,KR名称,KR描述
-提高产品质量,通过测试覆盖率和代码审查提升质量,单元测试覆盖率达到80%,提升核心模块测试覆盖
-提高产品质量,通过测试覆盖率和代码审查提升质量,代码审查通过率95%,确保每次PR都经过审查
-提升用户满意度,改善用户体验和客户服务质量,NPS分数提升到8.5,用户调查和反馈分析`;
+  app.get("/api/import/template", requireAuth, async (req: Request, res: Response) => {
+    const now = new Date();
+    const quarter = Math.ceil((now.getMonth() + 1) / 3);
+    const defaultCycle = `${now.getFullYear()} 第${quarter === 1 ? '一' : quarter === 2 ? '二' : quarter === 3 ? '三' : '四'}季度`;
+
+    const user = await getUser(req.session.userId!);
+    const allDepts = await getDepartments();
+    const allUsers = await getAllUsers();
+
+    let deptName = "";
+    if (user?.departmentId) {
+      const dept = allDepts.find(d => d.id === user.departmentId);
+      deptName = dept?.name || "";
+    }
+
+    const csvContent = `目标名称,目标描述,OKR类型,关联上级,KR名称,KR描述,执行人,权重,周期,部门
+提高产品质量,通过测试覆盖率和代码审查提升质量,承诺型,否,单元测试覆盖率达到80%,提升核心模块测试覆盖,,1,${defaultCycle},${deptName}
+提高产品质量,通过测试覆盖率和代码审查提升质量,承诺型,否,代码审查通过率95%,确保每次PR都经过审查,,1,${defaultCycle},${deptName}
+提升用户满意度,改善用户体验和客户服务质量,挑战型,是,NPS分数提升到8.5,用户调查和反馈分析,,1,${defaultCycle},${deptName}`;
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=okr_import_template.csv");
@@ -391,10 +405,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const allDepts = await getDepartments();
-      let deptId = user.departmentId || "";
-      if (!deptId) {
+      const allUsers = await getAllUsers();
+      let defaultDeptId = user.departmentId || "";
+      if (!defaultDeptId) {
         if (user.role === "super_admin" && allDepts.length > 0) {
-          deptId = allDepts[0].id;
+          defaultDeptId = allDepts[0].id;
         } else {
           return res.status(400).json({ message: "您未分配部门，无法导入" });
         }
@@ -416,24 +431,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const objDesc = row["目标描述"]?.trim() || "";
         const krTitle = row["KR名称"]?.trim();
         const krDesc = row["KR描述"]?.trim() || "";
+        const okrType = row["OKR类型"]?.trim() || "承诺型";
+        const linkedToParentStr = row["关联上级"]?.trim() || "否";
+        const linkedToParent = linkedToParentStr === "是";
+        const assigneeName = row["执行人"]?.trim() || "";
+        const weightStr = row["权重"]?.trim() || "1";
+        const parsed = parseFloat(weightStr);
+        const weight = Number.isFinite(parsed) ? parsed : 1;
+        const cycle = row["周期"]?.trim() || defaultCycle;
+        const deptName = row["部门"]?.trim() || "";
 
         if (!objTitle) {
           errors.push(`第${i + 2}行: 目标名称不能为空`);
           continue;
         }
 
-        const objKey = `${objTitle}|${deptId}`;
+        let deptId = defaultDeptId;
+        if (deptName) {
+          const dept = allDepts.find(d => d.name === deptName);
+          if (dept) {
+            if (user.role === "super_admin" || dept.id === user.departmentId) {
+              deptId = dept.id;
+            } else {
+              errors.push(`第${i + 2}行: 无权导入到部门"${deptName}"，使用默认部门`);
+            }
+          } else {
+            errors.push(`第${i + 2}行: 部门"${deptName}"不存在，使用默认部门`);
+          }
+        }
+
+        let assigneeId: string | null = null;
+        let resolvedAssigneeName = "";
+        if (assigneeName) {
+          const matchUser = allUsers.find(u => u.displayName === assigneeName || u.username === assigneeName);
+          if (matchUser) {
+            assigneeId = matchUser.id;
+            resolvedAssigneeName = matchUser.displayName;
+          } else {
+            resolvedAssigneeName = assigneeName;
+            errors.push(`第${i + 2}行: 执行人"${assigneeName}"未匹配到系统用户`);
+          }
+        }
+
+        const objKey = `${objTitle}|${deptId}|${cycle}`;
         if (!objectiveMap.has(objKey)) {
+          const validOkrType = okrType === "挑战型" ? "挑战型" : "承诺型";
           const obj = await createObjectiveInDb({
             title: objTitle,
             description: objDesc,
             departmentId: deptId,
-            cycle: defaultCycle,
+            cycle,
             parentObjectiveId: null,
             isCollaborative: false,
             collaborativeDeptIds: [],
             collaborativeUserIds: [],
             createdBy: user.id,
+            linkedToParent,
+            okrType: validOkrType,
           });
           objectiveMap.set(objKey, obj);
           importedObjectives++;
@@ -441,15 +495,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (krTitle) {
           const obj = objectiveMap.get(objKey);
+          const validKrType = okrType === "挑战型" ? "挑战型" : "承诺型";
           await createKeyResultInDb({
             objectiveId: obj.id,
             title: krTitle,
             description: krDesc,
-            assigneeId: null,
-            assigneeName: "",
+            assigneeId,
+            assigneeName: resolvedAssigneeName,
             startDate: now.toISOString().split("T")[0],
             endDate: defaultEndDate,
-            weight: 1,
+            weight,
+            okrType: validKrType,
           });
           importedKRs++;
         }

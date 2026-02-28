@@ -66,11 +66,15 @@ Preferred communication style: Simple, everyday language.
 - **Collaborator (跨部门协同人)**: Single-select from other-department users only. Shown with radio buttons in blue/info color.
 - Both are optional when creating a KR.
 
-### CSV Import (Simplified)
-- Template only requires: 目标名称, 目标描述, KR名称, KR描述
-- Other fields (department, cycle, dates) auto-filled from current user's department and current quarter
-- Same-named objectives are auto-merged
-- Assignee/collaborator can be set manually after import
+### CSV Import (Enhanced Batch Import)
+- Template columns: 目标名称, 目标描述, OKR类型, 关联上级, KR名称, KR描述, 执行人, 权重, 周期, 部门
+- Two import modes: download CSV template or online editing (editable table in-app)
+- Template auto-fills current cycle and user's department as defaults
+- OKR类型 supports 承诺型/挑战型; 关联上级 supports 是/否
+- 执行人 matches by displayName or username; unmatched names become warnings
+- Department override restricted: non-admin users can only import to their own department
+- Same-named objectives (same title + department + cycle) auto-merged
+- Weight parsing preserves 0 values correctly
 
 ### Key Screens
 - `app/login.tsx` — Login screen with username/password
@@ -82,7 +86,7 @@ Preferred communication style: Simple, everyday language.
 - `app/objective/[id].tsx` — Objective detail with KR list showing assignee and collaborator info
 - `app/create-objective.tsx` — Create objective (dept-scoped for non-admins)
 - `app/create-kr.tsx` — Create key result with same-dept assignee picker and cross-dept collaborator picker
-- `app/import-okr.tsx` — Simplified CSV import (title + description only)
+- `app/import-okr.tsx` — Enhanced batch import with CSV template or online editable table
 - `app/update-progress.tsx` — Update KR progress
 - `app/score-kr.tsx` — Self-score KR
 - `app/manage-departments.tsx` — Department CRUD (admin only)

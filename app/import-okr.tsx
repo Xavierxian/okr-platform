@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { StyleSheet, Text, View, Pressable, ScrollView, Alert, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, Pressable, ScrollView, Alert, Platform, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
@@ -7,6 +7,7 @@ import { apiRequest, getApiUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
+const COLUMNS = ['目标名称', '目标描述', 'OKR类型', '关联上级', 'KR名称', 'KR描述', '执行人', '权重', '周期', '部门'];
 const REQUIRED_HEADERS = ['目标名称'];
 
 function parseCSVLine(line: string): string[] {
@@ -111,6 +112,10 @@ async function pickFileNative(): Promise<{ name: string; content: string } | nul
   }
 }
 
+function emptyRow(): Record<string, string> {
+  return COLUMNS.reduce((acc, col) => { acc[col] = ''; return acc; }, {} as Record<string, string>);
+}
+
 export default function ImportOKRScreen() {
   const { refresh } = useOKR();
   const [importing, setImporting] = useState(false);
@@ -118,6 +123,7 @@ export default function ImportOKRScreen() {
   const [fileName, setFileName] = useState('');
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   const handleDownloadTemplate = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -151,6 +157,7 @@ export default function ImportOKRScreen() {
     setParsedRows(rows);
     setParseError(error);
     setResult(null);
+    if (rows.length > 0) setEditMode(true);
   }, []);
 
   const handlePickFileNative = useCallback(async () => {
@@ -159,12 +166,33 @@ export default function ImportOKRScreen() {
     processFileContent(fileData.name, fileData.content);
   }, [processFileContent]);
 
+  const handleAddRow = useCallback(() => {
+    setParsedRows(prev => [...prev, emptyRow()]);
+    if (!editMode) setEditMode(true);
+  }, [editMode]);
+
+  const handleDeleteRow = useCallback((index: number) => {
+    setParsedRows(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleCellChange = useCallback((rowIdx: number, col: string, value: string) => {
+    setParsedRows(prev => {
+      const newRows = [...prev];
+      newRows[rowIdx] = { ...newRows[rowIdx], [col]: value };
+      return newRows;
+    });
+  }, []);
+
   const handleImport = useCallback(async () => {
-    if (parsedRows.length === 0) return;
+    const validRows = parsedRows.filter(r => r['目标名称']?.trim());
+    if (validRows.length === 0) {
+      Alert.alert('提示', '没有有效数据（目标名称不能为空）');
+      return;
+    }
     setImporting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const res = await apiRequest("POST", "/api/import/okr", { rows: parsedRows });
+      const res = await apiRequest("POST", "/api/import/okr", { rows: validRows });
       const data = await res.json();
       setResult({ message: data.message, errors: data.errors || [] });
       await refresh();
@@ -176,92 +204,153 @@ export default function ImportOKRScreen() {
     setImporting(false);
   }, [parsedRows, refresh]);
 
+  const handleManualEntry = useCallback(() => {
+    setParsedRows([emptyRow(), emptyRow(), emptyRow()]);
+    setEditMode(true);
+    setFileName('');
+    setParseError(null);
+    setResult(null);
+  }, []);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>导入 OKR</Text>
+        <Text style={styles.headerTitle}>批量导入 OKR</Text>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <Ionicons name="close" size={24} color={Colors.textSecondary} />
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.stepCard}>
-          <View style={styles.stepNum}><Text style={styles.stepNumText}>1</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.stepTitle}>下载模板</Text>
-            <Text style={styles.stepDesc}>下载 CSV 模板，按照格式填写 OKR 数据</Text>
-            <Pressable onPress={handleDownloadTemplate} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
-              <Ionicons name="download-outline" size={18} color={Colors.primary} />
-              <Text style={styles.actionBtnText}>下载模板文件</Text>
+        <View style={styles.methodSection}>
+          <Text style={styles.sectionTitle}>选择导入方式</Text>
+          <View style={styles.methodRow}>
+            <Pressable onPress={handleDownloadTemplate} style={({ pressed }) => [styles.methodCard, { opacity: pressed ? 0.8 : 1 }]}>
+              <View style={[styles.methodIcon, { backgroundColor: Colors.primary + '15' }]}>
+                <Ionicons name="download-outline" size={22} color={Colors.primary} />
+              </View>
+              <Text style={styles.methodTitle}>下载模板</Text>
+              <Text style={styles.methodDesc}>下载CSV模板填写后上传</Text>
+            </Pressable>
+            <Pressable onPress={handleManualEntry} style={({ pressed }) => [styles.methodCard, { opacity: pressed ? 0.8 : 1 }]}>
+              <View style={[styles.methodIcon, { backgroundColor: Colors.success + '15' }]}>
+                <Ionicons name="create-outline" size={22} color={Colors.success} />
+              </View>
+              <Text style={styles.methodTitle}>在线填写</Text>
+              <Text style={styles.methodDesc}>直接在表格中录入数据</Text>
             </Pressable>
           </View>
         </View>
 
-        <View style={styles.stepCard}>
-          <View style={styles.stepNum}><Text style={styles.stepNumText}>2</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.stepTitle}>选择文件</Text>
-            <Text style={styles.stepDesc}>选择填写好的 CSV 文件上传</Text>
-            {Platform.OS === 'web' ? (
-              <WebFileInput onFileRead={processFileContent} />
-            ) : (
-              <Pressable onPress={handlePickFileNative} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
-                <Ionicons name="document-outline" size={18} color={Colors.primary} />
-                <Text style={styles.actionBtnText}>{fileName || '选择 CSV 文件'}</Text>
-              </Pressable>
-            )}
-            {fileName ? <Text style={styles.fileInfo}>已选择: {fileName}</Text> : null}
-            {parseError && (
-              <View style={styles.parseErrorRow}>
-                <Ionicons name="alert-circle" size={14} color={Colors.danger} />
-                <Text style={styles.parseErrorText}>{parseError}</Text>
-              </View>
-            )}
-            {parsedRows.length > 0 && !parseError && (
-              <Text style={styles.fileInfo}>已解析 {parsedRows.length} 行数据</Text>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.stepCard}>
-          <View style={styles.stepNum}><Text style={styles.stepNumText}>3</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.stepTitle}>确认导入</Text>
-            <Text style={styles.stepDesc}>相同目标名称+部门+周期会合并为一个目标，执行人用户名会自动关联系统用户</Text>
-          </View>
-        </View>
-
-        {parsedRows.length > 0 && (
-          <View style={styles.previewCard}>
-            <Text style={styles.previewTitle}>数据预览</Text>
-            {parsedRows.slice(0, 5).map((row, idx) => (
-              <View key={idx} style={styles.previewRow}>
-                <Text style={styles.previewObj} numberOfLines={1}>O: {row['目标名称'] || '-'}</Text>
-                <Text style={styles.previewKR} numberOfLines={1}>KR: {row['KR名称'] || '-'}</Text>
-                <Text style={styles.previewMeta}>{row['目标描述'] || '-'}</Text>
-              </View>
-            ))}
-            {parsedRows.length > 5 && <Text style={styles.moreText}>还有 {parsedRows.length - 5} 行...</Text>}
+        {!editMode && (
+          <View style={styles.uploadSection}>
+            <Text style={styles.sectionTitle}>上传文件</Text>
+            <View style={styles.uploadCard}>
+              <Ionicons name="cloud-upload-outline" size={36} color={Colors.textTertiary} />
+              <Text style={styles.uploadHint}>选择填好的CSV文件</Text>
+              {Platform.OS === 'web' ? (
+                <WebFileInput onFileRead={processFileContent} />
+              ) : (
+                <Pressable onPress={handlePickFileNative} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
+                  <Ionicons name="document-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.actionBtnText}>{fileName || '选择 CSV 文件'}</Text>
+                </Pressable>
+              )}
+              {fileName ? <Text style={styles.fileInfo}>已选择: {fileName}</Text> : null}
+              {parseError && (
+                <View style={styles.parseErrorRow}>
+                  <Ionicons name="alert-circle" size={14} color={Colors.danger} />
+                  <Text style={styles.parseErrorText}>{parseError}</Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
-        <Pressable
-          onPress={handleImport}
-          disabled={parsedRows.length === 0 || importing}
-          style={({ pressed }) => [
-            styles.importBtn,
-            { opacity: (parsedRows.length === 0 || importing) ? 0.5 : pressed ? 0.9 : 1 }
-          ]}
-        >
-          {importing ? (
-            <ActivityIndicator size="small" color={Colors.white} />
-          ) : (
-            <>
-              <Ionicons name="cloud-upload-outline" size={20} color={Colors.white} />
-              <Text style={styles.importBtnText}>开始导入</Text>
-            </>
-          )}
-        </Pressable>
+        {editMode && parsedRows.length > 0 && (
+          <View style={styles.tableSection}>
+            <View style={styles.tableTitleRow}>
+              <Text style={styles.sectionTitle}>数据编辑 ({parsedRows.length} 行)</Text>
+              <Pressable onPress={handleAddRow} style={({ pressed }) => [styles.addRowBtn, { opacity: pressed ? 0.8 : 1 }]}>
+                <Ionicons name="add-circle-outline" size={16} color={Colors.primary} />
+                <Text style={styles.addRowText}>添加行</Text>
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableScroll}>
+              <View>
+                <View style={styles.tableHeaderRow}>
+                  <View style={styles.rowNumCell}><Text style={styles.headerCellText}>#</Text></View>
+                  {COLUMNS.map(col => (
+                    <View key={col} style={[styles.headerCell, col === '目标名称' || col === 'KR名称' ? styles.wideCell : col === '目标描述' || col === 'KR描述' ? styles.wideCell : styles.normalCell]}>
+                      <Text style={styles.headerCellText} numberOfLines={1}>{col}</Text>
+                    </View>
+                  ))}
+                  <View style={styles.actionCell}><Text style={styles.headerCellText}>操作</Text></View>
+                </View>
+                {parsedRows.map((row, rowIdx) => (
+                  <View key={rowIdx} style={[styles.tableRow, rowIdx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd]}>
+                    <View style={styles.rowNumCell}><Text style={styles.rowNumText}>{rowIdx + 1}</Text></View>
+                    {COLUMNS.map(col => (
+                      <View key={col} style={[styles.dataCell, col === '目标名称' || col === 'KR名称' ? styles.wideCell : col === '目标描述' || col === 'KR描述' ? styles.wideCell : styles.normalCell]}>
+                        {col === 'OKR类型' ? (
+                          <Pressable
+                            onPress={() => handleCellChange(rowIdx, col, row[col] === '挑战型' ? '承诺型' : '挑战型')}
+                            style={[styles.typeBadge, { backgroundColor: row[col] === '挑战型' ? Colors.warning + '20' : Colors.primary + '15' }]}
+                          >
+                            <Text style={[styles.typeBadgeText, { color: row[col] === '挑战型' ? Colors.warning : Colors.primary }]}>
+                              {row[col] || '承诺型'}
+                            </Text>
+                          </Pressable>
+                        ) : col === '关联上级' ? (
+                          <Pressable
+                            onPress={() => handleCellChange(rowIdx, col, row[col] === '是' ? '否' : '是')}
+                            style={[styles.typeBadge, { backgroundColor: row[col] === '是' ? Colors.success + '20' : Colors.backgroundTertiary }]}
+                          >
+                            <Text style={[styles.typeBadgeText, { color: row[col] === '是' ? Colors.success : Colors.textTertiary }]}>
+                              {row[col] || '否'}
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <TextInput
+                            style={styles.cellInput}
+                            value={row[col] || ''}
+                            onChangeText={(v) => handleCellChange(rowIdx, col, v)}
+                            placeholder={col === '权重' ? '1' : ''}
+                            placeholderTextColor={Colors.textTertiary}
+                          />
+                        )}
+                      </View>
+                    ))}
+                    <View style={styles.actionCell}>
+                      <Pressable onPress={() => handleDeleteRow(rowIdx)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                        <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
+        {(editMode && parsedRows.length > 0) && (
+          <Pressable
+            onPress={handleImport}
+            disabled={importing}
+            style={({ pressed }) => [
+              styles.importBtn,
+              { opacity: importing ? 0.5 : pressed ? 0.9 : 1 }
+            ]}
+          >
+            {importing ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <>
+                <Ionicons name="cloud-upload-outline" size={20} color={Colors.white} />
+                <Text style={styles.importBtnText}>确认导入 ({parsedRows.filter(r => r['目标名称']?.trim()).length} 条)</Text>
+              </>
+            )}
+          </Pressable>
+        )}
 
         {result && (
           <View style={[styles.resultCard, { borderColor: result.errors.length > 0 ? Colors.warning : Colors.success }]}>
@@ -276,11 +365,13 @@ export default function ImportOKRScreen() {
         )}
 
         <View style={styles.tipsCard}>
-          <Text style={styles.tipsTitle}>模板说明</Text>
-          <Text style={styles.tipsItem}>• 只需填写：目标名称、目标描述、KR名称、KR描述</Text>
-          <Text style={styles.tipsItem}>• 所属部门、周期、截止日期等由系统自动填充</Text>
-          <Text style={styles.tipsItem}>• 同名目标会自动合并为一个目标</Text>
-          <Text style={styles.tipsItem}>• 导入后可在详情页手动指派执行人和协同人</Text>
+          <Text style={styles.tipsTitle}>填写说明</Text>
+          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>目标名称</Text>（必填）：同名目标+同部门+同周期会自动合并</Text>
+          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>OKR类型</Text>：承诺型（默认）或 挑战型</Text>
+          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>关联上级</Text>：是 或 否（默认）</Text>
+          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>执行人</Text>：填写系统用户的姓名或用户名</Text>
+          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>权重</Text>：默认为1，可调整KR权重</Text>
+          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>周期/部门</Text>：留空则使用当前周期和您所在部门</Text>
         </View>
       </ScrollView>
     </View>
@@ -291,31 +382,50 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.card },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, color: Colors.text },
-  content: { paddingHorizontal: 20, paddingBottom: 40 },
-  stepCard: { flexDirection: 'row', gap: 14, backgroundColor: Colors.backgroundTertiary, borderRadius: 14, padding: 16, marginBottom: 12 },
-  stepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  stepNumText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: Colors.white },
-  stepTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.text },
-  stepDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 4 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.primary + '15', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, marginTop: 10, alignSelf: 'flex-start' },
+  content: { paddingHorizontal: 16, paddingBottom: 40 },
+  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.text, marginBottom: 10 },
+  methodSection: { marginBottom: 16 },
+  methodRow: { flexDirection: 'row', gap: 10 },
+  methodCard: { flex: 1, backgroundColor: Colors.backgroundTertiary, borderRadius: 12, padding: 14, alignItems: 'center', gap: 6 },
+  methodIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  methodTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: Colors.text },
+  methodDesc: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textSecondary, textAlign: 'center' },
+  uploadSection: { marginBottom: 16 },
+  uploadCard: { backgroundColor: Colors.backgroundTertiary, borderRadius: 12, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
+  uploadHint: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textSecondary },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.primary + '15', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, marginTop: 4 },
   actionBtnText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.primary },
-  fileInfo: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.success, marginTop: 6 },
+  fileInfo: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.success, marginTop: 4 },
   parseErrorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8 },
   parseErrorText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.danger, flex: 1 },
-  previewCard: { backgroundColor: Colors.backgroundTertiary, borderRadius: 14, padding: 16, marginBottom: 12 },
-  previewTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.text, marginBottom: 10 },
-  previewRow: { borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: 8 },
-  previewObj: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.text },
-  previewKR: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  previewMeta: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textTertiary, marginTop: 2 },
-  moreText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, textAlign: 'center', marginTop: 8 },
-  importBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginBottom: 16 },
-  importBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },
-  resultCard: { backgroundColor: Colors.backgroundTertiary, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1 },
+  tableSection: { marginBottom: 16 },
+  tableTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  addRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: Colors.primary + '10', borderRadius: 6 },
+  addRowText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.primary },
+  tableScroll: { borderRadius: 10, borderWidth: 1, borderColor: Colors.border },
+  tableHeaderRow: { flexDirection: 'row', backgroundColor: Colors.primary + '10' },
+  headerCell: { paddingHorizontal: 8, paddingVertical: 10, borderRightWidth: 1, borderRightColor: Colors.border },
+  headerCellText: { fontFamily: 'Inter_600SemiBold', fontSize: 11, color: Colors.primary },
+  wideCell: { width: 140 },
+  normalCell: { width: 80 },
+  rowNumCell: { width: 32, paddingHorizontal: 4, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', borderRightWidth: 1, borderRightColor: Colors.border },
+  rowNumText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textTertiary },
+  actionCell: { width: 40, paddingHorizontal: 4, paddingVertical: 8, alignItems: 'center', justifyContent: 'center' },
+  tableRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: Colors.border },
+  tableRowEven: { backgroundColor: Colors.card },
+  tableRowOdd: { backgroundColor: Colors.backgroundTertiary },
+  dataCell: { paddingHorizontal: 4, paddingVertical: 4, borderRightWidth: 1, borderRightColor: Colors.border, justifyContent: 'center' },
+  cellInput: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.text, paddingHorizontal: 4, paddingVertical: 4, minHeight: 28 },
+  typeBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignItems: 'center' },
+  typeBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
+  importBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 14, borderRadius: 12, marginBottom: 16 },
+  importBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.white },
+  resultCard: { backgroundColor: Colors.backgroundTertiary, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1 },
   resultMsg: { fontFamily: 'Inter_600SemiBold', fontSize: 14, marginBottom: 8 },
   errorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 4 },
   errorText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.danger, flex: 1 },
-  tipsCard: { backgroundColor: Colors.backgroundTertiary, borderRadius: 14, padding: 16 },
+  tipsCard: { backgroundColor: Colors.backgroundTertiary, borderRadius: 12, padding: 16 },
   tipsTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.text, marginBottom: 8 },
-  tipsItem: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, lineHeight: 20 },
+  tipsItem: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, lineHeight: 20, marginBottom: 2 },
+  tipsBold: { fontFamily: 'Inter_500Medium', color: Colors.text },
 });
