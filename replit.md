@@ -46,7 +46,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Build & Development
 - **Development**: Two processes — `expo:dev` for the Expo bundler and `server:dev` for the Express server (via tsx)
-- **Production**: Static web build via custom `scripts/build.js`, server bundle via esbuild
+- **Production**: Static web build via custom `scripts/build.js` (builds iOS/Android bundles + Expo web export to `static-build/web/`), server bundle via esbuild. The server detects `static-build/web/index.html` and serves the web app directly to browsers instead of the Expo Go landing page.
 - **Database Migrations**: `npm run db:push` uses drizzle-kit to push schema
 
 ### Important Architectural Gap
