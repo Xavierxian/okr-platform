@@ -5,17 +5,37 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import Colors from '@/constants/colors';
-import { getStatusColor, getScoreColor, getScoreLabel } from '@/lib/storage';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const STATUS_LABELS: Record<string, string> = {
-  normal: '正常',
-  behind: '滞后',
-  completed: '已完成',
-  overdue: '已逾期',
-  paused: '已暂停',
+  normal: '正常', behind: '滞后', completed: '已完成', overdue: '已逾期', paused: '已暂停',
 };
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'normal': return '#10B981';
+    case 'behind': return '#F59E0B';
+    case 'completed': return '#3B82F6';
+    case 'overdue': return '#EF4444';
+    case 'paused': return '#64748B';
+    default: return '#94A3B8';
+  }
+}
+
+function getScoreColor(score: number): string {
+  if (score === 1) return '#10B981';
+  if (score === 0.7) return '#3B82F6';
+  if (score === 0.3) return '#F59E0B';
+  return '#EF4444';
+}
+
+function getScoreLabel(score: number): string {
+  if (score === 1) return '完全达成';
+  if (score === 0.7) return '基本达成';
+  if (score === 0.3) return '部分达成';
+  return '未达成';
+}
 
 export default function ObjectiveDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -65,10 +85,7 @@ export default function ObjectiveDetailScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert('删除关键结果', `确定删除"${krTitle}"吗？`, [
       { text: '取消', style: 'cancel' },
-      {
-        text: '删除', style: 'destructive',
-        onPress: () => removeKeyResult(krId),
-      },
+      { text: '删除', style: 'destructive', onPress: () => removeKeyResult(krId) },
     ]);
   };
 
@@ -84,10 +101,7 @@ export default function ObjectiveDetailScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Platform.OS === 'web' ? 34 : 40 }]}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Platform.OS === 'web' ? 34 : 40 }]} showsVerticalScrollIndicator={false}>
         <Animated.View entering={FadeInDown.duration(400)}>
           <View style={styles.objHeader}>
             <View style={styles.cycleBadge}>
@@ -97,12 +111,16 @@ export default function ObjectiveDetailScreen() {
               <Ionicons name="business-outline" size={12} color={Colors.textSecondary} />
               <Text style={styles.deptBadgeText}>{dept?.name || '未知'}</Text>
             </View>
+            {objective.isCollaborative && (
+              <View style={[styles.deptBadge, { backgroundColor: Colors.accent + '20' }]}>
+                <Ionicons name="people-outline" size={12} color={Colors.accent} />
+                <Text style={[styles.deptBadgeText, { color: Colors.accent }]}>跨部门协同</Text>
+              </View>
+            )}
           </View>
 
           <Text style={styles.objTitle}>{objective.title}</Text>
-          {objective.description ? (
-            <Text style={styles.objDesc}>{objective.description}</Text>
-          ) : null}
+          {objective.description ? <Text style={styles.objDesc}>{objective.description}</Text> : null}
 
           <View style={styles.progressCard}>
             <View style={styles.progressTop}>
@@ -147,13 +165,11 @@ export default function ObjectiveDetailScreen() {
                   <View style={[styles.krStatusDot, { backgroundColor: getStatusColor(kr.status) }]} />
                   <Text style={styles.krTitle} numberOfLines={2}>{kr.title}</Text>
                 </View>
-                {kr.description ? (
-                  <Text style={styles.krDesc} numberOfLines={2}>{kr.description}</Text>
-                ) : null}
+                {kr.description ? <Text style={styles.krDesc} numberOfLines={2}>{kr.description}</Text> : null}
                 <View style={styles.krMeta}>
                   <View style={styles.krMetaItem}>
                     <Ionicons name="person-outline" size={12} color={Colors.textSecondary} />
-                    <Text style={styles.krMetaText}>{kr.assignee}</Text>
+                    <Text style={styles.krMetaText}>{kr.assigneeName}</Text>
                   </View>
                   <View style={styles.krMetaItem}>
                     <Ionicons name="calendar-outline" size={12} color={Colors.textSecondary} />
@@ -165,10 +181,7 @@ export default function ObjectiveDetailScreen() {
                 </View>
                 <View style={styles.krProgressRow}>
                   <View style={styles.krProgressBar}>
-                    <View style={[styles.krProgressFill, {
-                      width: `${kr.progress}%`,
-                      backgroundColor: getStatusColor(kr.status),
-                    }]} />
+                    <View style={[styles.krProgressFill, { width: `${kr.progress}%`, backgroundColor: getStatusColor(kr.status) }]} />
                   </View>
                   <Text style={styles.krProgressText}>{kr.progress}%</Text>
                 </View>
@@ -182,20 +195,14 @@ export default function ObjectiveDetailScreen() {
                 )}
                 <View style={styles.krActions}>
                   <Pressable
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      router.push({ pathname: '/update-progress', params: { krId: kr.id } });
-                    }}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/update-progress', params: { krId: kr.id } }); }}
                     style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
                   >
                     <Ionicons name="create-outline" size={16} color={Colors.primary} />
                     <Text style={styles.actionText}>更新进度</Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      router.push({ pathname: '/score-kr', params: { krId: kr.id } });
-                    }}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/score-kr', params: { krId: kr.id } }); }}
                     style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
                   >
                     <Ionicons name="star-outline" size={16} color={Colors.accent} />
@@ -211,7 +218,7 @@ export default function ObjectiveDetailScreen() {
                 {kr.progressHistory && kr.progressHistory.length > 0 && (
                   <View style={styles.historySection}>
                     <Text style={styles.historyTitle}>最近更新</Text>
-                    {kr.progressHistory.slice(-3).reverse().map(entry => (
+                    {kr.progressHistory.slice(-3).reverse().map((entry: any) => (
                       <View key={entry.id} style={styles.historyItem}>
                         <View style={styles.historyDot} />
                         <View style={{ flex: 1 }}>
@@ -242,7 +249,7 @@ const styles = StyleSheet.create({
   notFoundText: { fontFamily: 'Inter_500Medium', fontSize: 16, color: Colors.textSecondary },
   backBtnFallback: { backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
   backBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.white },
-  objHeader: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  objHeader: { flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
   cycleBadge: { backgroundColor: Colors.primary + '20', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
   cycleBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.primary },
   deptBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.backgroundTertiary, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },

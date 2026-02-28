@@ -1,21 +1,46 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
+import { useAuth } from '@/lib/auth-context';
 import Colors from '@/constants/colors';
-import { getCycleOptions } from '@/lib/storage';
 import * as Haptics from 'expo-haptics';
+
+function getCycleOptions(): string[] {
+  const year = new Date().getFullYear();
+  return [
+    `${year} 第一季度`,
+    `${year} 第二季度`,
+    `${year} 第三季度`,
+    `${year} 第四季度`,
+    `${year} 年度`,
+    `${year + 1} 第一季度`,
+    `${year + 1} 第二季度`,
+  ];
+}
 
 export default function CreateObjectiveScreen() {
   const { departments, addObjective } = useOKR();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'super_admin';
+
+  const defaultDeptId = isAdmin ? (departments[0]?.id || '') : (user?.departmentId || departments[0]?.id || '');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedDept, setSelectedDept] = useState(departments[0]?.id || '');
+  const [selectedDept, setSelectedDept] = useState(defaultDeptId);
   const [selectedCycle, setSelectedCycle] = useState(getCycleOptions()[0]);
+  const [isCollaborative, setIsCollaborative] = useState(false);
+  const [collabDeptIds, setCollabDeptIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const canSave = title.trim().length > 0 && selectedDept && selectedCycle;
+
+  const toggleCollabDept = (id: string) => {
+    setCollabDeptIds(prev =>
+      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
+    );
+  };
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -27,6 +52,8 @@ export default function CreateObjectiveScreen() {
       departmentId: selectedDept,
       cycle: selectedCycle,
       parentObjectiveId: null,
+      isCollaborative,
+      collaborativeDeptIds: isCollaborative ? collabDeptIds : [],
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
@@ -63,17 +90,19 @@ export default function CreateObjectiveScreen() {
         <Text style={styles.label}>所属部门</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
           <View style={styles.chipRow}>
-            {departments.map(dept => (
-              <Pressable
-                key={dept.id}
-                onPress={() => setSelectedDept(dept.id)}
-                style={[styles.chip, selectedDept === dept.id && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, selectedDept === dept.id && styles.chipTextActive]}>
-                  {dept.level > 0 ? '  ' : ''}{dept.name}
-                </Text>
-              </Pressable>
-            ))}
+            {departments
+              .filter(dept => isAdmin || dept.id === user?.departmentId)
+              .map(dept => (
+                <Pressable
+                  key={dept.id}
+                  onPress={() => setSelectedDept(dept.id)}
+                  style={[styles.chip, selectedDept === dept.id && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, selectedDept === dept.id && styles.chipTextActive]}>
+                    {dept.level > 0 ? '  ' : ''}{dept.name}
+                  </Text>
+                </Pressable>
+              ))}
           </View>
         </ScrollView>
 
@@ -91,6 +120,40 @@ export default function CreateObjectiveScreen() {
             ))}
           </View>
         </ScrollView>
+
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchLabel}>跨部门协同</Text>
+            <Text style={styles.switchDesc}>其他部门也可以看到此目标</Text>
+          </View>
+          <Switch
+            value={isCollaborative}
+            onValueChange={setIsCollaborative}
+            trackColor={{ false: Colors.backgroundTertiary, true: Colors.primary + '80' }}
+            thumbColor={isCollaborative ? Colors.primary : Colors.textTertiary}
+          />
+        </View>
+
+        {isCollaborative && (
+          <>
+            <Text style={styles.label}>协同部门</Text>
+            <View style={styles.chipRow}>
+              {departments
+                .filter(d => d.id !== selectedDept)
+                .map(dept => (
+                  <Pressable
+                    key={dept.id}
+                    onPress={() => toggleCollabDept(dept.id)}
+                    style={[styles.chip, collabDeptIds.includes(dept.id) && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, collabDeptIds.includes(dept.id) && styles.chipTextActive]}>
+                      {dept.name}
+                    </Text>
+                  </Pressable>
+                ))}
+            </View>
+          </>
+        )}
 
         <Pressable
           onPress={handleSave}
@@ -122,6 +185,9 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: Colors.primary },
   chipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
   chipTextActive: { color: Colors.white },
+  switchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, backgroundColor: Colors.backgroundTertiary, borderRadius: 12, padding: 14 },
+  switchLabel: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.text },
+  switchDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 2 },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 28 },
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },
 });

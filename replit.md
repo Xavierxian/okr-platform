@@ -2,9 +2,9 @@
 
 ## Overview
 
-This is an OKR (Objectives and Key Results) management platform built as a cross-platform mobile/web application using Expo (React Native). The app allows users to create and manage organizational objectives, define key results, track progress, and self-score outcomes. The UI is in Chinese, targeting Chinese-speaking users.
+This is an OKR (Objectives and Key Results) management platform built as a cross-platform mobile/web application using Expo (React Native). The app allows users to create and manage organizational objectives, define key results, track progress, and self-score outcomes. The UI is in Chinese with a dark theme (teal #0D9488 primary).
 
-The project follows a dual architecture: an Expo/React Native frontend with file-based routing (expo-router) and an Express.js backend server. Currently, the app stores OKR data locally using AsyncStorage on the client side, with a PostgreSQL database schema defined via Drizzle ORM that is not yet fully integrated into the OKR workflow.
+The project uses a dual architecture: an Expo/React Native frontend with file-based routing (expo-router) and an Express.js backend server with PostgreSQL via Drizzle ORM.
 
 ## User Preferences
 
@@ -17,45 +17,68 @@ Preferred communication style: Simple, everyday language.
 - **Routing**: expo-router v6 with file-based routing under the `app/` directory
 - **Navigation Structure**: 
   - Tab-based layout with 4 tabs: Dashboard (仪表盘), OKR list, Analytics (分析), Profile (我的)
-  - Modal screens for creating objectives, creating key results, updating progress, and scoring
+  - Modal screens for creating objectives, creating key results, updating progress, scoring, user/department management
   - Detail screen for individual objectives at `objective/[id]`
-- **State Management**: React Context (`OKRProvider` in `lib/okr-context.tsx`) manages all OKR state (departments, objectives, key results) with local AsyncStorage persistence
-- **Data Fetching**: `@tanstack/react-query` is set up with an API client (`lib/query-client.ts`) but is not currently used for OKR data — OKR data flows through the context/AsyncStorage layer
-- **Styling**: Dark theme with custom color constants (`constants/colors.ts`), using StyleSheet API directly (no styling library)
+  - Login screen shown via AuthGate when not authenticated
+- **State Management**: 
+  - `AuthProvider` (`lib/auth-context.tsx`) manages authentication state (login/logout/session)
+  - `OKRProvider` (`lib/okr-context.tsx`) manages all OKR data via API calls, resets on user change
+- **Data Fetching**: `apiRequest` from `lib/query-client.ts` for all API calls with credentials: "include" for session cookies
+- **Styling**: Dark theme with custom color constants (`constants/colors.ts`), using StyleSheet API
 - **Animations**: react-native-reanimated for entry animations (FadeInDown)
 - **Fonts**: Inter font family via `@expo-google-fonts/inter`
-- **Haptics**: expo-haptics for tactile feedback on save actions
+- **Haptics**: expo-haptics for tactile feedback
 
 ### Backend Architecture
 - **Framework**: Express.js v5 running on Node.js
-- **Server Entry**: `server/index.ts` — handles CORS for Replit domains and localhost, serves static builds in production
-- **Routes**: `server/routes.ts` — currently a skeleton with no API routes defined
-- **Storage Layer**: `server/storage.ts` — in-memory storage (`MemStorage`) implementing a user CRUD interface; not yet connected to OKR operations
-- **Build**: Server is bundled with esbuild for production (`server_dist/`)
+- **Server Entry**: `server/index.ts`
+- **Routes**: `server/routes.ts` — full CRUD APIs for auth, departments, objectives, key results, users
+- **Storage Layer**: `server/storage.ts` — Drizzle ORM with PostgreSQL, full CRUD operations with department-based filtering
+- **Auth**: Session-based with `express-session` + `connect-pg-simple` (PostgreSQL session store)
+- **Build**: Server bundled with esbuild for production (`server_dist/`), CJS format
+
+### Authentication & Authorization
+- **Session-based auth**: express-session with PostgreSQL session store
+- **Default super admin**: username=`admin`, password=`admin123`, displayName=`超级管理员`
+- **Roles**: `super_admin` (full access), `dept_admin` (department admin), `member` (department-scoped)
+- **Middleware**: `requireAuth` for all protected routes, `requireAdmin` for admin-only routes
+- **Department scoping**: Non-admin users can only create objectives for their own department; server validates department ownership
 
 ### Data Layer
-- **Client-side Storage**: AsyncStorage (`lib/storage.ts`) stores departments, objectives, and key results as JSON. Includes seed data for departments. All CRUD operations happen client-side.
-- **Database Schema**: Drizzle ORM with PostgreSQL (`shared/schema.ts`) — currently only defines a `users` table. The OKR entities (objectives, key results, departments) are NOT yet in the database schema.
-- **Schema Validation**: drizzle-zod for generating Zod schemas from Drizzle table definitions
-- **Migration**: Drizzle Kit configured to push schema to PostgreSQL via `DATABASE_URL` environment variable
+- **Database**: PostgreSQL via Drizzle ORM (`shared/schema.ts`)
+- **Tables**: `users`, `departments`, `objectives` (with isCollaborative, collaborativeDeptIds), `key_results` (with progressHistory JSONB)
+- **Default departments**: 技术部, 产品部, 设计部, 市场部, 运营部, 人力资源部
+- **Schema Validation**: drizzle-zod for generating Zod schemas
 
-### Key Data Models (Client-side)
-- **Department**: id, name, parentId, level (hierarchical organization structure)
-- **Objective**: id, title, description, departmentId, cycle (e.g., "2025-Q1"), parentObjectiveId, status (draft/active/completed/archived)
-- **KeyResult**: id, objectiveId, title, description, assignee, startDate, endDate, progress (0-100), weight, status (normal/behind/completed/overdue/paused), selfScore (0-1 scale), progressHistory
+### Key Data Models
+- **Department**: id, name, parentId, level (hierarchical)
+- **Objective**: id, title, description, departmentId, cycle, status, isCollaborative, collaborativeDeptIds, createdBy
+- **KeyResult**: id, objectiveId, title, description, assigneeName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory
+- **User**: id, username, password (hashed), displayName, role, departmentId
+
+### Key Screens
+- `app/login.tsx` — Login screen with username/password
+- `app/(tabs)/index.tsx` — Dashboard with progress ring, stats, at-risk items
+- `app/(tabs)/okrs.tsx` — OKR list with department/cycle filters
+- `app/(tabs)/analytics.tsx` — Status distribution, department progress, score stats
+- `app/(tabs)/profile.tsx` — User info, stats, admin management links, logout
+- `app/objective/[id].tsx` — Objective detail with KR list and actions
+- `app/create-objective.tsx` — Create objective (dept-scoped for non-admins)
+- `app/create-kr.tsx` — Create key result
+- `app/update-progress.tsx` — Update KR progress
+- `app/score-kr.tsx` — Self-score KR
+- `app/manage-departments.tsx` — Department CRUD (admin only)
+- `app/manage-users.tsx` — User list and management (admin only)
+- `app/create-department.tsx` — Create new department
+- `app/create-user.tsx` — Create new user with role/department assignment
 
 ### Build & Development
-- **Development**: Two processes — `expo:dev` for the Expo bundler and `server:dev` for the Express server (via tsx)
-- **Production**: Static web build via custom `scripts/build.js` (builds iOS/Android bundles + Expo web export to `static-build/web/`), server bundle via esbuild. The server detects `static-build/web/index.html` and serves the web app directly to browsers instead of the Expo Go landing page.
+- **Development**: Two workflows — `Start Frontend` (Expo on port 8081) and `Start Backend` (Express on port 5000)
+- **Production**: Static web build + esbuild server bundle
 - **Database Migrations**: `npm run db:push` uses drizzle-kit to push schema
-
-### Important Architectural Gap
-The OKR data currently lives entirely in client-side AsyncStorage. The Express server and PostgreSQL database are set up but not wired to serve OKR data. To make this a proper multi-user application, the OKR models need to be added to the Drizzle schema, API routes need to be created in `server/routes.ts`, and the client needs to switch from AsyncStorage to API calls.
 
 ## External Dependencies
 
-- **PostgreSQL**: Database configured via `DATABASE_URL` environment variable, managed through Drizzle ORM. Currently only has a users table.
-- **Expo Services**: Uses various Expo SDK modules (haptics, image picker, location, crypto, etc.)
-- **Replit Environment**: The app is designed to run on Replit — CORS setup references `REPLIT_DEV_DOMAIN` and `REPLIT_DOMAINS`, and the build script checks `REPLIT_INTERNAL_APP_DOMAIN`
-- **No external auth service**: No authentication is currently implemented beyond a basic user schema
-- **No external APIs**: The app is self-contained with no third-party API integrations
+- **PostgreSQL**: Database configured via `DATABASE_URL`, managed through Drizzle ORM
+- **Expo Services**: Various Expo SDK modules (haptics, safe-area, etc.)
+- **Replit Environment**: CORS setup references Replit domains; EXPO_PUBLIC_DOMAIN injected at build time

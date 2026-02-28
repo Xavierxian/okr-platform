@@ -4,7 +4,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useOKR } from '@/lib/okr-context';
 import Colors from '@/constants/colors';
-import { getScoreColor, getScoreLabel } from '@/lib/storage';
+function getScoreColor(score: number): string {
+  if (score === 1) return '#10B981';
+  if (score === 0.7) return '#3B82F6';
+  if (score === 0.3) return '#F59E0B';
+  return '#EF4444';
+}
+function getScoreLabel(score: number): string {
+  if (score === 1) return '完全达成';
+  if (score === 0.7) return '基本达成';
+  if (score === 0.3) return '部分达成';
+  return '未达成';
+}
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 function Bar({ label, value, maxValue, color, delay }: { label: string; value: number; maxValue: number; color: string; delay: number }) {

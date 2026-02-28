@@ -4,8 +4,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
+import { useAuth } from '@/lib/auth-context';
 import Colors from '@/constants/colors';
-import { getStatusColor } from '@/lib/storage';
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'normal': return '#10B981';
+    case 'behind': return '#F59E0B';
+    case 'completed': return '#3B82F6';
+    case 'overdue': return '#EF4444';
+    case 'paused': return '#64748B';
+    default: return '#94A3B8';
+  }
+}
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 function ProgressRing({ progress, size = 80, strokeWidth = 8, color }: { progress: number; size?: number; strokeWidth?: number; color: string }) {
@@ -53,6 +63,7 @@ function StatCard({ title, value, subtitle, icon, color, delay }: { title: strin
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { objectives, keyResults, departments, isLoading } = useOKR();
+  const { user } = useAuth();
 
   const stats = useMemo(() => {
     const totalKRs = keyResults.length;
@@ -84,7 +95,7 @@ export default function DashboardScreen() {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>OKR 仪表盘</Text>
+            <Text style={styles.greeting}>{user?.displayName || 'OKR'} 的仪表盘</Text>
             <Text style={styles.subtitle}>{objectives.length} 个目标，{keyResults.length} 个关键结果</Text>
           </View>
           <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>

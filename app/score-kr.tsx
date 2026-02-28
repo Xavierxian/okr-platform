@@ -4,7 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import Colors from '@/constants/colors';
-import { getScoreColor } from '@/lib/storage';
+function getScoreColor(score: number): string {
+  if (score === 1) return '#10B981';
+  if (score === 0.7) return '#3B82F6';
+  if (score === 0.3) return '#F59E0B';
+  return '#EF4444';
+}
 import * as Haptics from 'expo-haptics';
 
 const SCORES = [

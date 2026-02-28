@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TextInput, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
@@ -11,7 +11,7 @@ export default function CreateKRScreen() {
   const { addKeyResult } = useOKR();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [assignee, setAssignee] = useState('');
+  const [assigneeName, setAssigneeName] = useState('');
   const [weight, setWeight] = useState('1');
   const [saving, setSaving] = useState(false);
 
@@ -22,7 +22,7 @@ export default function CreateKRScreen() {
   const [startDate] = useState(today.toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(endDefault.toISOString().split('T')[0]);
 
-  const canSave = title.trim().length > 0 && assignee.trim().length > 0;
+  const canSave = title.trim().length > 0 && assigneeName.trim().length > 0;
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -32,7 +32,8 @@ export default function CreateKRScreen() {
       objectiveId: objectiveId || '',
       title: title.trim(),
       description: description.trim(),
-      assignee: assignee.trim(),
+      assigneeName: assigneeName.trim(),
+      assigneeId: null,
       startDate,
       endDate,
       weight: parseFloat(weight) || 1,
@@ -72,8 +73,8 @@ export default function CreateKRScreen() {
         <Text style={styles.label}>执行人</Text>
         <TextInput
           style={styles.input}
-          value={assignee}
-          onChangeText={setAssignee}
+          value={assigneeName}
+          onChangeText={setAssigneeName}
           placeholder="谁来负责？"
           placeholderTextColor={Colors.textTertiary}
         />

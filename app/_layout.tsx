@@ -7,19 +7,39 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { OKRProvider } from "@/lib/okr-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import Colors from "@/constants/colors";
+import LoginScreen from "@/app/login";
 
 SplashScreen.preventAutoHideAsync();
 
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  return <>{children}</>;
+}
+
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
+    <Stack screenOptions={{ headerBackTitle: "返回" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="objective/[id]"
-        options={{
-          headerShown: false,
-        }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="create-objective"
@@ -61,6 +81,47 @@ function RootLayoutNav() {
           contentStyle: { backgroundColor: "#1E293B" },
         }}
       />
+      <Stack.Screen
+        name="manage-users"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.9],
+          sheetGrabberVisible: true,
+          headerShown: false,
+          contentStyle: { backgroundColor: "#1E293B" },
+        }}
+      />
+      <Stack.Screen
+        name="manage-departments"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.9],
+          sheetGrabberVisible: true,
+          headerShown: false,
+          contentStyle: { backgroundColor: "#1E293B" },
+        }}
+      />
+      <Stack.Screen
+        name="create-user"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+          headerShown: false,
+          contentStyle: { backgroundColor: "#1E293B" },
+        }}
+      />
+      <Stack.Screen
+        name="create-department"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.7],
+          sheetGrabberVisible: true,
+          headerShown: false,
+          contentStyle: { backgroundColor: "#1E293B" },
+        }}
+      />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -84,14 +145,22 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <OKRProvider>
+        <AuthProvider>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              <RootLayoutNav />
+              <AuthGate>
+                <OKRProvider>
+                  <RootLayoutNav />
+                </OKRProvider>
+              </AuthGate>
             </KeyboardProvider>
           </GestureHandlerRootView>
-        </OKRProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: { flex: 1, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
+});

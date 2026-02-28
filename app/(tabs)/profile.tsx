@@ -2,14 +2,28 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
+import { useAuth } from '@/lib/auth-context';
 import Colors from '@/constants/colors';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: '超级管理员',
+  dept_admin: '部门管理员',
+  member: '普通成员',
+};
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { objectives, keyResults, refresh } = useOKR();
+  const { objectives, keyResults, departments } = useOKR();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'super_admin';
+
+  const userDept = useMemo(() => {
+    if (!user?.departmentId) return null;
+    return departments.find(d => d.id === user.departmentId);
+  }, [user, departments]);
 
   const personalStats = useMemo(() => {
     const totalKR = keyResults.length;
@@ -24,22 +38,11 @@ export default function ProfileScreen() {
     return { totalKR, completed, avgProgress, avgScore, scored: scored.length };
   }, [keyResults]);
 
-  const handleClearData = () => {
-    Alert.alert(
-      '清除所有数据',
-      '此操作将删除所有目标和关键结果，且不可恢复。',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '清除',
-          style: 'destructive',
-          onPress: async () => {
-            await AsyncStorage.multiRemove(['okr_departments', 'okr_objectives', 'okr_key_results']);
-            await refresh();
-          },
-        },
-      ]
-    );
+  const handleLogout = () => {
+    Alert.alert('退出登录', '确定要退出当前账号吗？', [
+      { text: '取消', style: 'cancel' },
+      { text: '退出', style: 'destructive', onPress: logout },
+    ]);
   };
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
@@ -56,8 +59,9 @@ export default function ProfileScreen() {
           <View style={styles.avatar}>
             <Ionicons name="person" size={36} color={Colors.primary} />
           </View>
-          <Text style={styles.userName}>OKR 管理员</Text>
-          <Text style={styles.userRole}>超级管理员</Text>
+          <Text style={styles.userName}>{user?.displayName || '用户'}</Text>
+          <Text style={styles.userRole}>{ROLE_LABELS[user?.role || ''] || user?.role}</Text>
+          {userDept && <Text style={styles.userDept}>{userDept.name}</Text>}
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.section}>
@@ -94,20 +98,40 @@ export default function ProfileScreen() {
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>设置</Text>
-          <Pressable onPress={handleClearData} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
+        {isAdmin && (
+          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
+            <Text style={styles.sectionTitle}>管理后台</Text>
+            <Pressable onPress={() => router.push('/manage-departments')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
+              <View style={[styles.settingIcon, { backgroundColor: Colors.info + '20' }]}>
+                <Ionicons name="business-outline" size={18} color={Colors.info} />
+              </View>
+              <Text style={styles.settingText}>部门管理</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            </Pressable>
+            <Pressable onPress={() => router.push('/manage-users')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
+              <View style={[styles.settingIcon, { backgroundColor: Colors.accent + '20' }]}>
+                <Ionicons name="people-outline" size={18} color={Colors.accent} />
+              </View>
+              <Text style={styles.settingText}>用户管理</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            </Pressable>
+          </Animated.View>
+        )}
+
+        <Animated.View entering={FadeInDown.delay(isAdmin ? 400 : 300).duration(400)} style={styles.section}>
+          <Text style={styles.sectionTitle}>账号</Text>
+          <Pressable onPress={handleLogout} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
             <View style={[styles.settingIcon, { backgroundColor: Colors.danger + '20' }]}>
-              <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+              <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
             </View>
-            <Text style={[styles.settingText, { color: Colors.danger }]}>清除所有数据</Text>
+            <Text style={[styles.settingText, { color: Colors.danger }]}>退出登录</Text>
             <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
           </Pressable>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.footerSection}>
-          <Text style={styles.version}>OKR Hub v1.0.0</Text>
-        </Animated.View>
+        <View style={styles.footerSection}>
+          <Text style={styles.version}>OKR 管理平台 v1.0.0</Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -121,6 +145,7 @@ const styles = StyleSheet.create({
   avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   userName: { fontFamily: 'Inter_600SemiBold', fontSize: 20, color: Colors.text },
   userRole: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
+  userDept: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.primary, marginTop: 4 },
   section: { backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 16 },
   sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.text, marginBottom: 14 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -132,7 +157,7 @@ const styles = StyleSheet.create({
   assessValue: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.text },
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   settingIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  settingText: { fontFamily: 'Inter_500Medium', fontSize: 15, flex: 1 },
+  settingText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.text, flex: 1 },
   footerSection: { alignItems: 'center', paddingVertical: 20 },
   version: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary },
 });
