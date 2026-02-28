@@ -67,26 +67,39 @@ export default function ObjectiveDetailScreen() {
     );
   }
 
-  const handleDeleteObjective = () => {
+  const handleDeleteObjective = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('删除目标', '此操作将删除该目标及其所有关键结果。', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除', style: 'destructive',
-        onPress: async () => {
-          await removeObjective(objective.id);
-          router.back();
+    if (Platform.OS === 'web') {
+      if (window.confirm('此操作将删除该目标及其所有关键结果，确定删除吗？')) {
+        await removeObjective(objective.id);
+        router.back();
+      }
+    } else {
+      Alert.alert('删除目标', '此操作将删除该目标及其所有关键结果。', [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除', style: 'destructive',
+          onPress: async () => {
+            await removeObjective(objective.id);
+            router.back();
+          },
         },
-      },
-    ]);
+      ]);
+    }
   };
 
-  const handleDeleteKR = (krId: string, krTitle: string) => {
+  const handleDeleteKR = async (krId: string, krTitle: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('删除关键结果', `确定删除"${krTitle}"吗？`, [
-      { text: '取消', style: 'cancel' },
-      { text: '删除', style: 'destructive', onPress: () => removeKeyResult(krId) },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm(`确定删除"${krTitle}"吗？`)) {
+        await removeKeyResult(krId);
+      }
+    } else {
+      Alert.alert('删除关键结果', `确定删除"${krTitle}"吗？`, [
+        { text: '取消', style: 'cancel' },
+        { text: '删除', style: 'destructive', onPress: () => removeKeyResult(krId) },
+      ]);
+    }
   };
 
   return (
