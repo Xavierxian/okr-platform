@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, FlatList, Pressable, Alert, ActivityIndicator, Platform, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
@@ -9,13 +9,15 @@ import * as Haptics from 'expo-haptics';
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: '超级管理员',
-  dept_admin: '部门管理员',
-  member: '普通成员',
+  vp: 'VP',
+  center_head: '中心负责人',
+  member: '普通员工',
 };
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: Colors.danger,
-  dept_admin: Colors.accent,
+  vp: '#8B5CF6',
+  center_head: Colors.accent,
   member: Colors.info,
 };
 
@@ -28,10 +30,18 @@ interface UserItem {
   createdAt: string;
 }
 
+const ROLE_OPTIONS = [
+  { value: 'member', label: '普通员工' },
+  { value: 'center_head', label: '中心负责人' },
+  { value: 'vp', label: 'VP' },
+  { value: 'super_admin', label: '超级管理员' },
+];
+
 export default function ManageUsersScreen() {
   const { departments } = useOKR();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [roleModalUser, setRoleModalUser] = useState<UserItem | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -67,20 +77,16 @@ export default function ManageUsersScreen() {
 
   const handleChangeRole = (user: UserItem) => {
     if (user.role === 'super_admin') return;
-    const roles = ['member', 'dept_admin'] as const;
-    const nextRole = user.role === 'member' ? 'dept_admin' : 'member';
-    Alert.alert('修改角色', `将 ${user.displayName} 的角色改为 ${ROLE_LABELS[nextRole]}？`, [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '确定',
-        onPress: async () => {
-          try {
-            await apiRequest("PUT", `/api/users/${user.id}`, { role: nextRole });
-            setUsers(prev => prev.map(u => u.id === user.id ? { ...u, role: nextRole } : u));
-          } catch { Alert.alert('错误', '更新失败'); }
-        },
-      },
-    ]);
+    setRoleModalUser(user);
+  };
+
+  const applyRoleChange = async (newRole: string) => {
+    if (!roleModalUser) return;
+    try {
+      await apiRequest("PUT", `/api/users/${roleModalUser.id}`, { role: newRole });
+      setUsers(prev => prev.map(u => u.id === roleModalUser.id ? { ...u, role: newRole } : u));
+    } catch { Alert.alert('错误', '更新失败'); }
+    setRoleModalUser(null);
   };
 
   const getDeptName = (deptId: string | null) => {
@@ -161,6 +167,24 @@ export default function ManageUsersScreen() {
           }
         />
       )}
+
+      <Modal visible={!!roleModalUser} transparent animationType="fade" onRequestClose={() => setRoleModalUser(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setRoleModalUser(null)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>切换角色</Text>
+            <Text style={styles.modalSub}>{roleModalUser?.displayName}</Text>
+            {ROLE_OPTIONS.filter(r => r.value !== roleModalUser?.role).map(r => (
+              <Pressable key={r.value} onPress={() => applyRoleChange(r.value)} style={({ pressed }) => [styles.modalOption, { opacity: pressed ? 0.7 : 1 }]}>
+                <View style={[styles.modalDot, { backgroundColor: ROLE_COLORS[r.value] || Colors.info }]} />
+                <Text style={styles.modalOptionText}>{r.label}</Text>
+              </Pressable>
+            ))}
+            <Pressable onPress={() => setRoleModalUser(null)} style={({ pressed }) => [styles.modalCancel, { opacity: pressed ? 0.7 : 1 }]}>
+              <Text style={styles.modalCancelText}>取消</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -189,4 +213,13 @@ const styles = StyleSheet.create({
   actionText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.primary },
   empty: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textTertiary },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: Colors.card, borderRadius: 16, padding: 20, width: 300 },
+  modalTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, color: Colors.text, textAlign: 'center', marginBottom: 4 },
+  modalSub: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, textAlign: 'center', marginBottom: 16 },
+  modalOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  modalDot: { width: 10, height: 10, borderRadius: 5 },
+  modalOptionText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.text },
+  modalCancel: { marginTop: 12, paddingVertical: 10, alignItems: 'center' },
+  modalCancelText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.textSecondary },
 });

@@ -91,12 +91,9 @@ export default function DashboardScreen() {
   const { user } = useAuth();
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
 
-  const isAdmin = user?.role === 'super_admin';
-
   const allMyObjectives = useMemo(() => {
-    if (isAdmin) return objectives;
-    return objectives.filter(obj => obj.createdBy === user?.id || obj.departmentId === user?.departmentId);
-  }, [objectives, user, isAdmin]);
+    return objectives.filter(obj => obj.createdBy === user?.id);
+  }, [objectives, user]);
 
   const myObjectives = useMemo(() => {
     if (selectedDeptIds.length === 0) return allMyObjectives;

@@ -1,27 +1,65 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StyleSheet, Text, View, FlatList, Pressable, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
+import { useAuth } from '@/lib/auth-context';
+import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
+
+interface SimpleUser {
+  id: string;
+  displayName: string;
+  departmentId: string | null;
+  role: string;
+}
 
 export default function OKRsScreen() {
   const insets = useSafeAreaInsets();
   const { objectives, keyResults, departments, isLoading } = useOKR();
+  const { user } = useAuth();
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
+  const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
 
-  const toggleDept = (id: string) => {
-    setSelectedDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
-  };
+  const userRole = user?.role || 'member';
+  const showUserFilter = true;
+  const showDeptFilter = userRole === 'center_head' || userRole === 'vp' || userRole === 'super_admin';
+
+  useEffect(() => {
+    if (showUserFilter || showDeptFilter) {
+      apiRequest("GET", "/api/users/all-safe")
+        .then(res => res.json())
+        .then((data: SimpleUser[]) => setAllUsers(data))
+        .catch(() => {});
+    }
+  }, [showUserFilter, showDeptFilter]);
+
+  const visibleUsers = useMemo(() => {
+    if (userRole === 'member') {
+      return allUsers.filter(u => u.departmentId === user?.departmentId);
+    }
+    if (userRole === 'center_head') {
+      if (selectedDeptIds.length > 0) {
+        return allUsers.filter(u => u.departmentId && selectedDeptIds.includes(u.departmentId));
+      }
+      return allUsers.filter(u => u.role === 'center_head');
+    }
+    if (selectedDeptIds.length > 0) {
+      return allUsers.filter(u => u.departmentId && selectedDeptIds.includes(u.departmentId));
+    }
+    return allUsers;
+  }, [allUsers, userRole, user, selectedDeptIds]);
 
   const filteredObjectives = useMemo(() => {
     let filtered = objectives;
     if (selectedDeptIds.length > 0) filtered = filtered.filter(o => selectedDeptIds.includes(o.departmentId));
+    if (selectedUserId) filtered = filtered.filter(o => o.createdBy === selectedUserId);
     if (selectedCycle) filtered = filtered.filter(o => o.cycle === selectedCycle);
     return filtered;
-  }, [objectives, selectedDeptIds, selectedCycle]);
+  }, [objectives, selectedDeptIds, selectedUserId, selectedCycle]);
 
   const cycles = useMemo(() => {
     const set = new Set(objectives.map(o => o.cycle));
@@ -32,6 +70,11 @@ export default function OKRsScreen() {
     const ids = new Set(objectives.map(o => o.departmentId));
     return departments.filter(d => ids.has(d.id));
   }, [objectives, departments]);
+
+  const toggleDept = (id: string) => {
+    setSelectedDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+    setSelectedUserId(null);
+  };
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -50,6 +93,7 @@ export default function OKRsScreen() {
       ? Math.round(objKRs.reduce((s, kr) => s + kr.progress, 0) / objKRs.length)
       : 0;
     const completedCount = objKRs.filter(kr => kr.status === 'completed').length;
+    const creator = allUsers.find(u => u.id === item.createdBy);
 
     return (
       <Pressable
@@ -78,6 +122,12 @@ export default function OKRsScreen() {
             <Ionicons name="key-outline" size={12} color={Colors.textSecondary} />
             <Text style={styles.metaText}>{objKRs.length} 个 KR</Text>
           </View>
+          {creator && (
+            <View style={styles.metaChip}>
+              <Ionicons name="person-outline" size={12} color={Colors.textSecondary} />
+              <Text style={styles.metaText}>{creator.displayName}</Text>
+            </View>
+          )}
         </View>
         <View style={styles.cardProgress}>
           <View style={styles.progressBar}>
@@ -109,14 +159,14 @@ export default function OKRsScreen() {
         </View>
       </View>
 
-      {(usedDepts.length > 0 || cycles.length > 0) && (
-        <View style={styles.filters}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+      <View style={styles.filters}>
+        {showDeptFilter && usedDepts.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 8 }}>
             <Pressable
-              onPress={() => setSelectedDeptIds([])}
+              onPress={() => { setSelectedDeptIds([]); setSelectedUserId(null); }}
               style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipActive]}
             >
-              <Text style={[styles.filterText, selectedDeptIds.length === 0 && styles.filterTextActive]}>全部</Text>
+              <Text style={[styles.filterText, selectedDeptIds.length === 0 && styles.filterTextActive]}>全部中心</Text>
             </Pressable>
             {usedDepts.map(d => {
               const isActive = selectedDeptIds.includes(d.id);
@@ -128,25 +178,47 @@ export default function OKRsScreen() {
               );
             })}
           </ScrollView>
-          {cycles.length > 0 && (
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={[{ id: null, label: '全部周期' }, ...cycles.map(c => ({ id: c, label: c }))]}
-              keyExtractor={item => item.id || 'all-cycles'}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginTop: 8 }}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => setSelectedCycle(item.id)}
-                  style={[styles.filterChip, selectedCycle === item.id && styles.filterChipActive]}
-                >
-                  <Text style={[styles.filterText, selectedCycle === item.id && styles.filterTextActive]}>{item.label}</Text>
+        )}
+
+        {showUserFilter && visibleUsers.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 8 }}>
+            <Pressable
+              onPress={() => setSelectedUserId(null)}
+              style={[styles.filterChip, !selectedUserId && styles.filterChipUserActive]}
+            >
+              <Text style={[styles.filterText, !selectedUserId && styles.filterTextActive]}>全部人员</Text>
+            </Pressable>
+            {visibleUsers.map(u => {
+              const isActive = selectedUserId === u.id;
+              return (
+                <Pressable key={u.id} onPress={() => setSelectedUserId(isActive ? null : u.id)} style={[styles.filterChip, isActive && styles.filterChipUserActive]}>
+                  <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{u.displayName}</Text>
                 </Pressable>
-              )}
-            />
-          )}
-        </View>
-      )}
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {cycles.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+            <Pressable
+              onPress={() => setSelectedCycle(null)}
+              style={[styles.filterChip, !selectedCycle && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterText, !selectedCycle && styles.filterTextActive]}>全部周期</Text>
+            </Pressable>
+            {cycles.map(c => (
+              <Pressable
+                key={c}
+                onPress={() => setSelectedCycle(selectedCycle === c ? null : c)}
+                style={[styles.filterChip, selectedCycle === c && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterText, selectedCycle === c && styles.filterTextActive]}>{c}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+      </View>
 
       <FlatList
         data={filteredObjectives}
@@ -177,6 +249,7 @@ const styles = StyleSheet.create({
   filters: { paddingBottom: 12 },
   filterChip: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.backgroundTertiary },
   filterChipActive: { backgroundColor: Colors.primary },
+  filterChipUserActive: { backgroundColor: Colors.success },
   filterText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
   filterTextActive: { color: Colors.white },
   card: { backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 12 },

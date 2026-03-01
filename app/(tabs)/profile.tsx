@@ -10,8 +10,9 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: '超级管理员',
-  dept_admin: '部门管理员',
-  member: '普通成员',
+  vp: 'VP',
+  center_head: '中心负责人',
+  member: '普通员工',
 };
 
 export default function ProfileScreen() {

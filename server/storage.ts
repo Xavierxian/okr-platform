@@ -77,7 +77,7 @@ export async function getUsersByDepartment(departmentId: string): Promise<User[]
 }
 
 export async function getObjectivesForUser(user: User): Promise<Objective[]> {
-  if (user.role === "super_admin") {
+  if (user.role === "super_admin" || user.role === "vp") {
     return db.select().from(objectives);
   }
   const allDepts = await getDepartments();
@@ -90,6 +90,21 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
       .filter(kr => kr.assigneeId === user.id || kr.collaboratorId === user.id)
       .map(kr => kr.objectiveId)
   );
+
+  if (user.role === "center_head") {
+    const allUsers = await getAllUsers();
+    const centerHeadIds = new Set(allUsers.filter(u => u.role === "center_head").map(u => u.id));
+    return allObjs.filter(obj => {
+      if (obj.createdBy && centerHeadIds.has(obj.createdBy)) return true;
+      if (deptIds.includes(obj.departmentId)) return true;
+      if (relatedObjIds.has(obj.id)) return true;
+      if (obj.isCollaborative) {
+        if ((obj.collaborativeDeptIds as string[] || []).some(id => deptIds.includes(id))) return true;
+        if ((obj.collaborativeUserIds as string[] || []).includes(user.id)) return true;
+      }
+      return false;
+    });
+  }
 
   return allObjs.filter(obj => {
     if (deptIds.includes(obj.departmentId)) return true;

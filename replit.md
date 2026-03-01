@@ -40,7 +40,7 @@ Preferred communication style: Simple, everyday language.
 ### Authentication & Authorization
 - **Session-based auth**: express-session with PostgreSQL session store
 - **Default super admin**: username=`admin`, password=`admin123`, displayName=`超级管理员`
-- **Roles**: `super_admin` (full access), `dept_admin` (department admin), `member` (department-scoped)
+- **Roles**: `super_admin` (超级管理员, full access), `vp` (VP, sees all OKRs), `center_head` (中心负责人, sees center_head OKRs), `member` (普通员工, department-scoped)
 - **Middleware**: `requireAuth` for all protected routes, `requireAdmin` for admin-only routes
 - **Department scoping**: Non-admin users can only create objectives for their own department; server validates department ownership
 
@@ -58,9 +58,15 @@ Preferred communication style: Simple, everyday language.
 - **User**: id, username, password (hashed), displayName, role, departmentId
 
 ### Dashboard Structure (3 Sections)
-1. **我的目标** — Objectives created by the user or belonging to user's department
+1. **我的目标** — Objectives created/imported by the current user only (createdBy === user.id)
 2. **本部门协同 KR** — KRs where the user is assigned as the executor (assigneeId). User can update progress, add notes, and self-evaluate.
 3. **跨部门协同 KR** — KRs where the user is set as the cross-department collaborator (collaboratorId). View-only: user can see progress and notes but cannot modify.
+
+### OKR List Visibility (Role-based)
+- **member** (普通员工): Sees OKRs from same department users, can filter by user
+- **center_head** (中心负责人): Sees all OKRs created by center_head role users, can filter by department and user
+- **vp** (VP): Sees all OKRs, can filter by department and user
+- **super_admin** (超级管理员): Sees all OKRs, can filter by department and user
 
 ### KR Collaboration Model
 - **Assignee (执行人)**: Single-select from same-department users only. Shown with radio buttons.

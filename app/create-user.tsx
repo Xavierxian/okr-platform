@@ -8,8 +8,9 @@ import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
 const ROLES = [
-  { value: 'member', label: '普通成员' },
-  { value: 'dept_admin', label: '部门管理员' },
+  { value: 'member', label: '普通员工' },
+  { value: 'center_head', label: '中心负责人' },
+  { value: 'vp', label: 'VP' },
   { value: 'super_admin', label: '超级管理员' },
 ];
 
