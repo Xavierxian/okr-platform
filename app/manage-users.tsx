@@ -126,17 +126,17 @@ export default function ManageUsersScreen() {
           <Text style={styles.metaText}>{getDeptName(item.departmentId)}</Text>
         </View>
       </View>
-      <View style={styles.actions}>
-        <Pressable onPress={() => handleChangeRole(item)} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.7 : 1 }]}>
-          <Ionicons name="swap-horizontal-outline" size={16} color={Colors.primary} />
-          <Text style={styles.actionText}>切换角色</Text>
-        </Pressable>
-        {item.role !== 'super_admin' && (
+      {item.role !== 'super_admin' && (
+        <View style={styles.actions}>
+          <Pressable onPress={() => handleChangeRole(item)} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.7 : 1 }]}>
+            <Ionicons name="swap-horizontal-outline" size={16} color={Colors.primary} />
+            <Text style={styles.actionText}>切换角色</Text>
+          </Pressable>
           <Pressable onPress={() => handleDelete(item)} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.7 : 1 }]}>
             <Ionicons name="trash-outline" size={16} color={Colors.danger} />
           </Pressable>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 
