@@ -12,6 +12,7 @@ const ROLE_LABELS: Record<string, string> = {
   vp: 'VP',
   center_head: '中心负责人',
   member: '普通员工和部门经理',
+  dept_admin: '部门管理员(旧)',
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -19,6 +20,7 @@ const ROLE_COLORS: Record<string, string> = {
   vp: '#8B5CF6',
   center_head: Colors.accent,
   member: Colors.info,
+  dept_admin: Colors.accent,
 };
 
 interface UserItem {
@@ -55,24 +57,33 @@ export default function ManageUsersScreen() {
 
   useEffect(() => { fetchUsers(); }, []);
 
+  const doDelete = async (user: UserItem) => {
+    try {
+      await apiRequest("DELETE", `/api/users/${user.id}`);
+      setUsers(prev => prev.filter(u => u.id !== user.id));
+    } catch {
+      if (Platform.OS === 'web') { window.alert('删除失败'); }
+      else { Alert.alert('错误', '删除失败'); }
+    }
+  };
+
   const handleDelete = (user: UserItem) => {
     if (user.role === 'super_admin') {
-      Alert.alert('提示', '不能删除超级管理员');
+      if (Platform.OS === 'web') { window.alert('不能删除超级管理员'); }
+      else { Alert.alert('提示', '不能删除超级管理员'); }
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('删除用户', `确定删除用户"${user.displayName}"吗？`, [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除', style: 'destructive',
-        onPress: async () => {
-          try {
-            await apiRequest("DELETE", `/api/users/${user.id}`);
-            setUsers(prev => prev.filter(u => u.id !== user.id));
-          } catch { Alert.alert('错误', '删除失败'); }
-        },
-      },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm(`确定删除用户"${user.displayName}"吗？`)) {
+        doDelete(user);
+      }
+    } else {
+      Alert.alert('删除用户', `确定删除用户"${user.displayName}"吗？`, [
+        { text: '取消', style: 'cancel' },
+        { text: '删除', style: 'destructive', onPress: () => doDelete(user) },
+      ]);
+    }
   };
 
   const handleChangeRole = (user: UserItem) => {
