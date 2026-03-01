@@ -26,7 +26,6 @@ export default function CreateObjectiveScreen() {
 
   const defaultDeptId = isAdmin ? (departments[0]?.id || '') : (user?.departmentId || departments[0]?.id || '');
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [selectedDept, setSelectedDept] = useState(defaultDeptId);
   const cycleOptions = cycles.map(c => c.name);
   const [selectedCycle, setSelectedCycle] = useState(cycleOptions[0] || '');
@@ -49,7 +48,6 @@ export default function CreateObjectiveScreen() {
   useEffect(() => {
     if (isEditMode && existingObj && !hydrated) {
       setTitle(existingObj.title);
-      setDescription(existingObj.description || '');
       setSelectedDept(existingObj.departmentId || defaultDeptId);
       setSelectedCycle(existingObj.cycle || cycleOptions[0] || '');
       setIsCollaborative(existingObj.isCollaborative || false);
@@ -93,7 +91,7 @@ export default function CreateObjectiveScreen() {
 
     const payload = {
       title: title.trim(),
-      description: description.trim(),
+      description: '',
       departmentId: selectedDept,
       cycle: selectedCycle,
       parentObjectiveId: null,
@@ -124,9 +122,6 @@ export default function CreateObjectiveScreen() {
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>目标名称</Text>
         <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="你想要达成什么目标？" placeholderTextColor={Colors.textTertiary} autoFocus={!isEditMode} />
-
-        <Text style={styles.label}>目标描述</Text>
-        <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="描述目标的意义和达成价值" placeholderTextColor={Colors.textTertiary} multiline numberOfLines={3} textAlignVertical="top" />
 
         <Text style={styles.label}>所属部门</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>

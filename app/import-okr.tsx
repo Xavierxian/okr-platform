@@ -7,7 +7,7 @@ import { apiRequest, getApiUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
-const COLUMNS = ['目标名称', '目标描述', 'OKR类型', '关联上级', 'KR名称', 'KR描述', '执行人', '权重', '周期', '部门'];
+const COLUMNS = ['目标名称', 'OKR类型', '关联上级', 'KR名称', '执行人', '权重', '周期', '部门'];
 const REQUIRED_HEADERS = ['目标名称'];
 
 function parseCSVLine(line: string): string[] {
@@ -280,7 +280,7 @@ export default function ImportOKRScreen() {
                 <View style={styles.tableHeaderRow}>
                   <View style={styles.rowNumCell}><Text style={styles.headerCellText}>#</Text></View>
                   {COLUMNS.map(col => (
-                    <View key={col} style={[styles.headerCell, col === '目标名称' || col === 'KR名称' ? styles.wideCell : col === '目标描述' || col === 'KR描述' ? styles.wideCell : styles.normalCell]}>
+                    <View key={col} style={[styles.headerCell, col === '目标名称' || col === 'KR名称' ? styles.wideCell : styles.normalCell]}>
                       <Text style={styles.headerCellText} numberOfLines={1}>{col}</Text>
                     </View>
                   ))}
@@ -290,7 +290,7 @@ export default function ImportOKRScreen() {
                   <View key={rowIdx} style={[styles.tableRow, rowIdx % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd]}>
                     <View style={styles.rowNumCell}><Text style={styles.rowNumText}>{rowIdx + 1}</Text></View>
                     {COLUMNS.map(col => (
-                      <View key={col} style={[styles.dataCell, col === '目标名称' || col === 'KR名称' ? styles.wideCell : col === '目标描述' || col === 'KR描述' ? styles.wideCell : styles.normalCell]}>
+                      <View key={col} style={[styles.dataCell, col === '目标名称' || col === 'KR名称' ? styles.wideCell : styles.normalCell]}>
                         {col === 'OKR类型' ? (
                           <Pressable
                             onPress={() => handleCellChange(rowIdx, col, row[col] === '挑战型' ? '承诺型' : '挑战型')}

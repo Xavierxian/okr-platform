@@ -28,7 +28,6 @@ export default function CreateKRScreen() {
   endDefault.setMonth(endDefault.getMonth() + 3);
 
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUserName, setSelectedUserName] = useState('');
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<string | null>(null);
@@ -48,7 +47,6 @@ export default function CreateKRScreen() {
   useEffect(() => {
     if (isEditMode && existingKR && !hydrated) {
       setTitle(existingKR.title);
-      setDescription(existingKR.description || '');
       setSelectedUserId(existingKR.assigneeId || null);
       setSelectedUserName(existingKR.assigneeName || '');
       setSelectedCollaboratorId(existingKR.collaboratorId || null);
@@ -110,7 +108,7 @@ export default function CreateKRScreen() {
     if (isEditMode) {
       await editKeyResult(existingKR.id, {
         title: title.trim(),
-        description: description.trim(),
+        description: '',
         assigneeId: selectedUserId,
         assigneeName: selectedUserName.trim(),
         collaboratorId: selectedCollaboratorId,
@@ -123,7 +121,7 @@ export default function CreateKRScreen() {
       await addKeyResult({
         objectiveId: effectiveObjectiveId,
         title: title.trim(),
-        description: description.trim(),
+        description: '',
         assigneeId: selectedUserId,
         assigneeName: selectedUserName.trim(),
         collaboratorId: selectedCollaboratorId,
@@ -161,17 +159,6 @@ export default function CreateKRScreen() {
           autoFocus={!isEditMode}
         />
 
-        <Text style={styles.label}>描述</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={description}
-          onChangeText={setDescription}
-          placeholder="如何衡量成功？执行路径是什么？"
-          placeholderTextColor={Colors.textTertiary}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
 
         <Text style={styles.label}>执行人（本部门，单选）</Text>
         {loadingUsers ? (

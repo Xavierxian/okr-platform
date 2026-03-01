@@ -152,7 +152,6 @@ export default function ObjectiveDetailScreen() {
           </View>
 
           <Text style={styles.objTitle}>{objective.title}</Text>
-          {objective.description ? <Text style={styles.objDesc}>{objective.description}</Text> : null}
 
           <View style={styles.progressCard}>
             <View style={styles.progressTop}>
@@ -197,7 +196,6 @@ export default function ObjectiveDetailScreen() {
                   <View style={[styles.krStatusDot, { backgroundColor: getStatusColor(kr.status) }]} />
                   <Text style={styles.krTitle} numberOfLines={2}>{kr.title}</Text>
                 </View>
-                {kr.description ? <Text style={styles.krDesc} numberOfLines={2}>{kr.description}</Text> : null}
                 <View style={styles.krMeta}>
                   {kr.assigneeName ? (
                     <View style={styles.krMetaItem}>

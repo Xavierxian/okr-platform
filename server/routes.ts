@@ -424,10 +424,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       deptName = dept?.name || "";
     }
 
-    const csvContent = `目标名称,目标描述,OKR类型,关联上级,KR名称,KR描述,执行人,权重,周期,部门
-提高产品质量,通过测试覆盖率和代码审查提升质量,承诺型,否,单元测试覆盖率达到80%,提升核心模块测试覆盖,,1,${defaultCycle},${deptName}
-提高产品质量,通过测试覆盖率和代码审查提升质量,承诺型,否,代码审查通过率95%,确保每次PR都经过审查,,1,${defaultCycle},${deptName}
-提升用户满意度,改善用户体验和客户服务质量,挑战型,是,NPS分数提升到8.5,用户调查和反馈分析,,1,${defaultCycle},${deptName}`;
+    const csvContent = `目标名称,OKR类型,关联上级,KR名称,执行人,权重,周期,部门
+提高产品质量,承诺型,否,单元测试覆盖率达到80%,,1,${defaultCycle},${deptName}
+提高产品质量,承诺型,否,代码审查通过率95%,,1,${defaultCycle},${deptName}
+提升用户满意度,挑战型,是,NPS分数提升到8.5,,1,${defaultCycle},${deptName}`;
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", "attachment; filename=okr_import_template.csv");
@@ -469,9 +469,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const objTitle = row["目标名称"]?.trim();
-        const objDesc = row["目标描述"]?.trim() || "";
+        const objDesc = "";
         const krTitle = row["KR名称"]?.trim();
-        const krDesc = row["KR描述"]?.trim() || "";
+        const krDesc = "";
         const okrType = row["OKR类型"]?.trim() || "承诺型";
         const linkedToParentStr = row["关联上级"]?.trim() || "否";
         const linkedToParent = linkedToParentStr === "是";
