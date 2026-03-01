@@ -87,7 +87,7 @@ export default function ManageUsersScreen() {
   };
 
   const handleChangeRole = (user: UserItem) => {
-    if (user.role === 'super_admin') return;
+    if (user.username === 'admin') return;
     setRoleModalUser(user);
   };
 
@@ -126,7 +126,7 @@ export default function ManageUsersScreen() {
           <Text style={styles.metaText}>{getDeptName(item.departmentId)}</Text>
         </View>
       </View>
-      {item.role !== 'super_admin' && (
+      {item.username !== 'admin' && (
         <View style={styles.actions}>
           <Pressable onPress={() => handleChangeRole(item)} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.7 : 1 }]}>
             <Ionicons name="swap-horizontal-outline" size={16} color={Colors.primary} />
