@@ -7,58 +7,9 @@ import { apiRequest, getApiUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
-const COLUMNS = ['目标名称', 'OKR类型', '关联上级', 'KR名称', '执行人', '权重', '周期', '部门'];
-const REQUIRED_HEADERS = ['目标名称'];
+const COLUMNS = ['部门', '目标名称', 'KR名称', '执行人', '周期', 'OKR类型', '关联上级', '权重'];
 
-function parseCSVLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ',') {
-        fields.push(current.trim());
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-  }
-  fields.push(current.trim());
-  return fields;
-}
-
-function parseCSV(text: string): { rows: Record<string, string>[]; error: string | null } {
-  const lines = text.replace(/^\uFEFF/, '').split('\n').filter(l => l.trim());
-  if (lines.length < 2) return { rows: [], error: '文件为空或只有表头' };
-  const headers = parseCSVLine(lines[0]);
-  const missing = REQUIRED_HEADERS.filter(h => !headers.includes(h));
-  if (missing.length > 0) {
-    return { rows: [], error: `缺少必要列: ${missing.join(', ')}。请使用模板文件。` };
-  }
-  const rows: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCSVLine(lines[i]);
-    const row: Record<string, string> = {};
-    headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
-    rows.push(row);
-  }
-  return { rows, error: null };
-}
-
-function WebFileInput({ onFileRead }: { onFileRead: (name: string, content: string) => void }) {
+function WebFileInput({ onFileSelected }: { onFileSelected: (file: File) => void }) {
   if (Platform.OS !== 'web') return null;
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -69,12 +20,7 @@ function WebFileInput({ onFileRead }: { onFileRead: (name: string, content: stri
   const handleChange = (e: any) => {
     const file = e.target?.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      onFileRead(file.name, text);
-    };
-    reader.readAsText(file, 'UTF-8');
+    onFileSelected(file);
     e.target.value = '';
   };
 
@@ -83,33 +29,16 @@ function WebFileInput({ onFileRead }: { onFileRead: (name: string, content: stri
       <input
         ref={inputRef as any}
         type="file"
-        accept=".csv,text/csv,text/comma-separated-values"
+        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
         onChange={handleChange}
         style={{ display: 'none' }}
       />
       <Pressable onPress={handleClick} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
         <Ionicons name="document-outline" size={18} color={Colors.primary} />
-        <Text style={styles.actionBtnText}>选择 CSV 文件</Text>
+        <Text style={styles.actionBtnText}>选择 Excel 文件</Text>
       </Pressable>
     </View>
   );
-}
-
-async function pickFileNative(): Promise<{ name: string; content: string } | null> {
-  try {
-    const DocumentPicker = await import('expo-document-picker');
-    const FileSystem = await import('expo-file-system');
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', '*/*'],
-      copyToCacheDirectory: true,
-    });
-    if (result.canceled || !result.assets?.[0]) return null;
-    const file = result.assets[0];
-    const content = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.UTF8 });
-    return { name: file.name, content };
-  } catch {
-    return null;
-  }
 }
 
 function emptyRow(): Record<string, string> {
@@ -119,6 +48,7 @@ function emptyRow(): Record<string, string> {
 export default function ImportOKRScreen() {
   const { refresh } = useOKR();
   const [importing, setImporting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<{ message: string; errors: string[] } | null>(null);
   const [fileName, setFileName] = useState('');
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
@@ -129,14 +59,12 @@ export default function ImportOKRScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const res = await apiRequest("GET", "/api/import/template");
-      const text = await res.text();
+      const blob = await res.blob();
       if (Platform.OS === 'web') {
-        const BOM = '\uFEFF';
-        const blob = new Blob([BOM + text], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'okr_import_template.csv';
+        link.download = 'okr_import_template.xlsx';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -151,20 +79,73 @@ export default function ImportOKRScreen() {
     }
   }, []);
 
-  const processFileContent = useCallback((name: string, content: string) => {
-    setFileName(name);
-    const { rows, error } = parseCSV(content);
-    setParsedRows(rows);
-    setParseError(error);
+  const uploadExcelFile = useCallback(async (file: File | { uri: string; name: string }) => {
+    setUploading(true);
+    setParseError(null);
     setResult(null);
-    if (rows.length > 0) setEditMode(true);
+    try {
+      let response: Response;
+      if (file instanceof File) {
+        const arrayBuffer = await file.arrayBuffer();
+        const baseUrl = getApiUrl();
+        response = await fetch(new URL('/api/import/parse-excel', baseUrl).toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          credentials: 'include',
+          body: arrayBuffer,
+        });
+      } else {
+        const FileSystem = await import('expo-file-system');
+        const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 });
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const baseUrl = getApiUrl();
+        response = await fetch(new URL('/api/import/parse-excel', baseUrl).toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          credentials: 'include',
+          body: bytes.buffer,
+        });
+      }
+      const data = await response.json();
+      if (!response.ok) {
+        setParseError(data.message || '解析失败');
+        return;
+      }
+      if (data.rows && data.rows.length > 0) {
+        setParsedRows(data.rows);
+        setEditMode(true);
+      } else {
+        setParseError('文件中没有有效数据');
+      }
+    } catch (err: any) {
+      setParseError(err?.message || '文件上传解析失败');
+    } finally {
+      setUploading(false);
+    }
   }, []);
 
+  const handleWebFileSelected = useCallback((file: File) => {
+    setFileName(file.name);
+    uploadExcelFile(file);
+  }, [uploadExcelFile]);
+
   const handlePickFileNative = useCallback(async () => {
-    const fileData = await pickFileNative();
-    if (!fileData) return;
-    processFileContent(fileData.name, fileData.content);
-  }, [processFileContent]);
+    try {
+      const DocumentPicker = await import('expo-document-picker');
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const file = result.assets[0];
+      setFileName(file.name);
+      uploadExcelFile({ uri: file.uri, name: file.name });
+    } catch {
+      Alert.alert('错误', '选择文件失败');
+    }
+  }, [uploadExcelFile]);
 
   const handleAddRow = useCallback(() => {
     setParsedRows(prev => [...prev, emptyRow()]);
@@ -229,7 +210,7 @@ export default function ImportOKRScreen() {
                 <Ionicons name="download-outline" size={22} color={Colors.primary} />
               </View>
               <Text style={styles.methodTitle}>下载模板</Text>
-              <Text style={styles.methodDesc}>下载CSV模板填写后上传</Text>
+              <Text style={styles.methodDesc}>下载Excel模板填写后上传</Text>
             </Pressable>
             <Pressable onPress={handleManualEntry} style={({ pressed }) => [styles.methodCard, { opacity: pressed ? 0.8 : 1 }]}>
               <View style={[styles.methodIcon, { backgroundColor: Colors.success + '15' }]}>
@@ -245,15 +226,24 @@ export default function ImportOKRScreen() {
           <View style={styles.uploadSection}>
             <Text style={styles.sectionTitle}>上传文件</Text>
             <View style={styles.uploadCard}>
-              <Ionicons name="cloud-upload-outline" size={36} color={Colors.textTertiary} />
-              <Text style={styles.uploadHint}>选择填好的CSV文件</Text>
-              {Platform.OS === 'web' ? (
-                <WebFileInput onFileRead={processFileContent} />
+              {uploading ? (
+                <>
+                  <ActivityIndicator size="large" color={Colors.primary} />
+                  <Text style={styles.uploadHint}>正在解析文件...</Text>
+                </>
               ) : (
-                <Pressable onPress={handlePickFileNative} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
-                  <Ionicons name="document-outline" size={18} color={Colors.primary} />
-                  <Text style={styles.actionBtnText}>{fileName || '选择 CSV 文件'}</Text>
-                </Pressable>
+                <>
+                  <Ionicons name="cloud-upload-outline" size={36} color={Colors.textTertiary} />
+                  <Text style={styles.uploadHint}>选择填好的 Excel 文件（.xlsx）</Text>
+                  {Platform.OS === 'web' ? (
+                    <WebFileInput onFileSelected={handleWebFileSelected} />
+                  ) : (
+                    <Pressable onPress={handlePickFileNative} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
+                      <Ionicons name="document-outline" size={18} color={Colors.primary} />
+                      <Text style={styles.actionBtnText}>{fileName || '选择 Excel 文件'}</Text>
+                    </Pressable>
+                  )}
+                </>
               )}
               {fileName ? <Text style={styles.fileInfo}>已选择: {fileName}</Text> : null}
               {parseError && (

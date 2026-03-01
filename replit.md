@@ -67,15 +67,18 @@ Preferred communication style: Simple, everyday language.
 - **Collaborator (跨部门协同人)**: Single-select from other-department users only. Shown with radio buttons in blue/info color.
 - Both are optional when creating a KR.
 
-### CSV Import (Enhanced Batch Import)
-- Template columns: 目标名称, 目标描述, OKR类型, 关联上级, KR名称, KR描述, 执行人, 权重, 周期, 部门
-- Two import modes: download CSV template or online editing (editable table in-app)
+### Excel Import (Enhanced Batch Import)
+- Template format: .xlsx (Excel) — download via GET /api/import/template
+- Upload endpoint: POST /api/import/parse-excel (binary body, server-side xlsx parsing)
+- Template columns (ordered): 部门, 目标名称, KR名称, 执行人, 周期, OKR类型, 关联上级, 权重
+- Two import modes: download Excel template or online editing (editable table in-app)
 - Template auto-fills current cycle and user's department as defaults
 - OKR类型 supports 承诺型/挑战型; 关联上级 supports 是/否
 - 执行人 matches by displayName or username; unmatched names become warnings
 - Department override restricted: non-admin users can only import to their own department
 - Same-named objectives (same title + department + cycle) auto-merged
 - Weight parsing preserves 0 values correctly
+- npm package: `xlsx` for server-side Excel parsing and template generation
 
 ### Key Screens
 - `app/login.tsx` — Login screen with username/password

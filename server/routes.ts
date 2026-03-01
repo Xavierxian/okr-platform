@@ -410,13 +410,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/import/template", requireAuth, async (req: Request, res: Response) => {
+    const XLSX = await import("xlsx");
     const now = new Date();
     const quarter = Math.ceil((now.getMonth() + 1) / 3);
     const defaultCycle = `${now.getFullYear()} 第${quarter === 1 ? '一' : quarter === 2 ? '二' : quarter === 3 ? '三' : '四'}季度`;
 
     const user = await getUser(req.session.userId!);
     const allDepts = await getDepartments();
-    const allUsers = await getAllUsers();
 
     let deptName = "";
     if (user?.departmentId) {
@@ -424,15 +424,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       deptName = dept?.name || "";
     }
 
-    const csvContent = `目标名称,OKR类型,关联上级,KR名称,执行人,权重,周期,部门
-提高产品质量,承诺型,否,单元测试覆盖率达到80%,,1,${defaultCycle},${deptName}
-提高产品质量,承诺型,否,代码审查通过率95%,,1,${defaultCycle},${deptName}
-提升用户满意度,挑战型,是,NPS分数提升到8.5,,1,${defaultCycle},${deptName}`;
+    const headers = ["部门", "目标名称", "KR名称", "执行人", "周期", "OKR类型", "关联上级", "权重"];
+    const rows = [
+      [deptName, "提高产品质量", "单元测试覆盖率达到80%", "", defaultCycle, "承诺型", "否", 1],
+      [deptName, "提高产品质量", "代码审查通过率95%", "", defaultCycle, "承诺型", "否", 1],
+      [deptName, "提升用户满意度", "NPS分数提升到8.5", "", defaultCycle, "挑战型", "是", 1],
+    ];
 
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=okr_import_template.csv");
-    const bom = "\uFEFF";
-    return res.send(bom + csvContent);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws["!cols"] = [
+      { wch: 14 }, { wch: 20 }, { wch: 24 }, { wch: 12 },
+      { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 8 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "OKR导入模板");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=okr_import_template.xlsx");
+    return res.send(buf);
+  });
+
+  app.post("/api/import/parse-excel", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const XLSX = await import("xlsx");
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      await new Promise<void>((resolve) => req.on("end", resolve));
+      const buf = Buffer.concat(chunks);
+      const wb = XLSX.read(buf, { type: "buffer" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) return res.status(400).json({ message: "Excel文件为空" });
+      const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      if (jsonData.length < 2) return res.status(400).json({ message: "Excel文件为空或只有表头" });
+      const headers = jsonData[0].map((h: any) => String(h).trim());
+      if (!headers.includes("目标名称")) {
+        return res.status(400).json({ message: "缺少必要列: 目标名称。请使用模板文件。" });
+      }
+      const rows: Record<string, string>[] = [];
+      for (let i = 1; i < jsonData.length; i++) {
+        const vals = jsonData[i];
+        if (!vals || vals.length === 0) continue;
+        const row: Record<string, string> = {};
+        headers.forEach((h: string, idx: number) => { row[h] = vals[idx] != null ? String(vals[idx]).trim() : ''; });
+        if (row["目标名称"]) rows.push(row);
+      }
+      return res.json({ rows });
+    } catch (err) {
+      console.error("Parse excel error:", err);
+      return res.status(400).json({ message: "Excel文件解析失败，请检查文件格式" });
+    }
   });
 
   app.post("/api/import/okr", requireAuth, async (req: Request, res: Response) => {
