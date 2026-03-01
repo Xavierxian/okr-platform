@@ -112,7 +112,7 @@ export default function ProfileScreen() {
               <View style={[styles.settingIcon, { backgroundColor: Colors.info + '20' }]}>
                 <Ionicons name="business-outline" size={18} color={Colors.info} />
               </View>
-              <Text style={styles.settingText}>部门管理</Text>
+              <Text style={styles.settingText}>中心管理</Text>
               <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
             </Pressable>
             <Pressable onPress={() => router.push('/manage-users')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
