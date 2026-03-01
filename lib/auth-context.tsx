@@ -7,6 +7,7 @@ export interface AuthUser {
   displayName: string;
   role: string;
   departmentId: string | null;
+  departmentIds?: string[];
   createdAt: string;
 }
 

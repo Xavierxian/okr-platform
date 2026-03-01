@@ -1,8 +1,8 @@
 import { eq, or, inArray, and, asc } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, departments, objectives, keyResults, cycles,
-  type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry, type Cycle,
+  users, departments, objectives, keyResults, cycles, userDepartments,
+  type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry, type Cycle, type UserDepartment,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -76,12 +76,34 @@ export async function getUsersByDepartment(departmentId: string): Promise<User[]
   return db.select().from(users).where(eq(users.departmentId, departmentId));
 }
 
+export async function getUserDepartmentIds(userId: string): Promise<string[]> {
+  const rows = await db.select().from(userDepartments).where(eq(userDepartments.userId, userId));
+  return rows.map(r => r.departmentId);
+}
+
+export async function setUserDepartments(userId: string, departmentIds: string[]): Promise<void> {
+  await db.delete(userDepartments).where(eq(userDepartments.userId, userId));
+  if (departmentIds.length > 0) {
+    await db.insert(userDepartments).values(departmentIds.map(deptId => ({ userId, departmentId: deptId })));
+  }
+}
+
+export async function getAllUserDepartments(): Promise<UserDepartment[]> {
+  return db.select().from(userDepartments);
+}
+
 export async function getObjectivesForUser(user: User): Promise<Objective[]> {
   if (user.role === "super_admin" || user.role === "vp") {
     return db.select().from(objectives);
   }
   const allDepts = await getDepartments();
-  const deptIds = getUserDeptIds(user.departmentId, allDepts);
+  const multiDeptIds = await getUserDepartmentIds(user.id);
+  const allUserDeptIds: string[] = [];
+  const baseDeptIds = multiDeptIds.length > 0 ? multiDeptIds : (user.departmentId ? [user.departmentId] : []);
+  for (const did of baseDeptIds) {
+    const expanded = getUserDeptIds(did, allDepts);
+    expanded.forEach(id => { if (!allUserDeptIds.includes(id)) allUserDeptIds.push(id); });
+  }
 
   const allObjs = await db.select().from(objectives);
   const allKRs = await db.select().from(keyResults);
@@ -96,10 +118,10 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
     const centerHeadIds = new Set(allUsers.filter(u => u.role === "center_head").map(u => u.id));
     return allObjs.filter(obj => {
       if (obj.createdBy && centerHeadIds.has(obj.createdBy)) return true;
-      if (deptIds.includes(obj.departmentId)) return true;
+      if (allUserDeptIds.includes(obj.departmentId)) return true;
       if (relatedObjIds.has(obj.id)) return true;
       if (obj.isCollaborative) {
-        if ((obj.collaborativeDeptIds as string[] || []).some(id => deptIds.includes(id))) return true;
+        if ((obj.collaborativeDeptIds as string[] || []).some(id => allUserDeptIds.includes(id))) return true;
         if ((obj.collaborativeUserIds as string[] || []).includes(user.id)) return true;
       }
       return false;
@@ -107,10 +129,10 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
   }
 
   return allObjs.filter(obj => {
-    if (deptIds.includes(obj.departmentId)) return true;
+    if (allUserDeptIds.includes(obj.departmentId)) return true;
     if (relatedObjIds.has(obj.id)) return true;
     if (obj.isCollaborative) {
-      if ((obj.collaborativeDeptIds as string[] || []).some(id => deptIds.includes(id))) return true;
+      if ((obj.collaborativeDeptIds as string[] || []).some(id => allUserDeptIds.includes(id))) return true;
       if ((obj.collaborativeUserIds as string[] || []).includes(user.id)) return true;
     }
     return false;

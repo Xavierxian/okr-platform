@@ -24,7 +24,8 @@ export default function CreateObjectiveScreen() {
   const existingObj = editId ? objectives.find(o => o.id === editId) : null;
   const isEditMode = !!editId;
 
-  const defaultDeptId = isAdmin ? (departments[0]?.id || '') : (user?.departmentId || departments[0]?.id || '');
+  const userDeptIds: string[] = user?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
+  const defaultDeptId = isAdmin ? (departments[0]?.id || '') : (userDeptIds[0] || departments[0]?.id || '');
   const [title, setTitle] = useState('');
   const [selectedDept, setSelectedDept] = useState(defaultDeptId);
   const cycleOptions = cycles.map(c => c.name);
@@ -123,10 +124,10 @@ export default function CreateObjectiveScreen() {
         <Text style={styles.label}>目标名称</Text>
         <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="你想要达成什么目标？" placeholderTextColor={Colors.textTertiary} autoFocus={!isEditMode} />
 
-        <Text style={styles.label}>所属部门</Text>
+        <Text style={styles.label}>所属中心</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
           <View style={styles.chipRow}>
-            {departments.filter(dept => isAdmin || dept.id === user?.departmentId).map(dept => (
+            {departments.filter(dept => isAdmin || userDeptIds.includes(dept.id)).map(dept => (
               <Pressable key={dept.id} onPress={() => setSelectedDept(dept.id)} style={[styles.chip, selectedDept === dept.id && styles.chipActive]}>
                 <Text style={[styles.chipText, selectedDept === dept.id && styles.chipTextActive]}>{dept.name}</Text>
               </Pressable>

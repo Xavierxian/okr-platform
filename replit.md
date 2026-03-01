@@ -42,7 +42,8 @@ Preferred communication style: Simple, everyday language.
 - **Default super admin**: username=`admin`, password=`admin123`, displayName=`超级管理员`
 - **Roles**: `super_admin` (超级管理员, full access), `vp` (VP, sees all OKRs), `center_head` (中心负责人, sees center_head OKRs), `member` (普通员工, department-scoped)
 - **Middleware**: `requireAuth` for all protected routes, `requireAdmin` for admin-only routes
-- **Department scoping**: Non-admin users can only create objectives for their own department; server validates department ownership
+- **Multi-center assignment**: Users can belong to multiple centers/departments via `user_departments` junction table; they can create OKRs and import for any of their assigned centers
+- **Department scoping**: Non-admin users can only create objectives for their assigned centers; server validates department ownership
 
 ### Data Layer
 - **Database**: PostgreSQL via Drizzle ORM (`shared/schema.ts`)
@@ -55,7 +56,8 @@ Preferred communication style: Simple, everyday language.
 - **Department**: id, name, parentId, level (hierarchical)
 - **Objective**: id, title, description, departmentId, cycle, status, isCollaborative, collaborativeDeptIds, collaborativeUserIds, createdBy, linkedToParent (boolean), okrType (text: '承诺型'|'挑战型')
 - **KeyResult**: id, objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory, okrType (text: '承诺型'|'挑战型')
-- **User**: id, username, password (hashed), displayName, role, departmentId
+- **User**: id, username, password (hashed), displayName, role, departmentId (legacy primary dept)
+- **UserDepartment**: id, userId, departmentId (many-to-many junction table for multi-center assignment)
 
 ### Dashboard Structure (3 Sections)
 1. **我的目标** — Objectives created/imported by the current user only (createdBy === user.id)

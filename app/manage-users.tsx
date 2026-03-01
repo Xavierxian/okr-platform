@@ -29,11 +29,12 @@ interface UserItem {
   displayName: string;
   role: string;
   departmentId: string | null;
+  departmentIds?: string[];
   createdAt: string;
 }
 
 const ROLE_OPTIONS = [
-  { value: 'member', label: '普通员工' },
+  { value: 'member', label: '普通员工和部门经理' },
   { value: 'center_head', label: '中心负责人' },
   { value: 'vp', label: 'VP' },
   { value: 'super_admin', label: '超级管理员' },
@@ -44,6 +45,8 @@ export default function ManageUsersScreen() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleModalUser, setRoleModalUser] = useState<UserItem | null>(null);
+  const [deptModalUser, setDeptModalUser] = useState<UserItem | null>(null);
+  const [deptModalSelected, setDeptModalSelected] = useState<string[]>([]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -68,11 +71,6 @@ export default function ManageUsersScreen() {
   };
 
   const handleDelete = (user: UserItem) => {
-    if (user.role === 'super_admin') {
-      if (Platform.OS === 'web') { window.alert('不能删除超级管理员'); }
-      else { Alert.alert('提示', '不能删除超级管理员'); }
-      return;
-    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     if (Platform.OS === 'web') {
       if (window.confirm(`确定删除用户"${user.displayName}"吗？`)) {
@@ -96,14 +94,47 @@ export default function ManageUsersScreen() {
     try {
       await apiRequest("PUT", `/api/users/${roleModalUser.id}`, { role: newRole });
       setUsers(prev => prev.map(u => u.id === roleModalUser.id ? { ...u, role: newRole } : u));
-    } catch { Alert.alert('错误', '更新失败'); }
+    } catch {
+      if (Platform.OS === 'web') { window.alert('更新失败'); }
+      else { Alert.alert('错误', '更新失败'); }
+    }
     setRoleModalUser(null);
   };
 
-  const getDeptName = (deptId: string | null) => {
-    if (!deptId) return '未分配';
-    const dept = departments.find(d => d.id === deptId);
-    return dept?.name || '未知';
+  const handleEditDepts = (user: UserItem) => {
+    setDeptModalUser(user);
+    setDeptModalSelected(user.departmentIds || (user.departmentId ? [user.departmentId] : []));
+  };
+
+  const toggleDeptSelection = (deptId: string) => {
+    setDeptModalSelected(prev =>
+      prev.includes(deptId) ? prev.filter(id => id !== deptId) : [...prev, deptId]
+    );
+  };
+
+  const applyDeptChange = async () => {
+    if (!deptModalUser) return;
+    try {
+      await apiRequest("PUT", `/api/users/${deptModalUser.id}`, { departmentIds: deptModalSelected });
+      setUsers(prev => prev.map(u => u.id === deptModalUser.id ? {
+        ...u,
+        departmentIds: deptModalSelected,
+        departmentId: deptModalSelected[0] || null,
+      } : u));
+    } catch {
+      if (Platform.OS === 'web') { window.alert('更新失败'); }
+      else { Alert.alert('错误', '更新失败'); }
+    }
+    setDeptModalUser(null);
+  };
+
+  const getDeptNames = (item: UserItem) => {
+    const ids = item.departmentIds || (item.departmentId ? [item.departmentId] : []);
+    if (ids.length === 0) return '未分配';
+    return ids.map(id => {
+      const dept = departments.find(d => d.id === id);
+      return dept?.name || '未知';
+    }).join('、');
   };
 
   const renderUser = ({ item }: { item: UserItem }) => (
@@ -120,12 +151,13 @@ export default function ManageUsersScreen() {
           <Text style={[styles.roleText, { color: ROLE_COLORS[item.role] || Colors.info }]}>{ROLE_LABELS[item.role] || item.role}</Text>
         </View>
       </View>
-      <View style={styles.cardMeta}>
+      <Pressable onPress={() => handleEditDepts(item)} style={({ pressed }) => [styles.cardMeta, { opacity: pressed ? 0.7 : 1 }]}>
         <View style={styles.metaItem}>
           <Ionicons name="business-outline" size={12} color={Colors.textSecondary} />
-          <Text style={styles.metaText}>{getDeptName(item.departmentId)}</Text>
+          <Text style={styles.metaText}>{getDeptNames(item)}</Text>
+          <Ionicons name="create-outline" size={12} color={Colors.primary} style={{ marginLeft: 4 }} />
         </View>
-      </View>
+      </Pressable>
       {item.username !== 'admin' && (
         <View style={styles.actions}>
           <Pressable onPress={() => handleChangeRole(item)} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.7 : 1 }]}>
@@ -196,6 +228,38 @@ export default function ManageUsersScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      <Modal visible={!!deptModalUser} transparent animationType="fade" onRequestClose={() => setDeptModalUser(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setDeptModalUser(null)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>编辑所属中心</Text>
+            <Text style={styles.modalSub}>{deptModalUser?.displayName}（可多选）</Text>
+            <View style={styles.deptChipRow}>
+              {departments.map(dept => {
+                const selected = deptModalSelected.includes(dept.id);
+                return (
+                  <Pressable
+                    key={dept.id}
+                    onPress={() => toggleDeptSelection(dept.id)}
+                    style={[styles.deptChip, selected && styles.deptChipActive]}
+                  >
+                    <Text style={[styles.deptChipText, selected && styles.deptChipTextActive]}>{dept.name}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {deptModalSelected.length === 0 && (
+              <Text style={styles.deptHint}>未选择任何中心</Text>
+            )}
+            <Pressable onPress={applyDeptChange} style={({ pressed }) => [styles.deptSaveBtn, { opacity: pressed ? 0.8 : 1 }]}>
+              <Text style={styles.deptSaveBtnText}>确认</Text>
+            </Pressable>
+            <Pressable onPress={() => setDeptModalUser(null)} style={({ pressed }) => [styles.modalCancel, { opacity: pressed ? 0.7 : 1 }]}>
+              <Text style={styles.modalCancelText}>取消</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -233,4 +297,12 @@ const styles = StyleSheet.create({
   modalOptionText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.text },
   modalCancel: { marginTop: 12, paddingVertical: 10, alignItems: 'center' },
   modalCancelText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.textSecondary },
+  deptChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  deptChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.backgroundTertiary },
+  deptChipActive: { backgroundColor: Colors.primary },
+  deptChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
+  deptChipTextActive: { color: Colors.white },
+  deptHint: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, textAlign: 'center', marginBottom: 8 },
+  deptSaveBtn: { backgroundColor: Colors.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  deptSaveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.white },
 });

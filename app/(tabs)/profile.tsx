@@ -21,9 +21,10 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'super_admin';
 
-  const userDept = useMemo(() => {
-    if (!user?.departmentId) return null;
-    return departments.find(d => d.id === user.departmentId);
+  const userDeptNames = useMemo(() => {
+    const deptIds: string[] = (user as any)?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
+    if (deptIds.length === 0) return '';
+    return deptIds.map(id => departments.find(d => d.id === id)?.name || '未知').join('、');
   }, [user, departments]);
 
   const personalStats = useMemo(() => {
@@ -68,7 +69,7 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.userName}>{user?.displayName || '用户'}</Text>
           <Text style={styles.userRole}>{ROLE_LABELS[user?.role || ''] || user?.role}</Text>
-          {userDept && <Text style={styles.userDept}>{userDept.name}</Text>}
+          {userDeptNames ? <Text style={styles.userDept}>{userDeptNames}</Text> : null}
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.section}>

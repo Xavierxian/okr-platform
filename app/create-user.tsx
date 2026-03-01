@@ -20,10 +20,16 @@ export default function CreateUserScreen() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState('member');
-  const [departmentId, setDepartmentId] = useState<string | null>(departments[0]?.id || null);
+  const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const canSave = username.trim() && password.trim() && displayName.trim();
+
+  const toggleDept = (deptId: string) => {
+    setSelectedDeptIds(prev =>
+      prev.includes(deptId) ? prev.filter(id => id !== deptId) : [...prev, deptId]
+    );
+  };
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -35,7 +41,7 @@ export default function CreateUserScreen() {
         password: password.trim(),
         displayName: displayName.trim(),
         role,
-        departmentId,
+        departmentIds: selectedDeptIds,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
@@ -100,24 +106,21 @@ export default function CreateUserScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>所属部门</Text>
+        <Text style={styles.label}>所属中心（可多选）</Text>
         <View style={styles.chipRow}>
-          <Pressable
-            onPress={() => setDepartmentId(null)}
-            style={[styles.chip, departmentId === null && styles.chipActive]}
-          >
-            <Text style={[styles.chipText, departmentId === null && styles.chipTextActive]}>未分配</Text>
-          </Pressable>
           {departments.map(dept => (
             <Pressable
               key={dept.id}
-              onPress={() => setDepartmentId(dept.id)}
-              style={[styles.chip, departmentId === dept.id && styles.chipActive]}
+              onPress={() => toggleDept(dept.id)}
+              style={[styles.chip, selectedDeptIds.includes(dept.id) && styles.chipActive]}
             >
-              <Text style={[styles.chipText, departmentId === dept.id && styles.chipTextActive]}>{dept.name}</Text>
+              <Text style={[styles.chipText, selectedDeptIds.includes(dept.id) && styles.chipTextActive]}>{dept.name}</Text>
             </Pressable>
           ))}
         </View>
+        {selectedDeptIds.length === 0 && (
+          <Text style={styles.hint}>未选择中心时为"未分配"</Text>
+        )}
 
         <Pressable
           onPress={handleSave}
@@ -147,6 +150,7 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: Colors.primary },
   chipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
   chipTextActive: { color: Colors.white },
+  hint: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 4 },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 28 },
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },
 });

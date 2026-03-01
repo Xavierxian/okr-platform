@@ -24,6 +24,14 @@ export const departments = pgTable("departments", {
   level: integer("level").notNull().default(0),
 });
 
+export const userDepartments = pgTable("user_departments", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  departmentId: varchar("department_id").notNull(),
+});
+
 export const cycles = pgTable("cycles", {
   id: varchar("id")
     .primaryKey()
@@ -97,6 +105,7 @@ export const loginSchema = z.object({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type UserDepartment = typeof userDepartments.$inferSelect;
 export type Department = typeof departments.$inferSelect;
 export type Cycle = typeof cycles.$inferSelect;
 export type Objective = typeof objectives.$inferSelect;

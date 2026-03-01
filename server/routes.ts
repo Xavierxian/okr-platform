@@ -11,6 +11,7 @@ import {
   updateKRProgressInDb, scoreKRInDb, getUsersByDepartment,
   getKRsAssignedToUser, getKRsCollaboratingUser,
   getCycles, createCycle, updateCycle, deleteCycle,
+  getUserDepartmentIds, setUserDepartments, getAllUserDepartments,
 } from "./storage";
 
 declare module "express-session" {
@@ -74,7 +75,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       req.session.userId = user.id;
       const { password: _, ...safeUser } = user;
-      return res.json({ user: safeUser });
+      const deptIds = await getUserDepartmentIds(user.id);
+      return res.json({ user: { ...safeUser, departmentIds: deptIds } });
     } catch (err) {
       console.error("Login error:", err);
       return res.status(500).json({ message: "登录失败" });
@@ -100,7 +102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "用户不存在" });
     }
     const { password: _, ...safeUser } = user;
-    return res.json({ user: safeUser });
+    const deptIds = await getUserDepartmentIds(user.id);
+    return res.json({ user: { ...safeUser, departmentIds: deptIds } });
   });
 
   app.put("/api/auth/change-password", requireAuth, async (req: Request, res: Response) => {
@@ -198,13 +201,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/users", requireAdmin, async (_req: Request, res: Response) => {
     const all = await getAllUsers();
-    const safe = all.map(({ password, ...u }) => u);
+    const allUD = await getAllUserDepartments();
+    const safe = all.map(({ password, ...u }) => ({
+      ...u,
+      departmentIds: allUD.filter(ud => ud.userId === u.id).map(ud => ud.departmentId),
+    }));
     return res.json(safe);
   });
 
   app.post("/api/users", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { username, password, displayName, role, departmentId } = req.body;
+      const { username, password, displayName, role, departmentId, departmentIds } = req.body;
       if (!username || !password || !displayName) {
         return res.status(400).json({ message: "请填写完整信息" });
       }
@@ -212,9 +219,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existing) {
         return res.status(400).json({ message: "用户名已存在" });
       }
-      const user = await createUser({ username, password, displayName, role: role || "member", departmentId: departmentId || null });
+      const deptIds: string[] = departmentIds || (departmentId ? [departmentId] : []);
+      const primaryDeptId = deptIds.length > 0 ? deptIds[0] : null;
+      const user = await createUser({ username, password, displayName, role: role || "member", departmentId: primaryDeptId });
+      if (deptIds.length > 0) {
+        await setUserDepartments(user.id, deptIds);
+      }
       const { password: _, ...safeUser } = user;
-      return res.json(safeUser);
+      return res.json({ ...safeUser, departmentIds: deptIds });
     } catch (err) {
       return res.status(500).json({ message: "创建用户失败" });
     }
@@ -222,10 +234,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/users/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const user = await updateUser(req.params.id, req.body);
+      const { departmentIds, ...rest } = req.body;
+      if (departmentIds && Array.isArray(departmentIds)) {
+        rest.departmentId = departmentIds.length > 0 ? departmentIds[0] : null;
+        await setUserDepartments(req.params.id, departmentIds);
+      }
+      const user = await updateUser(req.params.id, rest);
       if (!user) return res.status(404).json({ message: "用户不存在" });
       const { password: _, ...safeUser } = user;
-      return res.json(safeUser);
+      const deptIds = departmentIds || await getUserDepartmentIds(user.id);
+      return res.json({ ...safeUser, departmentIds: deptIds });
     } catch (err) {
       return res.status(500).json({ message: "更新用户失败" });
     }
@@ -244,7 +262,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/all-safe", requireAuth, async (_req: Request, res: Response) => {
     try {
       const all = await getAllUsers();
-      const safe = all.map(({ password, ...u }) => u);
+      const allUD = await getAllUserDepartments();
+      const safe = all.map(({ password, ...u }) => ({
+        ...u,
+        departmentIds: allUD.filter(ud => ud.userId === u.id).map(ud => ud.departmentId),
+      }));
       return res.json(safe);
     } catch (err) {
       return res.status(500).json({ message: "获取用户列表失败" });
@@ -276,8 +298,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await getUser(req.session.userId!);
       if (!user) return res.status(401).json({ message: "用户不存在" });
       const { title, description, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds, linkedToParent, okrType } = req.body;
-      if (user.role !== "super_admin" && departmentId !== user.departmentId) {
-        return res.status(403).json({ message: "只能为自己部门创建目标" });
+      if (user.role !== "super_admin") {
+        const userDeptIds = await getUserDepartmentIds(user.id);
+        const allowedDepts = userDeptIds.length > 0 ? userDeptIds : (user.departmentId ? [user.departmentId] : []);
+        if (!allowedDepts.includes(departmentId)) {
+          return res.status(403).json({ message: "只能为自己所属中心创建目标" });
+        }
       }
       const obj = await createObjectiveInDb({
         title,
@@ -488,7 +514,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const allDepts = await getDepartments();
       const allUsers = await getAllUsers();
-      let defaultDeptId = user.departmentId || "";
+      const userMultiDepts = await getUserDepartmentIds(user.id);
+      const userAllowedDepts = userMultiDepts.length > 0 ? userMultiDepts : (user.departmentId ? [user.departmentId] : []);
+      let defaultDeptId = userAllowedDepts[0] || "";
       if (!defaultDeptId) {
         if (user.role === "super_admin" && allDepts.length > 0) {
           defaultDeptId = allDepts[0].id;
@@ -532,7 +560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (deptName) {
           const dept = allDepts.find(d => d.name === deptName);
           if (dept) {
-            if (user.role === "super_admin" || dept.id === user.departmentId) {
+            if (user.role === "super_admin" || userAllowedDepts.includes(dept.id)) {
               deptId = dept.id;
             } else {
               errors.push(`第${i + 2}行: 无权导入到部门"${deptName}"，使用默认部门`);
