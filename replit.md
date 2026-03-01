@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is an OKR (Objectives and Key Results) management platform built as a cross-platform mobile/web application using Expo (React Native). The app allows users to create and manage organizational objectives, define key results, track progress, and self-score outcomes. The UI is in Chinese with a dark theme (teal #0D9488 primary).
+This is an OKR (Objectives and Key Results) management platform built as a cross-platform mobile/web application using Expo (React Native). The app allows users to create and manage organizational objectives, define key results, track progress, and self-score outcomes. The UI is in Chinese with a light blue-white-gray theme (#2563EB primary, #F1F5F9 background, #FFFFFF cards).
 
 The project uses a dual architecture: an Expo/React Native frontend with file-based routing (expo-router) and an Express.js backend server with PostgreSQL via Drizzle ORM.
 

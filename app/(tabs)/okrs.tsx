@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { StyleSheet, Text, View, FlatList, Pressable, Platform, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, FlatList, Pressable, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -9,15 +9,19 @@ import Colors from '@/constants/colors';
 export default function OKRsScreen() {
   const insets = useSafeAreaInsets();
   const { objectives, keyResults, departments, isLoading } = useOKR();
-  const [selectedDept, setSelectedDept] = useState<string | null>(null);
+  const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
+
+  const toggleDept = (id: string) => {
+    setSelectedDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+  };
 
   const filteredObjectives = useMemo(() => {
     let filtered = objectives;
-    if (selectedDept) filtered = filtered.filter(o => o.departmentId === selectedDept);
+    if (selectedDeptIds.length > 0) filtered = filtered.filter(o => selectedDeptIds.includes(o.departmentId));
     if (selectedCycle) filtered = filtered.filter(o => o.cycle === selectedCycle);
     return filtered;
-  }, [objectives, selectedDept, selectedCycle]);
+  }, [objectives, selectedDeptIds, selectedCycle]);
 
   const cycles = useMemo(() => {
     const set = new Set(objectives.map(o => o.cycle));
@@ -107,21 +111,23 @@ export default function OKRsScreen() {
 
       {(usedDepts.length > 0 || cycles.length > 0) && (
         <View style={styles.filters}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={[{ id: null, label: '全部' }, ...usedDepts.map(d => ({ id: d.id, label: d.name }))]}
-            keyExtractor={item => item.id || 'all'}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => setSelectedDept(item.id)}
-                style={[styles.filterChip, selectedDept === item.id && styles.filterChipActive]}
-              >
-                <Text style={[styles.filterText, selectedDept === item.id && styles.filterTextActive]}>{item.label}</Text>
-              </Pressable>
-            )}
-          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+            <Pressable
+              onPress={() => setSelectedDeptIds([])}
+              style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterText, selectedDeptIds.length === 0 && styles.filterTextActive]}>全部</Text>
+            </Pressable>
+            {usedDepts.map(d => {
+              const isActive = selectedDeptIds.includes(d.id);
+              return (
+                <Pressable key={d.id} onPress={() => toggleDept(d.id)} style={[styles.filterChip, isActive && styles.filterChipActive]}>
+                  {isActive && <Ionicons name="checkmark" size={14} color={Colors.white} style={{ marginRight: 2 }} />}
+                  <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{d.name}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
           {cycles.length > 0 && (
             <FlatList
               horizontal
@@ -169,7 +175,7 @@ const styles = StyleSheet.create({
   importBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary + '20', alignItems: 'center', justifyContent: 'center' },
   addBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   filters: { paddingBottom: 12 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.backgroundTertiary },
+  filterChip: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.backgroundTertiary },
   filterChipActive: { backgroundColor: Colors.primary },
   filterText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
   filterTextActive: { color: Colors.white },

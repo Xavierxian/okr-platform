@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -89,10 +89,28 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { objectives, keyResults, departments, assignedKRs, collaboratingKRs, isLoading } = useOKR();
   const { user } = useAuth();
+  const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
+
+  const isAdmin = user?.role === 'super_admin';
+
+  const allMyObjectives = useMemo(() => {
+    if (isAdmin) return objectives;
+    return objectives.filter(obj => obj.createdBy === user?.id || obj.departmentId === user?.departmentId);
+  }, [objectives, user, isAdmin]);
 
   const myObjectives = useMemo(() => {
-    return objectives.filter(obj => obj.createdBy === user?.id || obj.departmentId === user?.departmentId);
-  }, [objectives, user]);
+    if (selectedDeptIds.length === 0) return allMyObjectives;
+    return allMyObjectives.filter(obj => selectedDeptIds.includes(obj.departmentId));
+  }, [allMyObjectives, selectedDeptIds]);
+
+  const usedDepts = useMemo(() => {
+    const ids = new Set(allMyObjectives.map(o => o.departmentId));
+    return departments.filter(d => ids.has(d.id));
+  }, [allMyObjectives, departments]);
+
+  const toggleDept = (id: string) => {
+    setSelectedDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+  };
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -123,6 +141,27 @@ export default function DashboardScreen() {
             <Ionicons name="add" size={24} color={Colors.white} />
           </Pressable>
         </View>
+
+        {usedDepts.length > 0 && (
+          <View style={styles.deptFilter}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.deptFilterRow}>
+                <Pressable onPress={() => setSelectedDeptIds([])} style={[styles.deptChip, selectedDeptIds.length === 0 && styles.deptChipActive]}>
+                  <Text style={[styles.deptChipText, selectedDeptIds.length === 0 && styles.deptChipTextActive]}>全部部门</Text>
+                </Pressable>
+                {usedDepts.map(d => {
+                  const isActive = selectedDeptIds.includes(d.id);
+                  return (
+                    <Pressable key={d.id} onPress={() => toggleDept(d.id)} style={[styles.deptChip, isActive && styles.deptChipActive]}>
+                      {isActive && <Ionicons name="checkmark" size={14} color={Colors.white} />}
+                      <Text style={[styles.deptChipText, isActive && styles.deptChipTextActive]}>{d.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        )}
 
         {!hasContent ? (
           <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyState}>
@@ -274,4 +313,10 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, textAlign: 'center', paddingHorizontal: 40 },
   emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginTop: 8 },
   emptyBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.white },
+  deptFilter: { marginBottom: 16 },
+  deptFilterRow: { flexDirection: 'row', gap: 8 },
+  deptChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
+  deptChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  deptChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
+  deptChipTextActive: { color: Colors.white },
 });
