@@ -12,7 +12,7 @@ const ROLE_LABELS: Record<string, string> = {
   super_admin: '超级管理员',
   vp: 'VP',
   center_head: '中心负责人',
-  member: '普通员工',
+  member: '普通员工和部门经理',
 };
 
 export default function ProfileScreen() {
