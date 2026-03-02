@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -22,6 +22,7 @@ export default function CreateUserScreen() {
   const [role, setRole] = useState('member');
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [deptSearch, setDeptSearch] = useState('');
 
   const canSave = username.trim() && password.trim() && displayName.trim();
 
@@ -30,6 +31,11 @@ export default function CreateUserScreen() {
       prev.includes(deptId) ? prev.filter(id => id !== deptId) : [...prev, deptId]
     );
   };
+
+  const filteredDepts = useMemo(() => {
+    if (!deptSearch.trim()) return departments;
+    return departments.filter(d => d.name.toLowerCase().includes(deptSearch.trim().toLowerCase()));
+  }, [departments, deptSearch]);
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -107,8 +113,25 @@ export default function CreateUserScreen() {
         </View>
 
         <Text style={styles.label}>所属中心（可多选）</Text>
+        {departments.length > 6 && (
+          <View style={styles.searchRow}>
+            <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
+            <TextInput
+              style={styles.searchInput}
+              value={deptSearch}
+              onChangeText={setDeptSearch}
+              placeholder="搜索中心..."
+              placeholderTextColor={Colors.textTertiary}
+            />
+            {deptSearch.length > 0 && (
+              <Pressable onPress={() => setDeptSearch('')}>
+                <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+              </Pressable>
+            )}
+          </View>
+        )}
         <View style={styles.chipRow}>
-          {departments.map(dept => (
+          {filteredDepts.map(dept => (
             <Pressable
               key={dept.id}
               onPress={() => toggleDept(dept.id)}
@@ -117,6 +140,9 @@ export default function CreateUserScreen() {
               <Text style={[styles.chipText, selectedDeptIds.includes(dept.id) && styles.chipTextActive]}>{dept.name}</Text>
             </Pressable>
           ))}
+          {filteredDepts.length === 0 && deptSearch.trim() && (
+            <Text style={styles.hint}>未找到匹配的中心</Text>
+          )}
         </View>
         {selectedDeptIds.length === 0 && (
           <Text style={styles.hint}>未选择中心时为"未分配"</Text>
@@ -150,6 +176,8 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: Colors.primary },
   chipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
   chipTextActive: { color: Colors.white },
+  searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.backgroundTertiary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8, marginBottom: 10 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.text, padding: 0 },
   hint: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 4 },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 28 },
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },

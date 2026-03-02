@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -39,6 +39,8 @@ export default function CreateObjectiveScreen() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hydrated, setHydrated] = useState(!isEditMode);
+  const [deptSearch, setDeptSearch] = useState('');
+  const [userSearch, setUserSearch] = useState('');
 
   useEffect(() => {
     if (!isEditMode && !selectedCycle && cycleOptions.length > 0) {
@@ -84,6 +86,20 @@ export default function CreateObjectiveScreen() {
   };
 
   const otherDeptUsers = allUsers.filter(u => u.departmentId !== selectedDept);
+
+  const filteredCollabDepts = useMemo(() => {
+    const depts = departments.filter(d => d.id !== selectedDept);
+    if (!deptSearch.trim()) return depts;
+    return depts.filter(d => d.name.toLowerCase().includes(deptSearch.trim().toLowerCase()));
+  }, [departments, selectedDept, deptSearch]);
+
+  const filteredCollabUsers = useMemo(() => {
+    if (!userSearch.trim()) return otherDeptUsers;
+    const q = userSearch.trim().toLowerCase();
+    return otherDeptUsers.filter(u =>
+      u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)
+    );
+  }, [otherDeptUsers, userSearch]);
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -174,21 +190,54 @@ export default function CreateObjectiveScreen() {
         {isCollaborative && (
           <>
             <Text style={styles.label}>协同部门</Text>
+            <View style={styles.searchRow}>
+              <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
+              <TextInput
+                style={styles.searchInput}
+                value={deptSearch}
+                onChangeText={setDeptSearch}
+                placeholder="搜索部门..."
+                placeholderTextColor={Colors.textTertiary}
+              />
+              {deptSearch.length > 0 && (
+                <Pressable onPress={() => setDeptSearch('')}>
+                  <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+                </Pressable>
+              )}
+            </View>
             <View style={styles.chipRow}>
-              {departments.filter(d => d.id !== selectedDept).map(dept => (
+              {filteredCollabDepts.map(dept => (
                 <Pressable key={dept.id} onPress={() => toggleCollabDept(dept.id)} style={[styles.chip, collabDeptIds.includes(dept.id) && styles.chipActive]}>
                   <Text style={[styles.chipText, collabDeptIds.includes(dept.id) && styles.chipTextActive]}>{dept.name}</Text>
                 </Pressable>
               ))}
+              {filteredCollabDepts.length === 0 && deptSearch.trim() && (
+                <Text style={styles.emptyText}>未找到匹配的部门</Text>
+              )}
             </View>
 
             <Text style={styles.label}>协同人员</Text>
             <Text style={styles.subLabel}>选择其他部门的人员，他们也能查看此目标和 KR 进度</Text>
+            <View style={styles.searchRow}>
+              <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
+              <TextInput
+                style={styles.searchInput}
+                value={userSearch}
+                onChangeText={setUserSearch}
+                placeholder="搜索人员姓名..."
+                placeholderTextColor={Colors.textTertiary}
+              />
+              {userSearch.length > 0 && (
+                <Pressable onPress={() => setUserSearch('')}>
+                  <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+                </Pressable>
+              )}
+            </View>
             {loadingUsers ? (
               <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 10 }} />
-            ) : otherDeptUsers.length > 0 ? (
+            ) : filteredCollabUsers.length > 0 ? (
               <View style={styles.chipRow}>
-                {otherDeptUsers.map(u => {
+                {filteredCollabUsers.map(u => {
                   const uDept = departments.find(d => d.id === u.departmentId);
                   return (
                     <Pressable key={u.id} onPress={() => toggleCollabUser(u.id)} style={[styles.userChip, collabUserIds.includes(u.id) && styles.userChipActive]}>
@@ -202,7 +251,7 @@ export default function CreateObjectiveScreen() {
                 })}
               </View>
             ) : (
-              <Text style={styles.emptyText}>暂无其他部门的用户</Text>
+              <Text style={styles.emptyText}>{userSearch.trim() ? '未找到匹配的人员' : '暂无其他部门的用户'}</Text>
             )}
           </>
         )}
@@ -239,6 +288,8 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, backgroundColor: Colors.backgroundTertiary, borderRadius: 12, padding: 14 },
   switchLabel: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.text },
   switchDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 2 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.backgroundTertiary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8, marginBottom: 10 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.text, padding: 0 },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textTertiary },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 28 },
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },

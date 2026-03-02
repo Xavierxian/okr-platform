@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -41,6 +41,8 @@ export default function CreateKRScreen() {
   const [startDate] = useState(today.toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(endDefault.toISOString().split('T')[0]);
   const [hydrated, setHydrated] = useState(!isEditMode);
+  const [assigneeSearch, setAssigneeSearch] = useState('');
+  const [collabSearch, setCollabSearch] = useState('');
 
   const objective = objectives.find(o => o.id === effectiveObjectiveId);
 
@@ -77,6 +79,18 @@ export default function CreateKRScreen() {
     ? allUsers.filter(u => u.departmentId === objective.departmentId)
     : [];
   const otherDeptUsers = allUsers.filter(u => u.departmentId !== objective?.departmentId);
+
+  const filteredDeptUsers = useMemo(() => {
+    if (!assigneeSearch.trim()) return deptUsers;
+    const q = assigneeSearch.trim().toLowerCase();
+    return deptUsers.filter(u => u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q));
+  }, [deptUsers, assigneeSearch]);
+
+  const filteredOtherUsers = useMemo(() => {
+    if (!collabSearch.trim()) return otherDeptUsers;
+    const q = collabSearch.trim().toLowerCase();
+    return otherDeptUsers.filter(u => u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q));
+  }, [otherDeptUsers, collabSearch]);
 
   const canSave = title.trim().length > 0 && hydrated;
 
@@ -170,9 +184,26 @@ export default function CreateKRScreen() {
           </Pressable>
         ) : (
           <>
-            {deptUsers.length > 0 ? (
+            {deptUsers.length > 3 && (
+              <View style={styles.searchRow}>
+                <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
+                <TextInput
+                  style={styles.searchInput}
+                  value={assigneeSearch}
+                  onChangeText={setAssigneeSearch}
+                  placeholder="搜索执行人..."
+                  placeholderTextColor={Colors.textTertiary}
+                />
+                {assigneeSearch.length > 0 && (
+                  <Pressable onPress={() => setAssigneeSearch('')}>
+                    <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+                  </Pressable>
+                )}
+              </View>
+            )}
+            {filteredDeptUsers.length > 0 ? (
               <View style={styles.chipRow}>
-                {deptUsers.map(u => {
+                {filteredDeptUsers.map(u => {
                   const isSelected = selectedUserId === u.id;
                   return (
                     <Pressable
@@ -187,7 +218,7 @@ export default function CreateKRScreen() {
                 })}
               </View>
             ) : (
-              <Text style={styles.emptyHint}>该部门暂无用户</Text>
+              <Text style={styles.emptyHint}>{assigneeSearch.trim() ? '未找到匹配的用户' : '该部门暂无用户'}</Text>
             )}
           </>
         )}
@@ -197,9 +228,26 @@ export default function CreateKRScreen() {
           <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 10 }} />
         ) : userLoadError ? null : (
           <>
-            {otherDeptUsers.length > 0 ? (
+            {otherDeptUsers.length > 3 && (
+              <View style={styles.searchRow}>
+                <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
+                <TextInput
+                  style={styles.searchInput}
+                  value={collabSearch}
+                  onChangeText={setCollabSearch}
+                  placeholder="搜索协同人..."
+                  placeholderTextColor={Colors.textTertiary}
+                />
+                {collabSearch.length > 0 && (
+                  <Pressable onPress={() => setCollabSearch('')}>
+                    <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+                  </Pressable>
+                )}
+              </View>
+            )}
+            {filteredOtherUsers.length > 0 ? (
               <View style={styles.chipRow}>
-                {otherDeptUsers.map(u => {
+                {filteredOtherUsers.map(u => {
                   const isSelected = selectedCollaboratorId === u.id;
                   return (
                     <Pressable
@@ -214,7 +262,7 @@ export default function CreateKRScreen() {
                 })}
               </View>
             ) : (
-              <Text style={styles.emptyHint}>无其他部门用户</Text>
+              <Text style={styles.emptyHint}>{collabSearch.trim() ? '未找到匹配的用户' : '无其他部门用户'}</Text>
             )}
           </>
         )}
@@ -284,6 +332,8 @@ const styles = StyleSheet.create({
   userChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
   userChipTextActive: { color: Colors.white },
   collabChipTextActive: { color: Colors.white },
+  searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.backgroundTertiary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8, marginBottom: 10 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.text, padding: 0 },
   emptyHint: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textTertiary, paddingVertical: 8 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
   retryText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.danger },
