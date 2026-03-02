@@ -71,7 +71,7 @@ interface OKRContextValue {
   addKeyResult: (data: any) => Promise<KeyResult>;
   editKeyResult: (id: string, updates: any) => Promise<void>;
   removeKeyResult: (id: string) => Promise<void>;
-  reportProgress: (id: string, progress: number, note: string) => Promise<void>;
+  reportProgress: (id: string, progress: number, note: string, images?: string[]) => Promise<void>;
   submitScore: (id: string, score: number, note: string) => Promise<void>;
 }
 
@@ -173,8 +173,8 @@ export function OKRProvider({ children }: { children: ReactNode }) {
     setKeyResults(prev => prev.filter(kr => kr.id !== id));
   }, []);
 
-  const reportProgress = useCallback(async (id: string, progress: number, note: string) => {
-    const res = await apiRequest("PUT", `/api/key-results/${id}/progress`, { progress, note });
+  const reportProgress = useCallback(async (id: string, progress: number, note: string, images?: string[]) => {
+    const res = await apiRequest("PUT", `/api/key-results/${id}/progress`, { progress, note, images });
     const updatedKR = await res.json();
     setKeyResults(prev => prev.map(kr => kr.id === id ? updatedKR : kr));
     await refresh();

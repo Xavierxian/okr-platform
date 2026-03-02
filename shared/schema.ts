@@ -116,6 +116,7 @@ export interface ProgressEntry {
   date: string;
   progress: number;
   note: string;
+  images?: string[];
 }
 
 export const insertUserSchema = createInsertSchema(users).pick({

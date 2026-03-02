@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert, TextInput, FlatList, Modal } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert, TextInput, FlatList, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -107,6 +107,7 @@ export default function ObjectiveDetailScreen() {
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [mentionedIds, setMentionedIds] = useState<string[]>([]);
   const [mentionSearch, setMentionSearch] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -508,6 +509,15 @@ export default function ObjectiveDetailScreen() {
                               <Text style={styles.historyDate}>{new Date(entry.date).toLocaleDateString('zh-CN')}</Text>
                             </View>
                             {entry.note ? <Text style={styles.historyNote} numberOfLines={2}>{entry.note}</Text> : null}
+                            {entry.images && entry.images.length > 0 && (
+                              <View style={styles.historyImages}>
+                                {entry.images.map((img: string, imgIdx: number) => (
+                                  <Pressable key={imgIdx} onPress={() => setPreviewImage(img)} style={styles.historyThumb}>
+                                    <Image source={{ uri: img }} style={styles.historyThumbImg} resizeMode="cover" />
+                                  </Pressable>
+                                ))}
+                              </View>
+                            )}
                           </View>
                         </View>
                       ))}
@@ -519,6 +529,17 @@ export default function ObjectiveDetailScreen() {
           )}
         </Animated.View>
       </ScrollView>
+
+      <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+        <Pressable style={styles.imagePreviewOverlay} onPress={() => setPreviewImage(null)}>
+          {previewImage && (
+            <Image source={{ uri: previewImage }} style={styles.imagePreviewFull} resizeMode="contain" />
+          )}
+          <Pressable onPress={() => setPreviewImage(null)} style={styles.imagePreviewClose}>
+            <Ionicons name="close-circle" size={32} color={Colors.white} />
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={showMentionPicker} transparent animationType="fade" onRequestClose={() => setShowMentionPicker(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setShowMentionPicker(false)}>

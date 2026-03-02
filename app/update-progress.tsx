@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { StyleSheet, Text, View, TextInput, Pressable, ScrollView } from 'react-native';
+import React, { useState, useMemo, useRef } from 'react';
+import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Image, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
+import { getApiUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function UpdateProgressScreen() {
   const { krId } = useLocalSearchParams<{ krId: string }>();
@@ -14,14 +16,112 @@ export default function UpdateProgressScreen() {
   const [progress, setProgress] = useState(kr?.progress?.toString() || '0');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const progressNum = Math.min(100, Math.max(0, parseInt(progress) || 0));
+
+  const uploadImageFromUri = async (uri: string, mimeType?: string) => {
+    setUploading(true);
+    try {
+      const { fetch: expoFetch } = await import('expo/fetch');
+      const { File } = await import('expo-file-system');
+      const file = new File(uri);
+      const formData = new FormData();
+      formData.append('file', file as any);
+
+      const apiUrl = getApiUrl();
+      const uploadUrl = new URL('/api/upload/image', apiUrl).toString();
+      const resp = await expoFetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': mimeType || 'image/jpeg' },
+        body: file,
+        credentials: 'include',
+      });
+      const data = await resp.json();
+      if (data.url) {
+        setImages(prev => [...prev, data.url]);
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+    }
+    setUploading(false);
+  };
+
+  const uploadImageFromBlob = async (blob: Blob) => {
+    setUploading(true);
+    try {
+      const apiUrl = getApiUrl();
+      const uploadUrl = new URL('/api/upload/image', apiUrl).toString();
+      const resp = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type || 'image/png' },
+        body: blob,
+        credentials: 'include',
+      });
+      const data = await resp.json();
+      if (data.url) {
+        setImages(prev => [...prev, data.url]);
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+    }
+    setUploading(false);
+  };
+
+  const pickImage = async () => {
+    if (Platform.OS === 'web') {
+      fileInputRef.current?.click();
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+    });
+    if (!result.canceled && result.assets) {
+      for (const asset of result.assets) {
+        await uploadImageFromUri(asset.uri, asset.mimeType);
+      }
+    }
+  };
+
+  const handleWebFileChange = async (e: any) => {
+    const files = e.target?.files;
+    if (!files) return;
+    for (let i = 0; i < files.length; i++) {
+      await uploadImageFromBlob(files[i]);
+    }
+    e.target.value = '';
+  };
+
+  const handlePaste = async (e: any) => {
+    if (Platform.OS !== 'web') return;
+    const clipboardData = e.nativeEvent?.clipboardData || e.clipboardData;
+    if (!clipboardData) return;
+    const items = clipboardData.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const blob = items[i].getAsFile();
+        if (blob) {
+          await uploadImageFromBlob(blob);
+        }
+      }
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    setImages(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const handleSave = async () => {
     if (saving || !krId) return;
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await reportProgress(krId, progressNum, note.trim());
+    await reportProgress(krId, progressNum, note.trim(), images.length > 0 ? images : undefined);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
   };
@@ -79,23 +179,80 @@ export default function UpdateProgressScreen() {
         </View>
 
         <Text style={styles.label}>执行说明</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={note}
-          onChangeText={setNote}
-          placeholder="已完成工作、遇到的问题、下一步计划..."
-          placeholderTextColor={Colors.textTertiary}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
+        <View onStartShouldSetResponder={() => false}>
+          {Platform.OS === 'web' ? (
+            <textarea
+              value={note}
+              onChange={(e: any) => setNote(e.target.value)}
+              onPaste={handlePaste}
+              placeholder="已完成工作、遇到的问题、下一步计划...（可粘贴截图）"
+              style={{
+                backgroundColor: '#F1F5F9',
+                borderRadius: 12,
+                padding: 16,
+                fontSize: 15,
+                fontFamily: 'Inter, sans-serif',
+                color: '#1E293B',
+                border: 'none',
+                outline: 'none',
+                minHeight: 80,
+                resize: 'vertical' as any,
+                width: '100%',
+                boxSizing: 'border-box' as any,
+              }}
+            />
+          ) : (
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={note}
+              onChangeText={setNote}
+              placeholder="已完成工作、遇到的问题、下一步计划..."
+              placeholderTextColor={Colors.textTertiary}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          )}
+        </View>
+
+        <Text style={[styles.label, { marginTop: 16 }]}>附件截图</Text>
+        <View style={styles.imageSection}>
+          {images.map((uri, idx) => (
+            <View key={idx} style={styles.imageThumb}>
+              <Image source={{ uri }} style={styles.thumbImg} />
+              <Pressable onPress={() => removeImage(idx)} style={styles.removeImgBtn}>
+                <Ionicons name="close-circle" size={20} color={Colors.danger} />
+              </Pressable>
+            </View>
+          ))}
+          {uploading && (
+            <View style={styles.imageThumb}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+            </View>
+          )}
+          <Pressable onPress={pickImage} style={({ pressed }) => [styles.addImageBtn, { opacity: pressed ? 0.7 : 1 }]}>
+            <Ionicons name="image-outline" size={24} color={Colors.primary} />
+            <Text style={styles.addImageText}>添加图片</Text>
+          </Pressable>
+        </View>
+        {Platform.OS === 'web' && (
+          <input
+            ref={fileInputRef as any}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleWebFileChange}
+            style={{ display: 'none' }}
+          />
+        )}
+        <Text style={styles.hint}>支持从相册选择图片{Platform.OS === 'web' ? '，或直接在说明框中粘贴截图' : ''}</Text>
 
         <Pressable
           onPress={handleSave}
-          disabled={saving}
+          disabled={saving || uploading}
           style={({ pressed }) => [
             styles.saveBtn,
-            { opacity: saving ? 0.5 : pressed ? 0.9 : 1 }
+            { opacity: (saving || uploading) ? 0.5 : pressed ? 0.9 : 1 }
           ]}
         >
           <Ionicons name="checkmark" size={20} color={Colors.white} />
@@ -122,6 +279,13 @@ const styles = StyleSheet.create({
   progressPercent: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.text, width: 40, textAlign: 'right' },
   input: { backgroundColor: Colors.backgroundTertiary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.text },
   textArea: { minHeight: 80 },
+  imageSection: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  imageThumb: { width: 80, height: 80, borderRadius: 10, backgroundColor: Colors.backgroundTertiary, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  thumbImg: { width: 80, height: 80, borderRadius: 10 },
+  removeImgBtn: { position: 'absolute', top: -2, right: -2 },
+  addImageBtn: { width: 80, height: 80, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.primary + '40', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  addImageText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.primary },
+  hint: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 6 },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 24 },
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },
   errorText: { fontFamily: 'Inter_500Medium', fontSize: 16, color: Colors.textSecondary },

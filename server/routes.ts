@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
+import { uploadFile } from "./file-upload";
 import {
   getUser, getUserByUsername, createUser, updateUser, deleteUser, getAllUsers, verifyPassword,
   getDepartments, createDepartment, updateDepartment, deleteDepartment,
@@ -429,8 +430,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/key-results/:id/progress", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { progress, note } = req.body;
-      const kr = await updateKRProgressInDb(req.params.id, progress, note || "");
+      const { progress, note, images } = req.body;
+      const kr = await updateKRProgressInDb(req.params.id, progress, note || "", images);
       if (!kr) return res.status(404).json({ message: "关键结果不存在" });
       return res.json(kr);
     } catch (err) {
@@ -483,6 +484,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", "attachment; filename=okr_import_template.xlsx");
     return res.send(buf);
+  });
+
+  app.post("/api/upload/image", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      await new Promise<void>((resolve) => req.on("end", resolve));
+      const buf = Buffer.concat(chunks);
+
+      if (buf.length === 0) return res.status(400).json({ message: "没有文件数据" });
+      if (buf.length > 10 * 1024 * 1024) return res.status(400).json({ message: "文件大小不能超过10MB" });
+
+      const contentType = req.headers["content-type"] || "image/png";
+      const ext = contentType.includes("png") ? "png" : contentType.includes("gif") ? "gif" : contentType.includes("webp") ? "webp" : "jpg";
+      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${ext}`;
+
+      const url = await uploadFile(buf, fileName, contentType);
+      return res.json({ url });
+    } catch (err) {
+      console.error("Image upload error:", err);
+      return res.status(500).json({ message: "图片上传失败" });
+    }
   });
 
   app.post("/api/import/parse-excel", requireAuth, async (req: Request, res: Response) => {

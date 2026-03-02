@@ -248,7 +248,7 @@ export async function deleteKeyResultInDb(id: string): Promise<void> {
   await db.delete(keyResults).where(eq(keyResults.id, id));
 }
 
-export async function updateKRProgressInDb(id: string, progress: number, note: string): Promise<KeyResult | undefined> {
+export async function updateKRProgressInDb(id: string, progress: number, note: string, images?: string[]): Promise<KeyResult | undefined> {
   const [existing] = await db.select().from(keyResults).where(eq(keyResults.id, id));
   if (!existing) return undefined;
 
@@ -257,6 +257,7 @@ export async function updateKRProgressInDb(id: string, progress: number, note: s
     date: new Date().toISOString(),
     progress,
     note,
+    images: images && images.length > 0 ? images : undefined,
   };
 
   const history = [...(existing.progressHistory || []), entry];
