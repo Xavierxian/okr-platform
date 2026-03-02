@@ -91,7 +91,7 @@ Preferred communication style: Simple, everyday language.
 ### Key Screens
 - `app/login.tsx` — Login screen with username/password
 - `app/(tabs)/index.tsx` — Dashboard with 3 sections: 我的目标, 本部门协同KR, 跨部门协同KR
-- `app/(tabs)/okrs.tsx` — OKR list with department/cycle filters
+- `app/(tabs)/okrs.tsx` — OKR list with department/cycle filters, import button visible only for super_admin
 - `app/(tabs)/analytics.tsx` — Enhanced analytics with cycle/dept filtering, department rankings (progress, self-eval, completion rate), AI analysis
 - `app/(tabs)/profile.tsx` — User info, stats, admin management links, password change, logout
 - `app/change-password.tsx` — Password change screen
@@ -106,6 +106,8 @@ Preferred communication style: Simple, everyday language.
 - `app/manage-users.tsx` — User list and management (admin only)
 - `app/create-department.tsx` — Create new department
 - `app/create-user.tsx` — Create new user with role/department assignment
+- `components/NotificationBell.tsx` — Shared notification bell with unread badge, polls every 15s, shown in dashboard/OKR/analytics headers
+- `components/NotificationToast.tsx` — Slide-down toast for real-time notification alerts
 
 ### API Endpoints
 - `GET /api/key-results/assigned-to-me` — KRs where current user is assignee (returns {kr, objective} pairs)

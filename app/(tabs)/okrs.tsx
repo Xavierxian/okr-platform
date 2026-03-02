@@ -7,6 +7,7 @@ import { useOKR } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
 import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
+import NotificationBell from '@/components/NotificationBell';
 
 interface SimpleUser {
   id: string;
@@ -161,9 +162,12 @@ export default function OKRsScreen() {
       <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
         <Text style={styles.headerTitle}>目标管理</Text>
         <View style={styles.headerActions}>
-          <Pressable onPress={() => router.push('/import-okr')} style={({ pressed }) => [styles.importBtn, { opacity: pressed ? 0.8 : 1 }]}>
-            <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} />
-          </Pressable>
+          <NotificationBell />
+          {userRole === 'super_admin' && (
+            <Pressable onPress={() => router.push('/import-okr')} style={({ pressed }) => [styles.importBtn, { opacity: pressed ? 0.8 : 1 }]}>
+              <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} />
+            </Pressable>
+          )}
           <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
             <Ionicons name="add" size={24} color={Colors.white} />
           </Pressable>

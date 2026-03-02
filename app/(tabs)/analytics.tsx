@@ -7,6 +7,7 @@ import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
+import NotificationBell from '@/components/NotificationBell';
 
 function getScoreColor(score: number): string {
   if (score >= 0.7) return Colors.success;
@@ -231,7 +232,10 @@ export default function AnalyticsScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 16, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>数据分析</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <Text style={styles.title}>数据分析</Text>
+          <NotificationBell />
+        </View>
 
         <View style={styles.filterSection}>
           <Text style={styles.filterLabel}>周期筛选</Text>

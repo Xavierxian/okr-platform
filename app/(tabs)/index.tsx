@@ -7,6 +7,7 @@ import { useOKR, type AssignedKRItem } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
 import Colors from '@/constants/colors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import NotificationBell from '@/components/NotificationBell';
 
 function getStatusColor(status: string): string {
   switch (status) {
@@ -134,9 +135,12 @@ export default function DashboardScreen() {
               {myObjectives.length} 个目标 · {assignedKRs.length} 个协同KR · {collaboratingKRs.length} 个跨部门协同
             </Text>
           </View>
-          <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
-            <Ionicons name="add" size={24} color={Colors.white} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <NotificationBell />
+            <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
+              <Ionicons name="add" size={24} color={Colors.white} />
+            </Pressable>
+          </View>
         </View>
 
         {usedDepts.length > 0 && (
