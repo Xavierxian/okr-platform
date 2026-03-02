@@ -113,6 +113,13 @@ Preferred communication style: Simple, everyday language.
 - `PUT /api/auth/change-password` — Change password (requires currentPassword, newPassword)
 - `GET /api/analytics/department-rankings?cycle=` — Department rankings with progress, score, completion rate
 - `POST /api/analytics/ai-analysis` — AI-powered OKR analysis (requires cycle, optional departmentId)
+- `GET /api/objectives/:id` — Single objective with its KRs (for notification deep-linking)
+- `GET /api/kr-comments/:krId` — Comments for a KR
+- `POST /api/kr-comments` — Create comment with @mentions (creates notifications)
+- `GET /api/notifications` — User's notifications
+- `GET /api/notifications/unread-count` — Unread notification count
+- `PUT /api/notifications/:id/read` — Mark notification as read
+- `PUT /api/notifications/read-all` — Mark all notifications as read
 - Standard CRUD endpoints for objectives, key-results, departments, users
 
 ### Build & Development

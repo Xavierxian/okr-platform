@@ -61,8 +61,27 @@ export default function ObjectiveDetailScreen() {
   const { objectives, keyResults, departments, removeObjective, removeKeyResult } = useOKR();
   const { user } = useAuth();
 
-  const objective = useMemo(() => objectives.find(o => o.id === id), [objectives, id]);
-  const objKRs = useMemo(() => keyResults.filter(kr => kr.objectiveId === id), [keyResults, id]);
+  const contextObjective = useMemo(() => objectives.find(o => o.id === id), [objectives, id]);
+  const contextKRs = useMemo(() => keyResults.filter(kr => kr.objectiveId === id), [keyResults, id]);
+
+  const [fetchedObjective, setFetchedObjective] = useState<any>(null);
+  const [fetchedKRs, setFetchedKRs] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!contextObjective && id) {
+      (async () => {
+        try {
+          const res = await apiRequest("GET", `/api/objectives/${id}`);
+          const data = await res.json();
+          setFetchedObjective(data.objective);
+          setFetchedKRs(data.keyResults || []);
+        } catch {}
+      })();
+    }
+  }, [contextObjective, id]);
+
+  const objective = contextObjective || fetchedObjective;
+  const objKRs = contextObjective ? contextKRs : fetchedKRs;
   const dept = useMemo(() => departments.find(d => d.id === objective?.departmentId), [departments, objective]);
 
   const canEditObj = useMemo(() => {

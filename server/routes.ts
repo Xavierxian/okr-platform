@@ -295,6 +295,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/objectives/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const allObjs = await getAllObjectives();
+      const obj = allObjs.find(o => o.id === req.params.id);
+      if (!obj) return res.status(404).json({ message: "目标不存在" });
+      const krs = await getKeyResultsForObjectives([obj.id]);
+      return res.json({ objective: obj, keyResults: krs });
+    } catch (err) {
+      return res.status(500).json({ message: "获取目标失败" });
+    }
+  });
+
   app.post("/api/objectives", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await getUser(req.session.userId!);
