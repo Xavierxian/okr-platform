@@ -12,6 +12,7 @@ import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_7
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
 import LoginScreen from "@/app/login";
+import NotificationToast from "@/components/NotificationToast";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -181,6 +182,7 @@ export default function RootLayout() {
               <AuthGate>
                 <OKRProvider>
                   <RootLayoutNav />
+                  <NotificationToast />
                 </OKRProvider>
               </AuthGate>
             </KeyboardProvider>
