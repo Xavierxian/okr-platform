@@ -31,38 +31,30 @@ export default function OKRsScreen() {
   const showDeptFilter = userRole === 'center_head' || userRole === 'vp' || userRole === 'super_admin';
 
   useEffect(() => {
-    if (showUserFilter || showDeptFilter) {
-      apiRequest("GET", "/api/users/all-safe")
-        .then(res => res.json())
-        .then((data: SimpleUser[]) => setAllUsers(data))
-        .catch(() => {});
-    }
-  }, [showUserFilter, showDeptFilter]);
+    apiRequest("GET", "/api/users/all-safe")
+      .then(res => res.json())
+      .then((data: SimpleUser[]) => setAllUsers(data))
+      .catch(() => {});
+  }, []);
 
   const visibleUsers = useMemo(() => {
+    let baseUsers = allUsers;
     if (userRole === 'member') {
       const myDeptIds = (user as any)?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
-      return allUsers.filter(u => {
+      baseUsers = allUsers.filter(u => {
         const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
         return uDepts.some((d: string) => myDeptIds.includes(d));
       });
-    }
-    if (userRole === 'center_head') {
-      if (selectedDeptIds.length > 0) {
-        return allUsers.filter(u => {
-          const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
-          return uDepts.some((d: string) => selectedDeptIds.includes(d));
-        });
-      }
-      return allUsers.filter(u => u.role === 'center_head');
+    } else if (userRole === 'center_head') {
+      baseUsers = allUsers.filter(u => u.role === 'center_head');
     }
     if (selectedDeptIds.length > 0) {
-      return allUsers.filter(u => {
+      baseUsers = baseUsers.filter(u => {
         const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
         return uDepts.some((d: string) => selectedDeptIds.includes(d));
       });
     }
-    return allUsers;
+    return baseUsers;
   }, [allUsers, userRole, user, selectedDeptIds]);
 
   const filteredObjectives = useMemo(() => {

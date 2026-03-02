@@ -96,6 +96,18 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
   if (user.role === "super_admin" || user.role === "vp") {
     return db.select().from(objectives);
   }
+
+  const allObjs = await db.select().from(objectives);
+
+  if (user.role === "center_head") {
+    const allUsers = await getAllUsers();
+    const centerHeadIds = new Set(allUsers.filter(u => u.role === "center_head").map(u => u.id));
+    return allObjs.filter(obj => {
+      if (obj.createdBy && centerHeadIds.has(obj.createdBy)) return true;
+      return false;
+    });
+  }
+
   const allDepts = await getDepartments();
   const multiDeptIds = await getUserDepartmentIds(user.id);
   const allUserDeptIds: string[] = [];
@@ -105,36 +117,8 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
     expanded.forEach(id => { if (!allUserDeptIds.includes(id)) allUserDeptIds.push(id); });
   }
 
-  const allObjs = await db.select().from(objectives);
-  const allKRs = await db.select().from(keyResults);
-  const relatedObjIds = new Set(
-    allKRs
-      .filter(kr => kr.assigneeId === user.id || kr.collaboratorId === user.id)
-      .map(kr => kr.objectiveId)
-  );
-
-  if (user.role === "center_head") {
-    const allUsers = await getAllUsers();
-    const centerHeadIds = new Set(allUsers.filter(u => u.role === "center_head").map(u => u.id));
-    return allObjs.filter(obj => {
-      if (obj.createdBy && centerHeadIds.has(obj.createdBy)) return true;
-      if (allUserDeptIds.includes(obj.departmentId)) return true;
-      if (relatedObjIds.has(obj.id)) return true;
-      if (obj.isCollaborative) {
-        if ((obj.collaborativeDeptIds as string[] || []).some(id => allUserDeptIds.includes(id))) return true;
-        if ((obj.collaborativeUserIds as string[] || []).includes(user.id)) return true;
-      }
-      return false;
-    });
-  }
-
   return allObjs.filter(obj => {
     if (allUserDeptIds.includes(obj.departmentId)) return true;
-    if (relatedObjIds.has(obj.id)) return true;
-    if (obj.isCollaborative) {
-      if ((obj.collaborativeDeptIds as string[] || []).some(id => allUserDeptIds.includes(id))) return true;
-      if ((obj.collaborativeUserIds as string[] || []).includes(user.id)) return true;
-    }
     return false;
   });
 }

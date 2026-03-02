@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Image, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -19,6 +19,8 @@ export default function UpdateProgressScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const uploadingRef = useRef(false);
 
   const progressNum = Math.min(100, Math.max(0, parseInt(progress) || 0));
 
@@ -49,7 +51,9 @@ export default function UpdateProgressScreen() {
     setUploading(false);
   };
 
-  const uploadImageFromBlob = async (blob: Blob) => {
+  const uploadImageFromBlob = useCallback(async (blob: Blob) => {
+    if (uploadingRef.current) return;
+    uploadingRef.current = true;
     setUploading(true);
     try {
       const apiUrl = getApiUrl();
@@ -67,8 +71,37 @@ export default function UpdateProgressScreen() {
     } catch (err) {
       console.error('Upload failed:', err);
     }
+    uploadingRef.current = false;
     setUploading(false);
-  };
+  }, []);
+
+  const pasteListenerRef = useRef<((e: ClipboardEvent) => void) | null>(null);
+
+  const setTextareaRef = useCallback((el: HTMLTextAreaElement | null) => {
+    if (Platform.OS !== 'web') return;
+    if (textareaRef.current && pasteListenerRef.current) {
+      textareaRef.current.removeEventListener('paste', pasteListenerRef.current);
+    }
+    textareaRef.current = el;
+    if (el) {
+      const handler = (e: ClipboardEvent) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            e.preventDefault();
+            const blob = items[i].getAsFile();
+            if (blob) {
+              uploadImageFromBlob(blob);
+            }
+            return;
+          }
+        }
+      };
+      pasteListenerRef.current = handler;
+      el.addEventListener('paste', handler);
+    }
+  }, [uploadImageFromBlob]);
 
   const pickImage = async () => {
     if (Platform.OS === 'web') {
@@ -94,23 +127,6 @@ export default function UpdateProgressScreen() {
       await uploadImageFromBlob(files[i]);
     }
     e.target.value = '';
-  };
-
-  const handlePaste = async (e: any) => {
-    if (Platform.OS !== 'web') return;
-    const clipboardData = e.nativeEvent?.clipboardData || e.clipboardData;
-    if (!clipboardData) return;
-    const items = clipboardData.items;
-    if (!items) return;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        e.preventDefault();
-        const blob = items[i].getAsFile();
-        if (blob) {
-          await uploadImageFromBlob(blob);
-        }
-      }
-    }
   };
 
   const removeImage = (idx: number) => {
@@ -182,9 +198,9 @@ export default function UpdateProgressScreen() {
         <View onStartShouldSetResponder={() => false}>
           {Platform.OS === 'web' ? (
             <textarea
+              ref={setTextareaRef as any}
               value={note}
               onChange={(e: any) => setNote(e.target.value)}
-              onPaste={handlePaste}
               placeholder="已完成工作、遇到的问题、下一步计划...（可粘贴截图）"
               style={{
                 backgroundColor: '#F1F5F9',
