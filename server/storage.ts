@@ -1,8 +1,8 @@
 import { eq, or, inArray, and, asc } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, departments, objectives, keyResults, cycles, userDepartments,
-  type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry, type Cycle, type UserDepartment,
+  users, departments, objectives, keyResults, cycles, userDepartments, krComments, notifications,
+  type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry, type Cycle, type UserDepartment, type KRComment, type Notification,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
@@ -356,4 +356,54 @@ export async function updateCycle(id: string, data: { name?: string; sortOrder?:
 
 export async function deleteCycle(id: string): Promise<void> {
   await db.delete(cycles).where(eq(cycles.id, id));
+}
+
+export async function getCommentsForKR(krId: string): Promise<KRComment[]> {
+  return db.select().from(krComments).where(eq(krComments.krId, krId));
+}
+
+export async function createComment(data: {
+  krId: string;
+  userId: string;
+  userName: string;
+  content: string;
+  mentionedUserIds: string[];
+}): Promise<KRComment> {
+  const [comment] = await db.insert(krComments).values(data).returning();
+  return comment;
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  await db.delete(krComments).where(eq(krComments.id, id));
+}
+
+export async function getNotificationsForUser(userId: string): Promise<Notification[]> {
+  return db.select().from(notifications).where(eq(notifications.userId, userId));
+}
+
+export async function createNotification(data: {
+  userId: string;
+  type: string;
+  title: string;
+  content: string;
+  relatedKrId?: string;
+  relatedObjectiveId?: string;
+  fromUserId?: string;
+  fromUserName?: string;
+}): Promise<Notification> {
+  const [notif] = await db.insert(notifications).values(data).returning();
+  return notif;
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+}
+
+export async function markAllNotificationsRead(userId: string): Promise<void> {
+  await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
+}
+
+export async function getUnreadNotificationCount(userId: string): Promise<number> {
+  const rows = await db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+  return rows.length;
 }

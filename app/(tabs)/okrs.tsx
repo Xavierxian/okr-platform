@@ -12,6 +12,7 @@ interface SimpleUser {
   id: string;
   displayName: string;
   departmentId: string | null;
+  departmentIds?: string[];
   role: string;
 }
 
@@ -39,16 +40,26 @@ export default function OKRsScreen() {
 
   const visibleUsers = useMemo(() => {
     if (userRole === 'member') {
-      return allUsers.filter(u => u.departmentId === user?.departmentId);
+      const myDeptIds = (user as any)?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
+      return allUsers.filter(u => {
+        const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
+        return uDepts.some((d: string) => myDeptIds.includes(d));
+      });
     }
     if (userRole === 'center_head') {
       if (selectedDeptIds.length > 0) {
-        return allUsers.filter(u => u.departmentId && selectedDeptIds.includes(u.departmentId));
+        return allUsers.filter(u => {
+          const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
+          return uDepts.some((d: string) => selectedDeptIds.includes(d));
+        });
       }
       return allUsers.filter(u => u.role === 'center_head');
     }
     if (selectedDeptIds.length > 0) {
-      return allUsers.filter(u => u.departmentId && selectedDeptIds.includes(u.departmentId));
+      return allUsers.filter(u => {
+        const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
+        return uDepts.some((d: string) => selectedDeptIds.includes(d));
+      });
     }
     return allUsers;
   }, [allUsers, userRole, user, selectedDeptIds]);

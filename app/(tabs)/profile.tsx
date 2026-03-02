@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
+import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -20,6 +21,17 @@ export default function ProfileScreen() {
   const { objectives, keyResults, departments } = useOKR();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'super_admin';
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/notifications/unread-count");
+        const data = await res.json();
+        setUnreadCount(data.count || 0);
+      } catch {}
+    })();
+  }, []);
 
   const userDeptNames = useMemo(() => {
     const deptIds: string[] = (user as any)?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
@@ -106,8 +118,24 @@ export default function ProfileScreen() {
           </View>
         </Animated.View>
 
+        <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.section}>
+          <Text style={styles.sectionTitle}>消息</Text>
+          <Pressable onPress={() => router.push('/notifications')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
+            <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
+              <Ionicons name="notifications-outline" size={18} color={Colors.primary} />
+            </View>
+            <Text style={styles.settingText}>消息通知</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
+            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+          </Pressable>
+        </Animated.View>
+
         {isAdmin && (
-          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
+          <Animated.View entering={FadeInDown.delay(350).duration(400)} style={styles.section}>
             <Text style={styles.sectionTitle}>管理后台</Text>
             <Pressable onPress={() => router.push('/manage-departments')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
               <View style={[styles.settingIcon, { backgroundColor: Colors.info + '20' }]}>
@@ -180,6 +208,8 @@ const styles = StyleSheet.create({
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   settingIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   settingText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.text, flex: 1 },
+  badge: { backgroundColor: Colors.danger, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, marginRight: 4 },
+  badgeText: { fontFamily: 'Inter_600SemiBold', fontSize: 11, color: Colors.white },
   footerSection: { alignItems: 'center', paddingVertical: 20 },
   version: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary },
 });

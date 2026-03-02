@@ -12,7 +12,6 @@ const ROLE_LABELS: Record<string, string> = {
   vp: 'VP',
   center_head: '中心负责人',
   member: '普通员工和部门经理',
-  dept_admin: '部门管理员(旧)',
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -20,7 +19,6 @@ const ROLE_COLORS: Record<string, string> = {
   vp: '#8B5CF6',
   center_head: Colors.accent,
   member: Colors.info,
-  dept_admin: Colors.accent,
 };
 
 interface UserItem {

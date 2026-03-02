@@ -83,6 +83,34 @@ export const keyResults = pgTable("key_results", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const krComments = pgTable("kr_comments", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  krId: varchar("kr_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  userName: text("user_name").notNull(),
+  content: text("content").notNull(),
+  mentionedUserIds: jsonb("mentioned_user_ids").$type<string[]>().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: text("type").notNull().default("comment_mention"),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  relatedKrId: varchar("related_kr_id"),
+  relatedObjectiveId: varchar("related_objective_id"),
+  fromUserId: varchar("from_user_id"),
+  fromUserName: text("from_user_name"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export interface ProgressEntry {
   id: string;
   date: string;
@@ -110,3 +138,5 @@ export type Department = typeof departments.$inferSelect;
 export type Cycle = typeof cycles.$inferSelect;
 export type Objective = typeof objectives.$inferSelect;
 export type KeyResult = typeof keyResults.$inferSelect;
+export type KRComment = typeof krComments.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;

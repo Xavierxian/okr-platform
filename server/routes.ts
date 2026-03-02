@@ -12,6 +12,8 @@ import {
   getKRsAssignedToUser, getKRsCollaboratingUser,
   getCycles, createCycle, updateCycle, deleteCycle,
   getUserDepartmentIds, setUserDepartments, getAllUserDepartments,
+  getCommentsForKR, createComment, deleteComment,
+  getNotificationsForUser, createNotification, markNotificationRead, markAllNotificationsRead, getUnreadNotificationCount,
 } from "./storage";
 
 declare module "express-session" {
@@ -703,6 +705,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error("AI analysis error:", err);
       return res.status(500).json({ message: "AI 分析生成失败" });
+    }
+  });
+
+  app.get("/api/kr-comments/:krId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const comments = await getCommentsForKR(req.params.krId);
+      return res.json(comments);
+    } catch (err) {
+      return res.status(500).json({ message: "获取评论失败" });
+    }
+  });
+
+  app.post("/api/kr-comments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const { krId, content, mentionedUserIds } = req.body;
+      if (!krId || !content?.trim()) {
+        return res.status(400).json({ message: "评论内容不能为空" });
+      }
+      const comment = await createComment({
+        krId,
+        userId: user.id,
+        userName: user.displayName,
+        content: content.trim(),
+        mentionedUserIds: mentionedUserIds || [],
+      });
+
+      if (mentionedUserIds && mentionedUserIds.length > 0) {
+        const allKRs = await getAllKeyResults();
+        const kr = allKRs.find(k => k.id === krId);
+        const allObjs = await getAllObjectives();
+        const obj = kr ? allObjs.find(o => o.id === kr.objectiveId) : null;
+        for (const mentionedId of mentionedUserIds) {
+          if (mentionedId !== user.id) {
+            await createNotification({
+              userId: mentionedId,
+              type: "comment_mention",
+              title: `${user.displayName} 在评论中提到了你`,
+              content: content.trim().substring(0, 100),
+              relatedKrId: krId,
+              relatedObjectiveId: obj?.id,
+              fromUserId: user.id,
+              fromUserName: user.displayName,
+            });
+          }
+        }
+      }
+
+      return res.json(comment);
+    } catch (err) {
+      return res.status(500).json({ message: "发送评论失败" });
+    }
+  });
+
+  app.delete("/api/kr-comments/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteComment(req.params.id);
+      return res.json({ message: "已删除" });
+    } catch (err) {
+      return res.status(500).json({ message: "删除评论失败" });
+    }
+  });
+
+  app.get("/api/notifications", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const notifs = await getNotificationsForUser(req.session.userId!);
+      return res.json(notifs);
+    } catch (err) {
+      return res.status(500).json({ message: "获取通知失败" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const count = await getUnreadNotificationCount(req.session.userId!);
+      return res.json({ count });
+    } catch (err) {
+      return res.status(500).json({ message: "获取未读数失败" });
+    }
+  });
+
+  app.put("/api/notifications/:id/read", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await markNotificationRead(req.params.id);
+      return res.json({ message: "已标记已读" });
+    } catch (err) {
+      return res.status(500).json({ message: "标记失败" });
+    }
+  });
+
+  app.put("/api/notifications/read-all", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await markAllNotificationsRead(req.session.userId!);
+      return res.json({ message: "已全部标记已读" });
+    } catch (err) {
+      return res.status(500).json({ message: "标记失败" });
     }
   });
 

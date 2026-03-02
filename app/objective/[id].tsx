@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert } from 'react-native';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert, TextInput, FlatList, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
+import { useAuth } from '@/lib/auth-context';
+import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -37,14 +39,131 @@ function getScoreLabel(score: number): string {
   return '未达成';
 }
 
+interface Comment {
+  id: string;
+  krId: string;
+  userId: string;
+  userName: string;
+  content: string;
+  mentionedUserIds: string[];
+  createdAt: string;
+}
+
+interface SimpleUser {
+  id: string;
+  displayName: string;
+  username: string;
+}
+
 export default function ObjectiveDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { objectives, keyResults, departments, removeObjective, removeKeyResult } = useOKR();
+  const { user } = useAuth();
 
   const objective = useMemo(() => objectives.find(o => o.id === id), [objectives, id]);
   const objKRs = useMemo(() => keyResults.filter(kr => kr.objectiveId === id), [keyResults, id]);
   const dept = useMemo(() => departments.find(d => d.id === objective?.departmentId), [departments, objective]);
+
+  const canEditObj = useMemo(() => {
+    if (!user || !objective) return false;
+    if (user.role === 'super_admin') return true;
+    if (objective.createdBy === user.id) return true;
+    return false;
+  }, [user, objective]);
+
+  const canEditKR = useCallback((kr: any) => {
+    if (!user) return false;
+    if (user.role === 'super_admin') return true;
+    if (objective?.createdBy === user.id) return true;
+    if (kr.assigneeId === user.id) return true;
+    return false;
+  }, [user, objective]);
+
+  const [commentKrId, setCommentKrId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [commentText, setCommentText] = useState('');
+  const [sendingComment, setSendingComment] = useState(false);
+  const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
+  const [showMentionPicker, setShowMentionPicker] = useState(false);
+  const [mentionedIds, setMentionedIds] = useState<string[]>([]);
+  const [mentionSearch, setMentionSearch] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/users/all-safe");
+        setAllUsers(await res.json());
+      } catch {}
+    })();
+  }, []);
+
+  const loadComments = async (krId: string) => {
+    try {
+      const res = await apiRequest("GET", `/api/kr-comments/${krId}`);
+      const data = await res.json();
+      setComments(prev => ({ ...prev, [krId]: data }));
+    } catch {}
+  };
+
+  useEffect(() => {
+    objKRs.forEach(kr => loadComments(kr.id));
+  }, [objKRs.length]);
+
+  const handleSendComment = async () => {
+    if (!commentKrId || !commentText.trim() || sendingComment) return;
+    setSendingComment(true);
+    try {
+      await apiRequest("POST", "/api/kr-comments", {
+        krId: commentKrId,
+        content: commentText.trim(),
+        mentionedUserIds: mentionedIds,
+      });
+      setCommentText('');
+      setMentionedIds([]);
+      await loadComments(commentKrId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+    setSendingComment(false);
+  };
+
+  const handleDeleteComment = async (commentId: string, krId: string) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('确定删除该评论吗？')) {
+        try {
+          await apiRequest("DELETE", `/api/kr-comments/${commentId}`);
+          await loadComments(krId);
+        } catch {}
+      }
+    } else {
+      Alert.alert('删除评论', '确定删除该评论吗？', [
+        { text: '取消', style: 'cancel' },
+        { text: '删除', style: 'destructive', onPress: async () => {
+          try {
+            await apiRequest("DELETE", `/api/kr-comments/${commentId}`);
+            await loadComments(krId);
+          } catch {}
+        }},
+      ]);
+    }
+  };
+
+  const insertMention = (mentionUser: SimpleUser) => {
+    setCommentText(prev => prev + `@${mentionUser.displayName} `);
+    if (!mentionedIds.includes(mentionUser.id)) {
+      setMentionedIds(prev => [...prev, mentionUser.id]);
+    }
+    setShowMentionPicker(false);
+    setMentionSearch('');
+  };
+
+  const filteredMentionUsers = useMemo(() => {
+    return allUsers.filter(u => {
+      if (u.id === user?.id) return false;
+      if (!mentionSearch) return true;
+      return u.displayName.includes(mentionSearch) || u.username.includes(mentionSearch);
+    });
+  }, [allUsers, mentionSearch, user]);
 
   const avgProgress = useMemo(() => {
     if (objKRs.length === 0) return 0;
@@ -77,13 +196,7 @@ export default function ObjectiveDetailScreen() {
     } else {
       Alert.alert('删除目标', '此操作将删除该目标及其所有关键结果。', [
         { text: '取消', style: 'cancel' },
-        {
-          text: '删除', style: 'destructive',
-          onPress: async () => {
-            await removeObjective(objective.id);
-            router.back();
-          },
-        },
+        { text: '删除', style: 'destructive', onPress: async () => { await removeObjective(objective.id); router.back(); } },
       ]);
     }
   };
@@ -102,6 +215,21 @@ export default function ObjectiveDetailScreen() {
     }
   };
 
+  const renderHighlightedContent = (content: string) => {
+    const parts = content.split(/(@\S+)/g);
+    return (
+      <Text style={styles.commentContent}>
+        {parts.map((part, i) =>
+          part.startsWith('@') ? (
+            <Text key={i} style={styles.mentionHighlight}>{part}</Text>
+          ) : (
+            <Text key={i}>{part}</Text>
+          )
+        )}
+      </Text>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={[styles.headerBar, { paddingTop: topPadding + 8 }]}>
@@ -109,18 +237,22 @@ export default function ObjectiveDetailScreen() {
           <Ionicons name="chevron-back" size={28} color={Colors.text} />
         </Pressable>
         <View style={{ flex: 1 }} />
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push({ pathname: '/create-objective', params: { editId: objective.id } });
-          }}
-          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, marginRight: 16 })}
-        >
-          <Ionicons name="pencil-outline" size={22} color={Colors.primary} />
-        </Pressable>
-        <Pressable onPress={handleDeleteObjective} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-          <Ionicons name="trash-outline" size={22} color={Colors.danger} />
-        </Pressable>
+        {canEditObj && (
+          <>
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push({ pathname: '/create-objective', params: { editId: objective.id } });
+              }}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, marginRight: 16 })}
+            >
+              <Ionicons name="pencil-outline" size={22} color={Colors.primary} />
+            </Pressable>
+            <Pressable onPress={handleDeleteObjective} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <Ionicons name="trash-outline" size={22} color={Colors.danger} />
+            </Pressable>
+          </>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Platform.OS === 'web' ? 34 : 40 }]} showsVerticalScrollIndicator={false}>
@@ -172,16 +304,18 @@ export default function ObjectiveDetailScreen() {
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
           <View style={styles.krHeader}>
             <Text style={styles.krSectionTitle}>关键结果 ({objKRs.length})</Text>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push({ pathname: '/create-kr', params: { objectiveId: objective.id } });
-              }}
-              style={({ pressed }) => [styles.addKRBtn, { opacity: pressed ? 0.8 : 1 }]}
-            >
-              <Ionicons name="add" size={18} color={Colors.primary} />
-              <Text style={styles.addKRText}>添加 KR</Text>
-            </Pressable>
+            {canEditObj && (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push({ pathname: '/create-kr', params: { objectiveId: objective.id } });
+                }}
+                style={({ pressed }) => [styles.addKRBtn, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Ionicons name="add" size={18} color={Colors.primary} />
+                <Text style={styles.addKRText}>添加 KR</Text>
+              </Pressable>
+            )}
           </View>
 
           {objKRs.length === 0 ? (
@@ -190,101 +324,219 @@ export default function ObjectiveDetailScreen() {
               <Text style={styles.emptyKRText}>暂无关键结果</Text>
             </View>
           ) : (
-            objKRs.map((kr, idx) => (
-              <Animated.View key={kr.id} entering={FadeInDown.delay(300 + idx * 100).duration(300)} style={styles.krCard}>
-                <View style={styles.krTop}>
-                  <View style={[styles.krStatusDot, { backgroundColor: getStatusColor(kr.status) }]} />
-                  <Text style={styles.krTitle} numberOfLines={2}>{kr.title}</Text>
-                </View>
-                <View style={styles.krMeta}>
-                  {kr.assigneeName ? (
-                    <View style={styles.krMetaItem}>
-                      <Ionicons name="person-outline" size={12} color={Colors.textSecondary} />
-                      <Text style={styles.krMetaText}>{kr.assigneeName}</Text>
-                    </View>
-                  ) : null}
-                  {kr.collaboratorName ? (
-                    <View style={styles.krMetaItem}>
-                      <Ionicons name="people-outline" size={12} color={Colors.info} />
-                      <Text style={[styles.krMetaText, { color: Colors.info }]}>协同: {kr.collaboratorName}</Text>
-                    </View>
-                  ) : null}
-                  <View style={styles.krMetaItem}>
-                    <Ionicons name="calendar-outline" size={12} color={Colors.textSecondary} />
-                    <Text style={styles.krMetaText}>{new Date(kr.endDate).toLocaleDateString('zh-CN')}</Text>
+            objKRs.map((kr, idx) => {
+              const krEditable = canEditKR(kr);
+              const krComments = comments[kr.id] || [];
+              const isCommenting = commentKrId === kr.id;
+              return (
+                <Animated.View key={kr.id} entering={FadeInDown.delay(300 + idx * 100).duration(300)} style={styles.krCard}>
+                  <View style={styles.krTop}>
+                    <View style={[styles.krStatusDot, { backgroundColor: getStatusColor(kr.status) }]} />
+                    <Text style={styles.krTitle} numberOfLines={2}>{kr.title}</Text>
                   </View>
-                  <View style={[styles.statusChip, { backgroundColor: getStatusColor(kr.status) + '20' }]}>
-                    <Text style={[styles.statusChipText, { color: getStatusColor(kr.status) }]}>{STATUS_LABELS[kr.status] || kr.status}</Text>
-                  </View>
-                  <View style={[styles.statusChip, { backgroundColor: (kr.okrType === '挑战型' ? '#F59E0B' : '#3B82F6') + '15' }]}>
-                    <Text style={[styles.statusChipText, { color: kr.okrType === '挑战型' ? '#F59E0B' : '#3B82F6' }]}>{kr.okrType || '承诺型'}</Text>
-                  </View>
-                </View>
-                <View style={styles.krProgressRow}>
-                  <View style={styles.krProgressBar}>
-                    <View style={[styles.krProgressFill, { width: `${kr.progress}%`, backgroundColor: getStatusColor(kr.status) }]} />
-                  </View>
-                  <Text style={styles.krProgressText}>{kr.progress}%</Text>
-                </View>
-                {kr.selfScore !== null && (
-                  <View style={styles.scoreSection}>
-                    <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(kr.selfScore) + '20' }]}>
-                      <Text style={[styles.scoreBadgeVal, { color: getScoreColor(kr.selfScore) }]}>{kr.selfScore}</Text>
-                    </View>
-                    <Text style={styles.scoreLabel}>{getScoreLabel(kr.selfScore)}</Text>
-                  </View>
-                )}
-                <View style={styles.krActions}>
-                  <Pressable
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/create-kr', params: { objectiveId: objective.id, editId: kr.id } }); }}
-                    style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
-                  >
-                    <Ionicons name="pencil-outline" size={16} color={Colors.info} />
-                    <Text style={[styles.actionText, { color: Colors.info }]}>编辑</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/update-progress', params: { krId: kr.id } }); }}
-                    style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
-                  >
-                    <Ionicons name="create-outline" size={16} color={Colors.primary} />
-                    <Text style={styles.actionText}>更新进度</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/score-kr', params: { krId: kr.id } }); }}
-                    style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
-                  >
-                    <Ionicons name="star-outline" size={16} color={Colors.accent} />
-                    <Text style={[styles.actionText, { color: Colors.accent }]}>自评</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleDeleteKR(kr.id, kr.title)}
-                    style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
-                  >
-                    <Ionicons name="trash-outline" size={16} color={Colors.danger} />
-                  </Pressable>
-                </View>
-                {kr.progressHistory && kr.progressHistory.length > 0 && (
-                  <View style={styles.historySection}>
-                    <Text style={styles.historyTitle}>最近更新</Text>
-                    {kr.progressHistory.slice(-3).reverse().map((entry: any) => (
-                      <View key={entry.id} style={styles.historyItem}>
-                        <View style={styles.historyDot} />
-                        <View style={{ flex: 1 }}>
-                          <View style={styles.historyTop}>
-                            <Text style={styles.historyProgress}>{entry.progress}%</Text>
-                            <Text style={styles.historyDate}>{new Date(entry.date).toLocaleDateString('zh-CN')}</Text>
-                          </View>
-                          {entry.note ? <Text style={styles.historyNote} numberOfLines={2}>{entry.note}</Text> : null}
-                        </View>
+                  <View style={styles.krMeta}>
+                    {kr.assigneeName ? (
+                      <View style={styles.krMetaItem}>
+                        <Ionicons name="person-outline" size={12} color={Colors.textSecondary} />
+                        <Text style={styles.krMetaText}>{kr.assigneeName}</Text>
                       </View>
-                    ))}
+                    ) : null}
+                    {kr.collaboratorName ? (
+                      <View style={styles.krMetaItem}>
+                        <Ionicons name="people-outline" size={12} color={Colors.info} />
+                        <Text style={[styles.krMetaText, { color: Colors.info }]}>协同: {kr.collaboratorName}</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.krMetaItem}>
+                      <Ionicons name="calendar-outline" size={12} color={Colors.textSecondary} />
+                      <Text style={styles.krMetaText}>{new Date(kr.endDate).toLocaleDateString('zh-CN')}</Text>
+                    </View>
+                    <View style={[styles.statusChip, { backgroundColor: getStatusColor(kr.status) + '20' }]}>
+                      <Text style={[styles.statusChipText, { color: getStatusColor(kr.status) }]}>{STATUS_LABELS[kr.status] || kr.status}</Text>
+                    </View>
+                    <View style={[styles.statusChip, { backgroundColor: (kr.okrType === '挑战型' ? '#F59E0B' : '#3B82F6') + '15' }]}>
+                      <Text style={[styles.statusChipText, { color: kr.okrType === '挑战型' ? '#F59E0B' : '#3B82F6' }]}>{kr.okrType || '承诺型'}</Text>
+                    </View>
                   </View>
-                )}
-              </Animated.View>
-            ))
+                  <View style={styles.krProgressRow}>
+                    <View style={styles.krProgressBar}>
+                      <View style={[styles.krProgressFill, { width: `${kr.progress}%`, backgroundColor: getStatusColor(kr.status) }]} />
+                    </View>
+                    <Text style={styles.krProgressText}>{kr.progress}%</Text>
+                  </View>
+                  {kr.selfScore !== null && (
+                    <View style={styles.scoreSection}>
+                      <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(kr.selfScore) + '20' }]}>
+                        <Text style={[styles.scoreBadgeVal, { color: getScoreColor(kr.selfScore) }]}>{kr.selfScore}</Text>
+                      </View>
+                      <Text style={styles.scoreLabel}>{getScoreLabel(kr.selfScore)}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.krActions}>
+                    {krEditable && (
+                      <>
+                        <Pressable
+                          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/create-kr', params: { objectiveId: objective.id, editId: kr.id } }); }}
+                          style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
+                        >
+                          <Ionicons name="pencil-outline" size={16} color={Colors.info} />
+                          <Text style={[styles.actionText, { color: Colors.info }]}>编辑</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/update-progress', params: { krId: kr.id } }); }}
+                          style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
+                        >
+                          <Ionicons name="create-outline" size={16} color={Colors.primary} />
+                          <Text style={styles.actionText}>更新进度</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push({ pathname: '/score-kr', params: { krId: kr.id } }); }}
+                          style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
+                        >
+                          <Ionicons name="star-outline" size={16} color={Colors.accent} />
+                          <Text style={[styles.actionText, { color: Colors.accent }]}>自评</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleDeleteKR(kr.id, kr.title)}
+                          style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                        </Pressable>
+                      </>
+                    )}
+                    <Pressable
+                      onPress={() => setCommentKrId(isCommenting ? null : kr.id)}
+                      style={({ pressed }) => [styles.actionBtn, isCommenting && styles.actionBtnActive, { opacity: pressed ? 0.8 : 1 }]}
+                    >
+                      <Ionicons name="chatbubble-outline" size={16} color={isCommenting ? Colors.white : Colors.primary} />
+                      <Text style={[styles.actionText, isCommenting && { color: Colors.white }]}>评论 {krComments.length > 0 ? `(${krComments.length})` : ''}</Text>
+                    </Pressable>
+                  </View>
+
+                  {krComments.length > 0 && (
+                    <View style={styles.commentsSection}>
+                      {krComments.map(c => (
+                        <View key={c.id} style={styles.commentItem}>
+                          <View style={styles.commentHeader}>
+                            <View style={styles.commentAvatar}>
+                              <Ionicons name="person" size={12} color={Colors.primary} />
+                            </View>
+                            <Text style={styles.commentUserName}>{c.userName}</Text>
+                            <Text style={styles.commentTime}>{new Date(c.createdAt).toLocaleDateString('zh-CN')} {new Date(c.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</Text>
+                            {c.userId === user?.id && (
+                              <Pressable onPress={() => handleDeleteComment(c.id, kr.id)} style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, marginLeft: 'auto' })}>
+                                <Ionicons name="close-circle-outline" size={16} color={Colors.textTertiary} />
+                              </Pressable>
+                            )}
+                          </View>
+                          {renderHighlightedContent(c.content)}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {isCommenting && (
+                    <View style={styles.commentInputSection}>
+                      <View style={styles.commentInputRow}>
+                        <TextInput
+                          style={styles.commentInput}
+                          value={commentText}
+                          onChangeText={setCommentText}
+                          placeholder="输入评论..."
+                          placeholderTextColor={Colors.textTertiary}
+                          multiline
+                        />
+                        <Pressable onPress={() => setShowMentionPicker(true)} style={({ pressed }) => [styles.mentionBtn, { opacity: pressed ? 0.7 : 1 }]}>
+                          <Text style={styles.mentionBtnText}>@</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={handleSendComment}
+                          disabled={!commentText.trim() || sendingComment}
+                          style={({ pressed }) => [styles.sendBtn, { opacity: (!commentText.trim() || sendingComment) ? 0.4 : pressed ? 0.7 : 1 }]}
+                        >
+                          <Ionicons name="send" size={18} color={Colors.white} />
+                        </Pressable>
+                      </View>
+                      {mentionedIds.length > 0 && (
+                        <View style={styles.mentionedRow}>
+                          <Text style={styles.mentionedLabel}>提到: </Text>
+                          {mentionedIds.map(mid => {
+                            const mu = allUsers.find(u => u.id === mid);
+                            return mu ? (
+                              <View key={mid} style={styles.mentionedChip}>
+                                <Text style={styles.mentionedChipText}>@{mu.displayName}</Text>
+                                <Pressable onPress={() => setMentionedIds(prev => prev.filter(x => x !== mid))}>
+                                  <Ionicons name="close-circle" size={14} color={Colors.primary} />
+                                </Pressable>
+                              </View>
+                            ) : null;
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {kr.progressHistory && kr.progressHistory.length > 0 && (
+                    <View style={styles.historySection}>
+                      <Text style={styles.historyTitle}>最近更新</Text>
+                      {kr.progressHistory.slice(-3).reverse().map((entry: any) => (
+                        <View key={entry.id} style={styles.historyItem}>
+                          <View style={styles.historyDot} />
+                          <View style={{ flex: 1 }}>
+                            <View style={styles.historyTop}>
+                              <Text style={styles.historyProgress}>{entry.progress}%</Text>
+                              <Text style={styles.historyDate}>{new Date(entry.date).toLocaleDateString('zh-CN')}</Text>
+                            </View>
+                            {entry.note ? <Text style={styles.historyNote} numberOfLines={2}>{entry.note}</Text> : null}
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </Animated.View>
+              );
+            })
           )}
         </Animated.View>
       </ScrollView>
+
+      <Modal visible={showMentionPicker} transparent animationType="fade" onRequestClose={() => setShowMentionPicker(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowMentionPicker(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>选择要@的人</Text>
+            <TextInput
+              style={styles.mentionSearchInput}
+              value={mentionSearch}
+              onChangeText={setMentionSearch}
+              placeholder="搜索用户..."
+              placeholderTextColor={Colors.textTertiary}
+              autoFocus
+            />
+            <FlatList
+              data={filteredMentionUsers}
+              keyExtractor={item => item.id}
+              style={{ maxHeight: 300 }}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => insertMention(item)}
+                  style={({ pressed }) => [styles.mentionUserItem, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <View style={styles.mentionUserAvatar}>
+                    <Ionicons name="person" size={14} color={Colors.primary} />
+                  </View>
+                  <Text style={styles.mentionUserName}>{item.displayName}</Text>
+                  <Text style={styles.mentionUserUsername}>@{item.username}</Text>
+                </Pressable>
+              )}
+              ListEmptyComponent={<Text style={styles.mentionEmpty}>无匹配用户</Text>}
+            />
+            <Pressable onPress={() => setShowMentionPicker(false)} style={({ pressed }) => [styles.modalCancelBtn, { opacity: pressed ? 0.7 : 1 }]}>
+              <Text style={styles.modalCancelText}>取消</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -303,7 +555,6 @@ const styles = StyleSheet.create({
   deptBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.backgroundTertiary, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   deptBadgeText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary },
   objTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, color: Colors.text, marginBottom: 8 },
-  objDesc: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, lineHeight: 20, marginBottom: 16 },
   progressCard: { backgroundColor: Colors.card, borderRadius: 14, padding: 16, marginBottom: 24 },
   progressTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   progressLabel: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textSecondary },
@@ -320,7 +571,6 @@ const styles = StyleSheet.create({
   krTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   krStatusDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   krTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.text, flex: 1 },
-  krDesc: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 6, marginLeft: 18 },
   krMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, marginLeft: 18 },
   krMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   krMetaText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textSecondary },
@@ -334,9 +584,28 @@ const styles = StyleSheet.create({
   scoreBadge: { width: 36, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   scoreBadgeVal: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   scoreLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary },
-  krActions: { flexDirection: 'row', gap: 10, marginTop: 12, marginLeft: 18 },
+  krActions: { flexDirection: 'row', gap: 10, marginTop: 12, marginLeft: 18, flexWrap: 'wrap' },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.backgroundTertiary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  actionBtnActive: { backgroundColor: Colors.primary },
   actionText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.primary },
+  commentsSection: { marginTop: 12, marginLeft: 18, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
+  commentItem: { marginBottom: 10 },
+  commentHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  commentAvatar: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
+  commentUserName: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: Colors.text },
+  commentTime: { fontFamily: 'Inter_400Regular', fontSize: 10, color: Colors.textTertiary },
+  commentContent: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.text, lineHeight: 18, marginLeft: 28 },
+  mentionHighlight: { color: Colors.primary, fontFamily: 'Inter_600SemiBold' },
+  commentInputSection: { marginTop: 8, marginLeft: 18 },
+  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  commentInput: { flex: 1, backgroundColor: Colors.backgroundTertiary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, fontFamily: 'Inter_400Regular', color: Colors.text, maxHeight: 80 },
+  mentionBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
+  mentionBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: Colors.primary },
+  sendBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  mentionedRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  mentionedLabel: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textTertiary },
+  mentionedChip: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: Colors.primary + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  mentionedChipText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: Colors.primary },
   historySection: { marginTop: 12, marginLeft: 18, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
   historyTitle: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.textTertiary, marginBottom: 8 },
   historyItem: { flexDirection: 'row', gap: 8, marginBottom: 8 },
@@ -345,4 +614,15 @@ const styles = StyleSheet.create({
   historyProgress: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.text },
   historyDate: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textTertiary },
   historyNote: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: Colors.card, borderRadius: 16, padding: 20, width: 320, maxHeight: 500 },
+  modalTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, color: Colors.text, textAlign: 'center', marginBottom: 12 },
+  mentionSearchInput: { backgroundColor: Colors.backgroundTertiary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.text, marginBottom: 8 },
+  mentionUserItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  mentionUserAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.primary + '15', alignItems: 'center', justifyContent: 'center' },
+  mentionUserName: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.text },
+  mentionUserUsername: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary },
+  mentionEmpty: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textTertiary, textAlign: 'center', paddingVertical: 20 },
+  modalCancelBtn: { marginTop: 12, paddingVertical: 10, alignItems: 'center' },
+  modalCancelText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.textSecondary },
 });
