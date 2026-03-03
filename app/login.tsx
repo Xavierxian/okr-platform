@@ -15,6 +15,26 @@ function isDingtalkBrowser(): boolean {
   }
 }
 
+function loadDingtalkJSAPI(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).dd?.runtime?.permission?.requestAuthCode) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector('script[src*="dingtalk"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      if ((window as any).dd) { resolve(); return; }
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.25/dingtalk.open.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load DingTalk JSAPI'));
+    document.head.appendChild(script);
+  });
+}
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login, dingtalkLogin } = useAuth();
@@ -32,6 +52,15 @@ export default function LoginScreen() {
   const inDingtalk = isDingtalkBrowser();
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('dt_error') === '1') {
+          setError('钉钉登录失败，请使用账号密码登录');
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch {}
+    }
     (async () => {
       try {
         const res = await apiRequest("GET", "/api/auth/dingtalk-config");
@@ -55,18 +84,24 @@ export default function LoginScreen() {
     setDtLoading(true);
     setError('');
     try {
+      await loadDingtalkJSAPI();
       const dd = (window as any).dd;
       if (!dd?.runtime?.permission?.requestAuthCode) {
-        setError('请在钉钉客户端中打开');
-        setDtLoading(false);
+        const redirectUri = encodeURIComponent(window.location.origin + '/api/auth/dingtalk-callback');
+        const url = `https://login.dingtalk.com/oauth2/auth?response_type=code&client_id=${dtConfig.appKey}&redirect_uri=${redirectUri}&scope=openid&prompt=consent`;
+        window.location.href = url;
         return;
       }
       dd.runtime.permission.requestAuthCode({
         corpId: dtConfig.corpId,
         onSuccess: async (result: { code: string }) => {
-          const loginResult = await dingtalkLogin(result.code);
-          if (!loginResult.success) {
-            setError(loginResult.message || '钉钉登录失败');
+          try {
+            const loginResult = await dingtalkLogin(result.code);
+            if (!loginResult.success) {
+              setError(loginResult.message || '钉钉登录失败');
+            }
+          } catch (e: any) {
+            setError(e?.message || '钉钉登录失败');
           }
           setDtLoading(false);
         },
@@ -77,8 +112,9 @@ export default function LoginScreen() {
         },
       });
     } catch (err) {
-      setError('钉钉登录失败，请使用账号密码登录');
-      setDtLoading(false);
+      const redirectUri = encodeURIComponent(window.location.origin + '/api/auth/dingtalk-callback');
+      const url = `https://login.dingtalk.com/oauth2/auth?response_type=code&client_id=${dtConfig.appKey}&redirect_uri=${redirectUri}&scope=openid&prompt=consent`;
+      window.location.href = url;
     }
   };
 
