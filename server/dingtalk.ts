@@ -31,11 +31,14 @@ export async function getAccessToken(): Promise<string> {
   return cachedToken.token;
 }
 
-export async function getUserInfoByAuthCode(authCode: string): Promise<{
+export interface DingtalkUserInfo {
   userid: string;
   name: string;
   avatar?: string;
-}> {
+  dept_id_list?: number[];
+}
+
+export async function getUserInfoByAuthCode(authCode: string): Promise<DingtalkUserInfo> {
   const token = await getAccessToken();
 
   const userIdRes = await fetch(`${DINGTALK_API}/topapi/v2/user/getuserinfo?access_token=${token}`, {
@@ -60,6 +63,7 @@ export async function getUserInfoByAuthCode(authCode: string): Promise<{
       userid: detailData.result.userid,
       name: detailData.result.name,
       avatar: detailData.result.avatar,
+      dept_id_list: detailData.result.dept_id_list || [],
     };
   }
 
@@ -83,10 +87,17 @@ export async function getUserInfoByAuthCode(authCode: string): Promise<{
         });
         const uidData = await uidRes.json() as any;
         if (uidData.errcode === 0 && uidData.result?.userid) {
+          const detailRes2 = await fetch(`${DINGTALK_API}/topapi/v2/user/get?access_token=${token}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userid: uidData.result.userid, language: "zh_CN" }),
+          });
+          const detailData2 = await detailRes2.json() as any;
           return {
             userid: uidData.result.userid,
             name: userData.nick || userData.name,
             avatar: userData.avatarUrl,
+            dept_id_list: detailData2.errcode === 0 ? (detailData2.result?.dept_id_list || []) : [],
           };
         }
       }
@@ -94,6 +105,56 @@ export async function getUserInfoByAuthCode(authCode: string): Promise<{
   } catch {}
 
   throw new Error("获取钉钉用户信息失败，请重试");
+}
+
+export async function getDepartmentDetail(deptId: number): Promise<{ dept_id: number; name: string; parent_id: number } | null> {
+  try {
+    const token = await getAccessToken();
+    const res = await fetch(`${DINGTALK_API}/topapi/v2/department/get?access_token=${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dept_id: deptId, language: "zh_CN" }),
+    });
+    const data = await res.json() as any;
+    if (data.errcode !== 0) {
+      console.error(`获取钉钉部门详情失败: ${data.errmsg}`);
+      return null;
+    }
+    return {
+      dept_id: data.result.dept_id,
+      name: data.result.name,
+      parent_id: data.result.parent_id,
+    };
+  } catch (err) {
+    console.error("获取钉钉部门详情异常:", err);
+    return null;
+  }
+}
+
+export async function getParentDepartmentName(deptId: number): Promise<string | null> {
+  const dept = await getDepartmentDetail(deptId);
+  if (!dept) return null;
+
+  if (dept.parent_id === 1) {
+    return dept.name;
+  }
+
+  const parentDept = await getDepartmentDetail(dept.parent_id);
+  if (!parentDept) return dept.name;
+
+  if (parentDept.parent_id === 1) {
+    return parentDept.name;
+  }
+
+  let current = parentDept;
+  for (let i = 0; i < 10; i++) {
+    const upper = await getDepartmentDetail(current.parent_id);
+    if (!upper) return current.name;
+    if (upper.parent_id === 1) return upper.name;
+    current = upper;
+  }
+
+  return current.name;
 }
 
 async function getUserAccessToken(authCode: string): Promise<string> {
