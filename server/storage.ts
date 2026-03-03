@@ -16,6 +16,11 @@ export async function getUserByUsername(username: string): Promise<User | undefi
   return user;
 }
 
+export async function getUserByDingtalkId(dingtalkUserId: string): Promise<User | undefined> {
+  const [user] = await db.select().from(users).where(eq(users.dingtalkUserId, dingtalkUserId));
+  return user;
+}
+
 export async function createUser(data: InsertUser): Promise<User> {
   const hashed = await bcrypt.hash(data.password, 10);
   const [user] = await db.insert(users).values({ ...data, password: hashed }).returning();

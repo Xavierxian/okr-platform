@@ -15,7 +15,16 @@ import {
   getUserDepartmentIds, setUserDepartments, getAllUserDepartments,
   getCommentsForKR, createComment, deleteComment,
   getNotificationsForUser, createNotification, markNotificationRead, markAllNotificationsRead, getUnreadNotificationCount,
+  getUserByDingtalkId,
 } from "./storage";
+import {
+  isDingtalkConfigured,
+  getUserInfoByAuthCode,
+  getDepartmentList,
+  getAllDingtalkUsers,
+  getDingtalkCorpId,
+  getDingtalkAppKey,
+} from "./dingtalk";
 
 declare module "express-session" {
   interface SessionData {
@@ -543,6 +552,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getUser(req.session.userId!);
       if (!user) return res.status(401).json({ message: "用户不存在" });
+      if (user.role !== "super_admin") {
+        return res.status(403).json({ message: "仅超级管理员可导入OKR" });
+      }
 
       const { rows } = req.body;
       if (!rows || !Array.isArray(rows) || rows.length === 0) {

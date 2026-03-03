@@ -56,7 +56,7 @@ Preferred communication style: Simple, everyday language.
 - **Department**: id, name, parentId, level (hierarchical)
 - **Objective**: id, title, description, departmentId, cycle, status, isCollaborative, collaborativeDeptIds, collaborativeUserIds, createdBy, linkedToParent (boolean), okrType (text: '承诺型'|'挑战型')
 - **KeyResult**: id, objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, progress, weight, status, selfScore, selfScoreNote, progressHistory, okrType (text: '承诺型'|'挑战型')
-- **User**: id, username, password (hashed), displayName, role, departmentId (legacy primary dept)
+- **User**: id, username, password (hashed), displayName, role, departmentId (legacy primary dept), dingtalkUserId (optional)
 - **UserDepartment**: id, userId, departmentId (many-to-many junction table for multi-center assignment)
 
 ### Dashboard Structure (3 Sections)

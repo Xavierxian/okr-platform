@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   displayName: text("display_name").notNull(),
   role: text("role").notNull().default("member"),
   departmentId: varchar("department_id"),
+  dingtalkUserId: text("dingtalk_user_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
