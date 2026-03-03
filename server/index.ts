@@ -249,6 +249,8 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
+  app.get("/healthz", (_req, res) => res.status(200).send("ok"));
+
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);

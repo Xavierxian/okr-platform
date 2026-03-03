@@ -58,23 +58,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.set("trust proxy", 1);
   }
 
-  app.use(
-    session({
-      store: new PgStore({
-        pool: pool as any,
-        createTableIfMissing: true,
-      }),
-      secret: process.env.SESSION_SECRET || "okr-secret-key",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        secure: isProd,
-        sameSite: "lax",
-      },
-    })
-  );
+  const sessionMiddleware = session({
+    store: new PgStore({
+      pool: pool as any,
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET || "okr-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax",
+    },
+  });
+
+  app.use("/api", sessionMiddleware);
 
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
