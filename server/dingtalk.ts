@@ -132,15 +132,19 @@ export async function getDepartmentDetail(deptId: number): Promise<{ dept_id: nu
 }
 
 export async function getParentDepartmentName(deptId: number): Promise<string | null> {
+  if (deptId === 1) return null;
+
   const dept = await getDepartmentDetail(deptId);
   if (!dept) return null;
+
+  if (!dept.parent_id || dept.parent_id <= 0) return null;
 
   if (dept.parent_id === 1) {
     return dept.name;
   }
 
   const parentDept = await getDepartmentDetail(dept.parent_id);
-  if (!parentDept) return dept.name;
+  if (!parentDept) return null;
 
   if (parentDept.parent_id === 1) {
     return parentDept.name;

@@ -162,10 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user = newUser;
         await syncDingtalkUserDept(newUser.id, dtUser.dept_id_list);
       } else {
-        const existingDeptIds = await getUserDepartmentIds(user.id);
-        if (existingDeptIds.length === 0) {
-          await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
-        }
+        await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
       }
 
       req.session.userId = user!.id;
@@ -260,10 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user = newUser;
         await syncDingtalkUserDept(newUser.id, dtUser.dept_id_list);
       } else {
-        const existingDeptIds = await getUserDepartmentIds(user.id);
-        if (existingDeptIds.length === 0) {
-          await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
-        }
+        await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
       }
       req.session.userId = user!.id;
       return res.redirect("/");
