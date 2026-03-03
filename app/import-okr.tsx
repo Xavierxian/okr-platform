@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, Pressable, ScrollView, Alert, Platform, Activit
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
+import { useAuth } from '@/lib/auth-context';
 import { apiRequest, getApiUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
@@ -47,6 +48,7 @@ function emptyRow(): Record<string, string> {
 
 export default function ImportOKRScreen() {
   const { refresh } = useOKR();
+  const { user } = useAuth();
   const [importing, setImporting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<{ message: string; errors: string[] } | null>(null);
@@ -54,6 +56,7 @@ export default function ImportOKRScreen() {
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const isAdmin = user?.role === 'super_admin';
 
   const handleDownloadTemplate = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -192,6 +195,18 @@ export default function ImportOKRScreen() {
     setParseError(null);
     setResult(null);
   }, []);
+
+  if (!isAdmin) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
+        <Ionicons name="lock-closed" size={48} color={Colors.textSecondary} />
+        <Text style={{ color: Colors.textSecondary, marginTop: 12, fontSize: 16 }}>仅超级管理员可使用导入功能</Text>
+        <Pressable onPress={() => router.back()} style={{ marginTop: 20, padding: 12 }}>
+          <Text style={{ color: Colors.primary, fontSize: 16 }}>返回</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
