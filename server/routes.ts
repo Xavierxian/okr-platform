@@ -52,6 +52,11 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const PgStore = connectPgSimple(session);
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (isProd) {
+    app.set("trust proxy", 1);
+  }
 
   app.use(
     session({
@@ -63,9 +68,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        maxAge: undefined,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         httpOnly: true,
-        secure: false,
+        secure: isProd,
         sameSite: "lax",
       },
     })
