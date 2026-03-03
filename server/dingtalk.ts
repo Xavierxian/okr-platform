@@ -38,29 +38,15 @@ export async function getUserInfoByAuthCode(authCode: string): Promise<{
 }> {
   const token = await getAccessToken();
 
-  const res = await fetch(`${DINGTALK_API_V2}/v1.0/contact/users/me`, {
-    method: "GET",
-    headers: {
-      "x-acs-dingtalk-access-token": await getUserAccessToken(authCode),
-      "Content-Type": "application/json",
-    },
+  const userIdRes = await fetch(`${DINGTALK_API}/topapi/v2/user/getuserinfo?access_token=${token}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: authCode }),
   });
+  const userIdData = await userIdRes.json() as any;
 
-  if (!res.ok) {
-    const userIdRes = await fetch(`${DINGTALK_API}/topapi/v2/user/getuserinfo?access_token=${token}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: authCode }),
-    });
-    const userIdData = await userIdRes.json() as any;
-    if (userIdData.errcode !== 0) {
-      throw new Error(`获取钉钉用户信息失败: ${userIdData.errmsg}`);
-    }
-    const userid = userIdData.result?.userid;
-    if (!userid) {
-      throw new Error("无法获取钉钉用户ID");
-    }
-
+  if (userIdData.errcode === 0 && userIdData.result?.userid) {
+    const userid = userIdData.result.userid;
     const detailRes = await fetch(`${DINGTALK_API}/topapi/v2/user/get?access_token=${token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -77,12 +63,37 @@ export async function getUserInfoByAuthCode(authCode: string): Promise<{
     };
   }
 
-  const userData = await res.json() as any;
-  return {
-    userid: userData.unionId || userData.openId,
-    name: userData.nick,
-    avatar: userData.avatarUrl,
-  };
+  try {
+    const userToken = await getUserAccessToken(authCode);
+    const res = await fetch(`${DINGTALK_API_V2}/v1.0/contact/users/me`, {
+      method: "GET",
+      headers: {
+        "x-acs-dingtalk-access-token": userToken,
+        "Content-Type": "application/json",
+      },
+    });
+    if (res.ok) {
+      const userData = await res.json() as any;
+      const unionId = userData.unionId;
+      if (unionId) {
+        const uidRes = await fetch(`${DINGTALK_API}/topapi/user/getbyunionid?access_token=${token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ unionid: unionId }),
+        });
+        const uidData = await uidRes.json() as any;
+        if (uidData.errcode === 0 && uidData.result?.userid) {
+          return {
+            userid: uidData.result.userid,
+            name: userData.nick || userData.name,
+            avatar: userData.avatarUrl,
+          };
+        }
+      }
+    }
+  } catch {}
+
+  throw new Error("获取钉钉用户信息失败，请重试");
 }
 
 async function getUserAccessToken(authCode: string): Promise<string> {

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -22,6 +22,8 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'super_admin';
   const [unreadCount, setUnreadCount] = useState(0);
+  const [dtSyncing, setDtSyncing] = useState(false);
+  const [dtEnabled, setDtEnabled] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -29,6 +31,13 @@ export default function ProfileScreen() {
         const res = await apiRequest("GET", "/api/notifications/unread-count");
         const data = await res.json();
         setUnreadCount(data.count || 0);
+      } catch {}
+    })();
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/auth/dingtalk-config");
+        const data = await res.json();
+        setDtEnabled(data.enabled || false);
       } catch {}
     })();
   }, []);
@@ -51,6 +60,22 @@ export default function ProfileScreen() {
       : '暂无';
     return { totalKR, completed, avgProgress, avgScore, scored: scored.length };
   }, [keyResults]);
+
+  const handleDtSync = async () => {
+    setDtSyncing(true);
+    try {
+      const res = await apiRequest("POST", "/api/dingtalk/sync-org");
+      const data = await res.json();
+      const msg = data.message || '同步完成';
+      if (Platform.OS === 'web') { window.alert(msg); }
+      else { Alert.alert('同步结果', msg); }
+    } catch (err: any) {
+      const msg = '同步失败';
+      if (Platform.OS === 'web') { window.alert(msg); }
+      else { Alert.alert('错误', msg); }
+    }
+    setDtSyncing(false);
+  };
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
@@ -158,6 +183,19 @@ export default function ProfileScreen() {
               <Text style={styles.settingText}>周期管理</Text>
               <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
             </Pressable>
+            {dtEnabled && (
+              <Pressable onPress={handleDtSync} disabled={dtSyncing} style={({ pressed }) => [styles.settingRow, { opacity: dtSyncing ? 0.5 : pressed ? 0.8 : 1 }]}>
+                <View style={[styles.settingIcon, { backgroundColor: '#0082EF20' }]}>
+                  <Ionicons name="sync-outline" size={18} color="#0082EF" />
+                </View>
+                <Text style={styles.settingText}>同步钉钉组织架构</Text>
+                {dtSyncing ? (
+                  <ActivityIndicator size="small" color="#0082EF" />
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+                )}
+              </Pressable>
+            )}
           </Animated.View>
         )}
 

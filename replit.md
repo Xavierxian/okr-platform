@@ -129,8 +129,20 @@ Preferred communication style: Simple, everyday language.
 - **Production**: Static web build + esbuild server bundle
 - **Database Migrations**: `npm run db:push` uses drizzle-kit to push schema
 
+### DingTalk Integration
+- **Backend module**: `server/dingtalk.ts` — DingTalk API client (access token, user info, department/user sync)
+- **Auth flow**: Two modes:
+  - **In-app SSO**: DingTalk's built-in browser auto-detects via User-Agent, uses `dd.runtime.permission.requestAuthCode` for silent login
+  - **Web login**: "钉钉扫码登录" button redirects to DingTalk OAuth2 page, callback at `/api/auth/dingtalk-callback`
+- **Org sync**: Super admin can sync DingTalk org structure (departments + users) via "同步钉钉组织架构" button in profile page
+- **User matching**: On DingTalk login, first checks `dingtalkUserId` field, then matches by `displayName`, or creates new user
+- **Config endpoint**: `GET /api/auth/dingtalk-config` returns `{ enabled, corpId, appKey }` — frontend uses this to conditionally show DingTalk login
+- **Routes**: `POST /api/auth/dingtalk-login` (auth code login), `GET /api/auth/dingtalk-callback` (OAuth redirect), `POST /api/dingtalk/sync-org` (admin only)
+- **Env vars**: `DINGTALK_APP_KEY`, `DINGTALK_APP_SECRET`, `DINGTALK_CORP_ID`
+
 ## External Dependencies
 
 - **PostgreSQL**: Database configured via `DATABASE_URL`, managed through Drizzle ORM
 - **Expo Services**: Various Expo SDK modules (haptics, safe-area, etc.)
 - **Replit Environment**: CORS setup references Replit domains; EXPO_PUBLIC_DOMAIN injected at build time
+- **DingTalk Open Platform**: OAuth2 login + org structure sync (requires AppKey, AppSecret, CorpId)

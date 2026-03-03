@@ -16,6 +16,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  dingtalkLogin: (authCode: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -55,6 +56,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const dingtalkLogin = useCallback(async (authCode: string) => {
+    try {
+      const res = await apiRequest("POST", "/api/auth/dingtalk-login", { authCode });
+      const data = await res.json();
+      setUser(data.user);
+      return { success: true };
+    } catch (err: any) {
+      const msg = err?.message || '钉钉登录失败';
+      const match = msg.match(/\d+:\s*(.*)/);
+      return { success: false, message: match ? match[1] : msg };
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await apiRequest("POST", "/api/auth/logout");
@@ -67,9 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     isAuthenticated: !!user,
     login,
+    dingtalkLogin,
     logout,
     refresh,
-  }), [user, isLoading, login, logout, refresh]);
+  }), [user, isLoading, login, dingtalkLogin, logout, refresh]);
 
   return (
     <AuthContext.Provider value={value}>

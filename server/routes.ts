@@ -95,6 +95,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/auth/dingtalk-config", (_req: Request, res: Response) => {
+    if (!isDingtalkConfigured()) {
+      return res.json({ enabled: false });
+    }
+    return res.json({
+      enabled: true,
+      corpId: getDingtalkCorpId(),
+      appKey: getDingtalkAppKey(),
+    });
+  });
+
+  app.post("/api/auth/dingtalk-login", async (req: Request, res: Response) => {
+    try {
+      if (!isDingtalkConfigured()) {
+        return res.status(400).json({ message: "钉钉登录未配置" });
+      }
+      const { authCode } = req.body;
+      if (!authCode) {
+        return res.status(400).json({ message: "缺少钉钉授权码" });
+      }
+
+      const dtUser = await getUserInfoByAuthCode(authCode);
+      let user = await getUserByDingtalkId(dtUser.userid);
+
+      if (!user) {
+        const newUser = await createUser({
+          username: `dt_${dtUser.userid}`,
+          password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          displayName: dtUser.name,
+          role: "member",
+          departmentId: null,
+          dingtalkUserId: dtUser.userid,
+        });
+        user = newUser;
+      }
+
+      req.session.userId = user!.id;
+      const { password: _, ...safeUser } = user!;
+      const deptIds = await getUserDepartmentIds(user!.id);
+      return res.json({ user: { ...safeUser, departmentIds: deptIds } });
+    } catch (err: any) {
+      console.error("DingTalk login error:", err);
+      return res.status(500).json({ message: err?.message || "钉钉登录失败" });
+    }
+  });
+
+  app.post("/api/dingtalk/sync-org", requireAdmin, async (_req: Request, res: Response) => {
+    try {
+      if (!isDingtalkConfigured()) {
+        return res.status(400).json({ message: "钉钉未配置" });
+      }
+
+      const dtDepts = await getDepartmentList();
+      const dtUsers = await getAllDingtalkUsers();
+      const existingDepts = await getDepartments();
+      const existingUsers = await getAllUsers();
+
+      let syncedDepts = 0;
+      let syncedUsers = 0;
+      const deptIdMap = new Map<number, string>();
+
+      for (const dtDept of dtDepts) {
+        const existing = existingDepts.find(d => d.name === dtDept.name);
+        if (existing) {
+          deptIdMap.set(dtDept.dept_id, existing.id);
+        } else {
+          const parentLocalId = dtDept.parent_id > 1 ? (deptIdMap.get(dtDept.parent_id) || null) : null;
+          const level = parentLocalId ? 1 : 0;
+          const newDept = await createDepartment({
+            name: dtDept.name,
+            parentId: parentLocalId,
+            level,
+          });
+          deptIdMap.set(dtDept.dept_id, newDept.id);
+          syncedDepts++;
+        }
+      }
+
+      for (const dtUser of dtUsers) {
+        const existingUser = existingUsers.find(u => u.dingtalkUserId === dtUser.userid);
+
+        if (existingUser) {
+          const mappedDeptIds = dtUser.dept_id_list
+            .map(did => deptIdMap.get(did))
+            .filter((id): id is string => !!id);
+          if (mappedDeptIds.length > 0) {
+            await setUserDepartments(existingUser.id, mappedDeptIds);
+          }
+        } else {
+          const newUser = await createUser({
+            username: `dt_${dtUser.userid}`,
+            password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            displayName: dtUser.name,
+            role: "member",
+            departmentId: null,
+            dingtalkUserId: dtUser.userid,
+          });
+          const mappedDeptIds = dtUser.dept_id_list
+            .map(did => deptIdMap.get(did))
+            .filter((id): id is string => !!id);
+          if (mappedDeptIds.length > 0) {
+            await setUserDepartments(newUser.id, mappedDeptIds);
+          }
+          syncedUsers++;
+        }
+      }
+
+      return res.json({
+        message: `同步完成: 新增 ${syncedDepts} 个部门, ${syncedUsers} 个用户`,
+        syncedDepts,
+        syncedUsers,
+      });
+    } catch (err: any) {
+      console.error("Org sync error:", err);
+      return res.status(500).json({ message: err?.message || "同步失败" });
+    }
+  });
+
+  app.get("/api/auth/dingtalk-callback", async (req: Request, res: Response) => {
+    try {
+      const authCode = req.query.authCode as string || req.query.code as string;
+      if (!authCode || !isDingtalkConfigured()) {
+        return res.redirect("/?dt_error=1");
+      }
+      const dtUser = await getUserInfoByAuthCode(authCode);
+      let user = await getUserByDingtalkId(dtUser.userid);
+      if (!user) {
+        const newUser = await createUser({
+          username: `dt_${dtUser.userid}`,
+          password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          displayName: dtUser.name,
+          role: "member",
+          departmentId: null,
+          dingtalkUserId: dtUser.userid,
+        });
+        user = newUser;
+      }
+      req.session.userId = user!.id;
+      return res.redirect("/");
+    } catch (err) {
+      console.error("DingTalk callback error:", err);
+      return res.redirect("/?dt_error=1");
+    }
+  });
+
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     req.session.destroy((err) => {
       if (err) {
