@@ -32,10 +32,14 @@ export default function CreateUserScreen() {
     );
   };
 
+  const parentDepts = useMemo(() => {
+    return departments.filter(d => !d.parentId);
+  }, [departments]);
+
   const filteredDepts = useMemo(() => {
-    if (!deptSearch.trim()) return departments;
-    return departments.filter(d => d.name.toLowerCase().includes(deptSearch.trim().toLowerCase()));
-  }, [departments, deptSearch]);
+    if (!deptSearch.trim()) return parentDepts;
+    return parentDepts.filter(d => d.name.toLowerCase().includes(deptSearch.trim().toLowerCase()));
+  }, [parentDepts, deptSearch]);
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -113,38 +117,58 @@ export default function CreateUserScreen() {
         </View>
 
         <Text style={styles.label}>所属中心（可多选）</Text>
-        {departments.length > 6 && (
-          <View style={styles.searchRow}>
-            <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
-            <TextInput
-              style={styles.searchInput}
-              value={deptSearch}
-              onChangeText={setDeptSearch}
-              placeholder="搜索中心..."
-              placeholderTextColor={Colors.textTertiary}
-            />
-            {deptSearch.length > 0 && (
-              <Pressable onPress={() => setDeptSearch('')}>
-                <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
-              </Pressable>
-            )}
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
+          <TextInput
+            style={styles.searchInput}
+            value={deptSearch}
+            onChangeText={setDeptSearch}
+            placeholder="搜索中心..."
+            placeholderTextColor={Colors.textTertiary}
+          />
+          {deptSearch.length > 0 && (
+            <Pressable onPress={() => setDeptSearch('')}>
+              <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+            </Pressable>
+          )}
+        </View>
+        {selectedDeptIds.length > 0 && (
+          <View style={styles.selectedRow}>
+            <Text style={styles.selectedLabel}>已选：</Text>
+            {selectedDeptIds.map(id => {
+              const d = departments.find(dd => dd.id === id);
+              return (
+                <Pressable key={id} onPress={() => toggleDept(id)} style={styles.selectedTag}>
+                  <Text style={styles.selectedTagText}>{d?.name || '未知'}</Text>
+                  <Ionicons name="close" size={12} color={Colors.white} />
+                </Pressable>
+              );
+            })}
           </View>
         )}
-        <View style={styles.chipRow}>
-          {filteredDepts.map(dept => (
-            <Pressable
-              key={dept.id}
-              onPress={() => toggleDept(dept.id)}
-              style={[styles.chip, selectedDeptIds.includes(dept.id) && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, selectedDeptIds.includes(dept.id) && styles.chipTextActive]}>{dept.name}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.deptList}>
+          {filteredDepts.map(dept => {
+            const selected = selectedDeptIds.includes(dept.id);
+            return (
+              <Pressable
+                key={dept.id}
+                onPress={() => toggleDept(dept.id)}
+                style={[styles.deptListItem, selected && styles.deptListItemActive]}
+              >
+                <Ionicons
+                  name={selected ? "checkbox" : "square-outline"}
+                  size={20}
+                  color={selected ? Colors.primary : Colors.textTertiary}
+                />
+                <Text style={[styles.deptListItemText, selected && styles.deptListItemTextActive]}>{dept.name}</Text>
+              </Pressable>
+            );
+          })}
           {filteredDepts.length === 0 && deptSearch.trim() && (
             <Text style={styles.hint}>未找到匹配的中心</Text>
           )}
         </View>
-        {selectedDeptIds.length === 0 && (
+        {selectedDeptIds.length === 0 && !deptSearch.trim() && (
           <Text style={styles.hint}>未选择中心时为"未分配"</Text>
         )}
 
@@ -178,6 +202,15 @@ const styles = StyleSheet.create({
   chipTextActive: { color: Colors.white },
   searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.backgroundTertiary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8, marginBottom: 10 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.text, padding: 0 },
+  selectedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  selectedLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, alignSelf: 'center' as const },
+  selectedTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14 },
+  selectedTagText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.white },
+  deptList: { backgroundColor: Colors.backgroundTertiary, borderRadius: 12, overflow: 'hidden' as const, marginBottom: 4 },
+  deptListItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  deptListItemActive: { backgroundColor: Colors.primary + '10' },
+  deptListItemText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.text },
+  deptListItemTextActive: { fontFamily: 'Inter_500Medium', color: Colors.primary },
   hint: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 4 },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 14, marginTop: 28 },
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.white },

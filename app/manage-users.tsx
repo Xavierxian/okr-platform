@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, Text, View, FlatList, Pressable, Alert, ActivityIndicator, Platform, Modal, TextInput } from 'react-native';
+import { StyleSheet, Text, View, FlatList, Pressable, Alert, ActivityIndicator, Platform, Modal, TextInput, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
@@ -106,10 +106,14 @@ export default function ManageUsersScreen() {
     setDeptModalSearch('');
   };
 
+  const parentDepts = useMemo(() => {
+    return departments.filter(d => !d.parentId);
+  }, [departments]);
+
   const filteredModalDepts = useMemo(() => {
-    if (!deptModalSearch.trim()) return departments;
-    return departments.filter(d => d.name.toLowerCase().includes(deptModalSearch.trim().toLowerCase()));
-  }, [departments, deptModalSearch]);
+    if (!deptModalSearch.trim()) return parentDepts;
+    return parentDepts.filter(d => d.name.toLowerCase().includes(deptModalSearch.trim().toLowerCase()));
+  }, [parentDepts, deptModalSearch]);
 
   const toggleDeptSelection = (deptId: string) => {
     setDeptModalSelected(prev =>
@@ -236,46 +240,60 @@ export default function ManageUsersScreen() {
 
       <Modal visible={!!deptModalUser} transparent animationType="fade" onRequestClose={() => setDeptModalUser(null)}>
         <Pressable style={styles.modalOverlay} onPress={() => setDeptModalUser(null)}>
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+          <View style={styles.deptModalContent} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>编辑所属中心</Text>
             <Text style={styles.modalSub}>{deptModalUser?.displayName}（可多选）</Text>
-            {departments.length > 6 && (
-              <View style={styles.searchRow}>
-                <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
-                <TextInput
-                  style={styles.searchInput}
-                  value={deptModalSearch}
-                  onChangeText={setDeptModalSearch}
-                  placeholder="搜索中心..."
-                  placeholderTextColor={Colors.textTertiary}
-                />
-                {deptModalSearch.length > 0 && (
-                  <Pressable onPress={() => setDeptModalSearch('')}>
-                    <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
-                  </Pressable>
-                )}
+            <View style={styles.searchRow}>
+              <Ionicons name="search-outline" size={16} color={Colors.textTertiary} />
+              <TextInput
+                style={styles.searchInput}
+                value={deptModalSearch}
+                onChangeText={setDeptModalSearch}
+                placeholder="搜索中心..."
+                placeholderTextColor={Colors.textTertiary}
+              />
+              {deptModalSearch.length > 0 && (
+                <Pressable onPress={() => setDeptModalSearch('')}>
+                  <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
+                </Pressable>
+              )}
+            </View>
+            {deptModalSelected.length > 0 && (
+              <View style={styles.selectedRow}>
+                <Text style={styles.selectedLabel}>已选：</Text>
+                {deptModalSelected.map(id => {
+                  const d = departments.find(dd => dd.id === id);
+                  return (
+                    <Pressable key={id} onPress={() => toggleDeptSelection(id)} style={styles.selectedTag}>
+                      <Text style={styles.selectedTagText}>{d?.name || '未知'}</Text>
+                      <Ionicons name="close" size={12} color={Colors.white} />
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
-            <View style={styles.deptChipRow}>
+            <ScrollView style={styles.deptListScroll} showsVerticalScrollIndicator>
               {filteredModalDepts.map(dept => {
                 const selected = deptModalSelected.includes(dept.id);
                 return (
                   <Pressable
                     key={dept.id}
                     onPress={() => toggleDeptSelection(dept.id)}
-                    style={[styles.deptChip, selected && styles.deptChipActive]}
+                    style={[styles.deptListItem, selected && styles.deptListItemActive]}
                   >
-                    <Text style={[styles.deptChipText, selected && styles.deptChipTextActive]}>{dept.name}</Text>
+                    <Ionicons
+                      name={selected ? "checkbox" : "square-outline"}
+                      size={20}
+                      color={selected ? Colors.primary : Colors.textTertiary}
+                    />
+                    <Text style={[styles.deptListItemText, selected && styles.deptListItemTextActive]}>{dept.name}</Text>
                   </Pressable>
                 );
               })}
               {filteredModalDepts.length === 0 && deptModalSearch.trim() && (
                 <Text style={styles.deptHint}>未找到匹配的中心</Text>
               )}
-            </View>
-            {deptModalSelected.length === 0 && !deptModalSearch.trim() && (
-              <Text style={styles.deptHint}>未选择任何中心</Text>
-            )}
+            </ScrollView>
             <Pressable onPress={applyDeptChange} style={({ pressed }) => [styles.deptSaveBtn, { opacity: pressed ? 0.8 : 1 }]}>
               <Text style={styles.deptSaveBtnText}>确认</Text>
             </Pressable>
@@ -324,12 +342,17 @@ const styles = StyleSheet.create({
   modalCancelText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.textSecondary },
   searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.backgroundTertiary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8, marginBottom: 10 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.text, padding: 0 },
-  deptChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  deptChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.backgroundTertiary },
-  deptChipActive: { backgroundColor: Colors.primary },
-  deptChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
-  deptChipTextActive: { color: Colors.white },
-  deptHint: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, textAlign: 'center', marginBottom: 8 },
+  deptModalContent: { backgroundColor: Colors.card, borderRadius: 16, padding: 20, width: 340, maxHeight: '80%' as any },
+  selectedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  selectedLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, alignSelf: 'center' as const },
+  selectedTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14 },
+  selectedTagText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.white },
+  deptListScroll: { maxHeight: 300, marginBottom: 12 },
+  deptListItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  deptListItemActive: { backgroundColor: Colors.primary + '10' },
+  deptListItemText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.text },
+  deptListItemTextActive: { fontFamily: 'Inter_500Medium', color: Colors.primary },
+  deptHint: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, textAlign: 'center', paddingVertical: 20 },
   deptSaveBtn: { backgroundColor: Colors.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   deptSaveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.white },
 });

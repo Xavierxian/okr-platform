@@ -24,6 +24,7 @@ import {
   getAllDingtalkUsers,
   getDingtalkCorpId,
   getDingtalkAppKey,
+  getParentDepartmentName,
 } from "./dingtalk";
 
 declare module "express-session" {
@@ -111,6 +112,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  async function syncDingtalkUserDept(userId: string, dtDeptIdList?: number[]) {
+    if (!dtDeptIdList || dtDeptIdList.length === 0) return;
+    try {
+      const existingDepts = await getDepartments();
+      const parentNames = new Set<string>();
+      for (const dtDeptId of dtDeptIdList) {
+        const parentName = await getParentDepartmentName(dtDeptId);
+        if (parentName) parentNames.add(parentName);
+      }
+      const localDeptIds: string[] = [];
+      for (const name of parentNames) {
+        let dept = existingDepts.find(d => d.name === name);
+        if (!dept) {
+          dept = await createDepartment({ name, parentId: null, level: 0 });
+        }
+        localDeptIds.push(dept.id);
+      }
+      if (localDeptIds.length > 0) {
+        await setUserDepartments(userId, localDeptIds);
+      }
+    } catch (err) {
+      console.error("同步钉钉用户部门失败:", err);
+    }
+  }
+
   app.post("/api/auth/dingtalk-login", async (req: Request, res: Response) => {
     try {
       if (!isDingtalkConfigured()) {
@@ -134,6 +160,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dingtalkUserId: dtUser.userid,
         });
         user = newUser;
+        await syncDingtalkUserDept(newUser.id, dtUser.dept_id_list);
+      } else {
+        const existingDeptIds = await getUserDepartmentIds(user.id);
+        if (existingDeptIds.length === 0) {
+          await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
+        }
       }
 
       req.session.userId = user!.id;
@@ -182,12 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existingUser = existingUsers.find(u => u.dingtalkUserId === dtUser.userid);
 
         if (existingUser) {
-          const mappedDeptIds = dtUser.dept_id_list
-            .map(did => deptIdMap.get(did))
-            .filter((id): id is string => !!id);
-          if (mappedDeptIds.length > 0) {
-            await setUserDepartments(existingUser.id, mappedDeptIds);
-          }
+          await syncDingtalkUserDept(existingUser.id, dtUser.dept_id_list);
         } else {
           const newUser = await createUser({
             username: `dt_${dtUser.userid}`,
@@ -197,12 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             departmentId: null,
             dingtalkUserId: dtUser.userid,
           });
-          const mappedDeptIds = dtUser.dept_id_list
-            .map(did => deptIdMap.get(did))
-            .filter((id): id is string => !!id);
-          if (mappedDeptIds.length > 0) {
-            await setUserDepartments(newUser.id, mappedDeptIds);
-          }
+          await syncDingtalkUserDept(newUser.id, dtUser.dept_id_list);
           syncedUsers++;
         }
       }
@@ -236,6 +258,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dingtalkUserId: dtUser.userid,
         });
         user = newUser;
+        await syncDingtalkUserDept(newUser.id, dtUser.dept_id_list);
+      } else {
+        const existingDeptIds = await getUserDepartmentIds(user.id);
+        if (existingDeptIds.length === 0) {
+          await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
+        }
       }
       req.session.userId = user!.id;
       return res.redirect("/");

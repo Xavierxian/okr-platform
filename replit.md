@@ -135,7 +135,10 @@ Preferred communication style: Simple, everyday language.
   - **In-app SSO**: DingTalk's built-in browser auto-detects via User-Agent, uses `dd.runtime.permission.requestAuthCode` for silent login
   - **Web login**: "钉钉扫码登录" button redirects to DingTalk OAuth2 page, callback at `/api/auth/dingtalk-callback`
 - **Org sync**: Super admin can sync DingTalk org structure (departments + users) via "同步钉钉组织架构" button in profile page
-- **User matching**: On DingTalk login, first checks `dingtalkUserId` field, then matches by `displayName`, or creates new user
+- **User matching**: On DingTalk login, first checks `dingtalkUserId` field; creates new user if not found
+- **Auto dept sync on login**: When a DingTalk user first logs in (or has no dept assigned), their DingTalk department hierarchy is resolved to the parent-level (center) name (e.g., "百胜软件-财务中心-管理部" → "财务中心") and auto-assigned
+- **Parent-level dept logic**: `getParentDepartmentName()` in dingtalk.ts traverses the DingTalk dept tree upward to find the second-level department (direct child of root corp)
+- **Dept selection UI**: Only parent-level departments (parentId===null) shown in create-user and manage-users department pickers; uses searchable list with checkboxes and selected tags
 - **Config endpoint**: `GET /api/auth/dingtalk-config` returns `{ enabled, corpId, appKey }` — frontend uses this to conditionally show DingTalk login
 - **Routes**: `POST /api/auth/dingtalk-login` (auth code login), `GET /api/auth/dingtalk-callback` (OAuth redirect), `POST /api/dingtalk/sync-org` (admin only)
 - **Env vars**: `DINGTALK_APP_KEY`, `DINGTALK_APP_SECRET`, `DINGTALK_CORP_ID`
