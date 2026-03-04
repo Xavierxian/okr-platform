@@ -9,10 +9,11 @@ export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
   if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+    return '';
   }
 
-  let url = new URL(`https://${host}`);
+  const protocol = host.startsWith('localhost') || host.match(/^\d/) ? 'http' : 'https';
+  let url = new URL(`${protocol}://${host}`);
 
   return url.href;
 }
@@ -30,9 +31,9 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const baseUrl = getApiUrl();
-  const url = new URL(route, baseUrl);
+  const url = baseUrl ? new URL(route, baseUrl).toString() : route;
 
-  const res = await fetch(url.toString(), {
+  const res = await fetch(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -50,9 +51,10 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const baseUrl = getApiUrl();
-    const url = new URL(queryKey.join("/") as string, baseUrl);
+    const path = queryKey.join("/") as string;
+    const url = baseUrl ? new URL(path, baseUrl).toString() : path;
 
-    const res = await fetch(url.toString(), {
+    const res = await fetch(url, {
       credentials: "include",
     });
 
