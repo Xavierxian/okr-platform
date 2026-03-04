@@ -1,0 +1,34 @@
+/root/.pm2/logs/okr-platform-out.log last 20 lines:
+0|okr-plat | GET /api/notifications/unread-count 304 in 2ms :: {"count":0}
+0|okr-plat | GET /api/notifications/unread-count 304 in 3ms :: {"count":0}
+0|okr-plat | GET /api/notifications 304 in 4ms :: []
+0|okr-plat | GET /api/notifications/unread-count 304 in 2ms :: {"count":0}
+0|okr-plat | POST /api/import/parse-excel 200 in 299ms :: {"rows":[{"部门":"总裁办","目标名称":"O1:完成…
+0|okr-plat | GET /api/notifications/unread-count 304 in 4ms :: {"count":0}
+0|okr-plat | POST /api/import/okr 200 in 68ms :: {"message":"导入完成: 13 个目标, 57 个关键结果","import…
+0|okr-plat | GET /api/departments 304 in 3ms :: [{"id":"dept_2","name":"产品部","parentId":null…
+0|okr-plat | GET /api/cycles 304 in 4ms :: [{"id":"2c3ccab6-7186-465d-bb72-963bab1ae76d","na…
+0|okr-plat | GET /api/key-results/collaborating 304 in 6ms :: []
+0|okr-plat | GET /api/objectives 200 in 10ms :: [{"id":"3f71ca9c-3647-47c4-aacb-5021ba17833f…
+0|okr-plat | GET /api/key-results/assigned-to-me 200 in 17ms :: [{"kr":{"id":"c1933e91-2c96-…
+0|okr-plat | GET /api/key-results 200 in 21ms :: [{"id":"fe9888a2-b8eb-4a89-b9ce-3d4b5b50ba1…
+0|okr-plat | GET /api/notifications/unread-count 304 in 3ms :: {"count":0}
+0|okr-plat | GET /api/notifications/unread-count 304 in 2ms :: {"count":0}
+0|okr-plat | GET /api/notifications/unread-count 304 in 2ms :: {"count":0}
+0|okr-plat | GET /api/notifications/unread-count 304 in 4ms :: {"count":0}
+0|okr-plat | GET /api/notifications 304 in 4ms :: []
+0|okr-plat | GET /api/notifications 304 in 4ms :: []
+0|okr-plat | GET /api/notifications/unread-count 304 in 2ms :: {"count":0}
+
+0|okr-platform  | GET /api/notifications/unread-count 304 in 3ms :: {"count":0}
+0|okr-platform  | GET /api/notifications/unread-count 304 in 2ms :: {"count":0}
+0|okr-platform  | GET /api/notifications/unread-count 304 in 2ms :: {"count":0}
+0|okr-platform  | GET /api/notifications/unread-count 304 in 4ms :: {"count":0}
+0|okr-platform  | GET /api/users/all-safe 304 in 4ms :: [{"id":"admin_1","username":"admin","disp…
+0|okr-platform  | GET /api/kr-comments/b3f14f60-2ee0-43cf-be87-cdcb1f670ea6 200 in 5ms :: []
+0|okr-platform  | GET /api/kr-comments/6be7c3c4-eac5-4f54-89b5-2f4fd17577ad 200 in 15ms :: []
+0|okr-platform  | GET /api/kr-comments/47fc8b4a-9be3-4dd3-a1a5-9fff453c37d8 200 in 15ms :: []
+0|okr-platform  | GET /api/notifications 304 in 4ms :: []
+0|okr-platform  | GET /api/auth/me 401 in 2ms :: {"message":"未登录"}
+0|okr-platform  | GET /api/auth/dingtalk-config 200 in 1ms :: {"enabled":true,"corpId":"ding501b2…
+0|okr-platform  | [DT Sync] userId=4c4f89cb-32b9-4807-8787-5e1adfbf3565, dtDeptIdList=[12114902]
