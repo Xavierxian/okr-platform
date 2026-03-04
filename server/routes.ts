@@ -698,9 +698,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const buf = Buffer.concat(chunks);
       const wb = XLSX.read(buf, { type: "buffer" });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      if (!ws) return res.status(400).json({ message: "Excel文件为空" });
+      if (!ws) return res.status(400).json({ message: "文件为空" });
       const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      if (jsonData.length < 2) return res.status(400).json({ message: "Excel文件为空或只有表头" });
+      if (jsonData.length < 2) return res.status(400).json({ message: "文件为空或只有表头" });
       const headers = jsonData[0].map((h: any) => String(h).trim());
       if (!headers.includes("目标名称")) {
         return res.status(400).json({ message: "缺少必要列: 目标名称。请使用模板文件。" });
@@ -716,7 +716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ rows });
     } catch (err) {
       console.error("Parse excel error:", err);
-      return res.status(400).json({ message: "Excel文件解析失败，请检查文件格式" });
+      return res.status(400).json({ message: "文件解析失败，请检查文件格式（支持 .xlsx 和 .csv）" });
     }
   });
 

@@ -30,13 +30,13 @@ function WebFileInput({ onFileSelected }: { onFileSelected: (file: File) => void
       <input
         ref={inputRef as any}
         type="file"
-        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+        accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
         onChange={handleChange}
         style={{ display: 'none' }}
       />
       <Pressable onPress={handleClick} style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.8 : 1 }]}>
         <Ionicons name="document-outline" size={18} color={Colors.primary} />
-        <Text style={styles.actionBtnText}>选择 Excel 文件</Text>
+        <Text style={styles.actionBtnText}>选择文件（Excel/CSV）</Text>
       </Pressable>
     </View>
   );
@@ -233,7 +233,7 @@ export default function ImportOKRScreen() {
               ) : (
                 <>
                   <Ionicons name="cloud-upload-outline" size={36} color={Colors.textTertiary} />
-                  <Text style={styles.uploadHint}>选择填好的 Excel 文件（.xlsx）</Text>
+                  <Text style={styles.uploadHint}>选择填好的文件（.xlsx / .csv）</Text>
                   {Platform.OS === 'web' ? (
                     <WebFileInput onFileSelected={handleWebFileSelected} />
                   ) : (
