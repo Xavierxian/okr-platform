@@ -733,14 +733,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allDepts = await getDepartments();
       const allUsers = await getAllUsers();
       const userMultiDepts = await getUserDepartmentIds(user.id);
-      const userAllowedDepts = userMultiDepts.length > 0 ? userMultiDepts : (user.departmentId ? [user.departmentId] : []);
-      let defaultDeptId = userAllowedDepts[0] || "";
+      let defaultDeptId = userMultiDepts[0] || user.departmentId || "";
+      if (!defaultDeptId && allDepts.length > 0) {
+        defaultDeptId = allDepts[0].id;
+      }
       if (!defaultDeptId) {
-        if (user.role === "super_admin" && allDepts.length > 0) {
-          defaultDeptId = allDepts[0].id;
-        } else {
-          return res.status(400).json({ message: "您未分配部门，无法导入" });
-        }
+        return res.status(400).json({ message: "系统中尚无部门，请先创建部门" });
       }
 
       const now = new Date();
@@ -778,11 +776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (deptName) {
           const dept = allDepts.find(d => d.name === deptName);
           if (dept) {
-            if (user.role === "super_admin" || userAllowedDepts.includes(dept.id)) {
-              deptId = dept.id;
-            } else {
-              errors.push(`第${i + 2}行: 无权导入到部门"${deptName}"，使用默认部门`);
-            }
+            deptId = dept.id;
           } else {
             errors.push(`第${i + 2}行: 部门"${deptName}"不存在，使用默认部门`);
           }
