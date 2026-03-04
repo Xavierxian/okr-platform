@@ -141,35 +141,35 @@ export async function getParentDepartmentName(deptId: number): Promise<string | 
 
   if (!dept.parent_id || dept.parent_id <= 0) return null;
 
-  if (dept.parent_id === 1) {
-    console.log(`[DT Dept] -> parent_id is 1, returning "${dept.name}"`);
-    return dept.name;
-  }
-
-  const parentDept = await getDepartmentDetail(dept.parent_id);
-  if (!parentDept) return null;
-  console.log(`[DT Dept] parent: name="${parentDept.name}", parent_id=${parentDept.parent_id}`);
-
-  if (parentDept.parent_id === 1) {
-    console.log(`[DT Dept] -> parent's parent_id is 1, returning "${parentDept.name}"`);
-    return parentDept.name;
-  }
-
-  let previous = parentDept;
-  let current = parentDept;
+  const chain: Array<{ dept_id: number; name: string; parent_id: number }> = [dept];
+  let current = dept;
   for (let i = 0; i < 10; i++) {
+    if (current.parent_id === 1) break;
     const upper = await getDepartmentDetail(current.parent_id);
-    if (!upper) return current.name;
-    console.log(`[DT Dept] traversing: name="${upper.name}", parent_id=${upper.parent_id}`);
-    if (upper.parent_id === 1) {
-      console.log(`[DT Dept] -> found company level "${upper.name}", returning child "${current.name}"`);
-      return current.name;
-    }
-    previous = current;
+    if (!upper) break;
+    console.log(`[DT Dept] chain: name="${upper.name}", parent_id=${upper.parent_id}`);
+    chain.push(upper);
     current = upper;
   }
 
-  return current.name;
+  const companyIdx = chain.findIndex(d => d.parent_id === 1);
+  if (companyIdx < 0) {
+    console.log(`[DT Dept] -> no company-level dept found, returning "${dept.name}"`);
+    return dept.name;
+  }
+
+  const targetIdx = companyIdx - 1;
+  if (targetIdx >= 0) {
+    console.log(`[DT Dept] -> company="${chain[companyIdx].name}", returning center="${chain[targetIdx].name}"`);
+    return chain[targetIdx].name;
+  }
+
+  if (companyIdx === 0) {
+    console.log(`[DT Dept] -> dept "${dept.name}" is direct child of root company, returning itself`);
+    return dept.name;
+  }
+
+  return dept.name;
 }
 
 async function getUserAccessToken(authCode: string): Promise<string> {
