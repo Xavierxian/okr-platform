@@ -631,7 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/import/template", requireAdmin, async (req: Request, res: Response) => {
+  app.get("/api/import/template", requireAuth, async (req: Request, res: Response) => {
     const XLSX = await import("xlsx");
     const now = new Date();
     const quarter = Math.ceil((now.getMonth() + 1) / 3);
@@ -689,7 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/import/parse-excel", requireAdmin, async (req: Request, res: Response) => {
+  app.post("/api/import/parse-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const XLSX = await import("xlsx");
       const chunks: Buffer[] = [];
@@ -720,13 +720,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/import/okr", requireAdmin, async (req: Request, res: Response) => {
+  app.post("/api/import/okr", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await getUser(req.session.userId!);
       if (!user) return res.status(401).json({ message: "用户不存在" });
-      if (user.role !== "super_admin") {
-        return res.status(403).json({ message: "仅超级管理员可导入OKR" });
-      }
 
       const { rows } = req.body;
       if (!rows || !Array.isArray(rows) || rows.length === 0) {

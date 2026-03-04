@@ -155,11 +155,9 @@ export default function OKRsScreen() {
         <Text style={styles.headerTitle}>目标管理</Text>
         <View style={styles.headerActions}>
           <NotificationBell />
-          {userRole === 'super_admin' && (
-            <Pressable onPress={() => router.push('/import-okr')} style={({ pressed }) => [styles.importBtn, { opacity: pressed ? 0.8 : 1 }]}>
-              <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} />
-            </Pressable>
-          )}
+          <Pressable onPress={() => router.push('/import-okr')} style={({ pressed }) => [styles.importBtn, { opacity: pressed ? 0.8 : 1 }]}>
+            <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} />
+          </Pressable>
           <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
             <Ionicons name="add" size={24} color={Colors.white} />
           </Pressable>

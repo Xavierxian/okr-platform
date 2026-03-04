@@ -56,8 +56,6 @@ export default function ImportOKRScreen() {
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
-  const isAdmin = user?.role === 'super_admin';
-
   const handleDownloadTemplate = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
@@ -196,17 +194,6 @@ export default function ImportOKRScreen() {
     setResult(null);
   }, []);
 
-  if (!isAdmin) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
-        <Ionicons name="lock-closed" size={48} color={Colors.textSecondary} />
-        <Text style={{ color: Colors.textSecondary, marginTop: 12, fontSize: 16 }}>仅超级管理员可使用导入功能</Text>
-        <Pressable onPress={() => router.back()} style={{ marginTop: 20, padding: 12 }}>
-          <Text style={{ color: Colors.primary, fontSize: 16 }}>返回</Text>
-        </Pressable>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
