@@ -155,12 +155,17 @@ export async function getParentDepartmentName(deptId: number): Promise<string | 
     return parentDept.name;
   }
 
+  let previous = parentDept;
   let current = parentDept;
   for (let i = 0; i < 10; i++) {
     const upper = await getDepartmentDetail(current.parent_id);
     if (!upper) return current.name;
     console.log(`[DT Dept] traversing: name="${upper.name}", parent_id=${upper.parent_id}`);
-    if (upper.parent_id === 1) return upper.name;
+    if (upper.parent_id === 1) {
+      console.log(`[DT Dept] -> found company level "${upper.name}", returning child "${current.name}"`);
+      return current.name;
+    }
+    previous = current;
     current = upper;
   }
 
