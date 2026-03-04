@@ -132,21 +132,26 @@ export async function getDepartmentDetail(deptId: number): Promise<{ dept_id: nu
 }
 
 export async function getParentDepartmentName(deptId: number): Promise<string | null> {
+  console.log(`[DT Dept] getParentDepartmentName called with deptId=${deptId}`);
   if (deptId === 1) return null;
 
   const dept = await getDepartmentDetail(deptId);
   if (!dept) return null;
+  console.log(`[DT Dept] deptId=${deptId}, name="${dept.name}", parent_id=${dept.parent_id}`);
 
   if (!dept.parent_id || dept.parent_id <= 0) return null;
 
   if (dept.parent_id === 1) {
+    console.log(`[DT Dept] -> parent_id is 1, returning "${dept.name}"`);
     return dept.name;
   }
 
   const parentDept = await getDepartmentDetail(dept.parent_id);
   if (!parentDept) return null;
+  console.log(`[DT Dept] parent: name="${parentDept.name}", parent_id=${parentDept.parent_id}`);
 
   if (parentDept.parent_id === 1) {
+    console.log(`[DT Dept] -> parent's parent_id is 1, returning "${parentDept.name}"`);
     return parentDept.name;
   }
 
@@ -154,6 +159,7 @@ export async function getParentDepartmentName(deptId: number): Promise<string | 
   for (let i = 0; i < 10; i++) {
     const upper = await getDepartmentDetail(current.parent_id);
     if (!upper) return current.name;
+    console.log(`[DT Dept] traversing: name="${upper.name}", parent_id=${upper.parent_id}`);
     if (upper.parent_id === 1) return upper.name;
     current = upper;
   }

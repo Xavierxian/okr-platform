@@ -115,10 +115,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function syncDingtalkUserDept(userId: string, dtDeptIdList?: number[]) {
     if (!dtDeptIdList || dtDeptIdList.length === 0) return;
     try {
+      console.log(`[DT Sync] userId=${userId}, dtDeptIdList=${JSON.stringify(dtDeptIdList)}`);
       const existingDepts = await getDepartments();
       const parentNames = new Set<string>();
       for (const dtDeptId of dtDeptIdList) {
+        console.log(`[DT Sync] Resolving dept_id=${dtDeptId}`);
         const parentName = await getParentDepartmentName(dtDeptId);
+        console.log(`[DT Sync] dept_id=${dtDeptId} -> parentName=${parentName}`);
         if (parentName) parentNames.add(parentName);
       }
       const localDeptIds: string[] = [];
