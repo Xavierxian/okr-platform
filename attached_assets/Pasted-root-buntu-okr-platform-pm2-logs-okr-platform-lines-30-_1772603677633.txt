@@ -1,0 +1,33 @@
+root@buntu:~/okr-platform# pm2 logs okr-platform --lines 30
+[TAILING] Tailing last 30 lines for [okr-platform] process (change the value with --lines option)
+/root/.pm2/logs/okr-platform-error.log last 30 lines:
+0|okr-plat | To eliminate this warning, add "type": "module" to /root/okr-platform/package.json.
+0|okr-plat | (Use `node --trace-warnings ...` to show where the warning was created)
+0|okr-plat | (node:7745) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///root/okr-platform/server_dist/index.js is not specified and it doesn't parse as CommonJS.
+0|okr-plat | Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+0|okr-plat | To eliminate this warning, add "type": "module" to /root/okr-platform/package.json.
+0|okr-plat | (Use `node --trace-warnings ...` to show where the warning was created)
+0|okr-plat | (node:7866) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///root/okr-platform/server_dist/index.js is not specified and it doesn't parse as CommonJS.
+0|okr-plat | Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+0|okr-plat | To eliminate this warning, add "type": "module" to /root/okr-platform/package.json.
+0|okr-plat | (Use `node --trace-warnings ...` to show where the warning was created)
+0|okr-plat | (node:8369) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///root/okr-platform/server_dist/index.js is not specified and it doesn't parse as CommonJS.
+0|okr-plat | Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+0|okr-plat | To eliminate this warning, add "type": "module" to /root/okr-platform/package.json.
+0|okr-plat | (Use `node --trace-warnings ...` to show where the warning was created)
+0|okr-plat | (node:8529) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///root/okr-platform/server_dist/index.js is not specified and it doesn't parse as CommonJS.
+0|okr-plat | Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+0|okr-plat | To eliminate this warning, add "type": "module" to /root/okr-platform/package.json.
+0|okr-plat | (Use `node --trace-warnings ...` to show where the warning was created)
+0|okr-plat | (node:8669) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///root/okr-platform/server_dist/index.js is not specified and it doesn't parse as CommonJS.
+0|okr-plat | Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+0|okr-plat | To eliminate this warning, add "type": "module" to /root/okr-platform/package.json.
+0|okr-plat | (Use `node --trace-warnings ...` to show where the warning was created)
+0|okr-plat | (node:8821) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///root/okr-platform/server_dist/index.js is not specified and it doesn't parse as CommonJS.
+0|okr-plat | Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+0|okr-plat | To eliminate this warning, add "type": "module" to /root/okr-platform/package.json.
+0|okr-plat | (Use `node --trace-warnings ...` to show where the warning was created)
+0|okr-plat | (node:9013) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///root/okr-platform/server_dist/index.js is not specified and it doesn't parse as CommonJS.
+0|okr-plat | Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+0|okr-plat | To eliminate this warning, add "type": "module" to /root/okr-platform/package.json.
+0|okr-plat | (Use `node --trace-warnings ...` to show where the warning was created)
