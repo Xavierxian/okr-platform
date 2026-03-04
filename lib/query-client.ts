@@ -18,6 +18,12 @@ export function getApiUrl(): string {
   return url.href;
 }
 
+export function buildUrl(path: string): string {
+  const baseUrl = getApiUrl();
+  if (!baseUrl) return path;
+  return new URL(path, baseUrl).toString();
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

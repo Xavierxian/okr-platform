@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
-import { apiRequest, getApiUrl } from '@/lib/query-client';
+import { apiRequest, buildUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
@@ -72,8 +72,7 @@ export default function ImportOKRScreen() {
         URL.revokeObjectURL(url);
       } else {
         const { Linking } = await import('react-native');
-        const url = new URL('/api/import/template', getApiUrl()).toString();
-        await Linking.openURL(url);
+        await Linking.openURL(buildUrl('/api/import/template'));
       }
     } catch {
       Alert.alert('错误', '下载模板失败');
@@ -88,8 +87,7 @@ export default function ImportOKRScreen() {
       let response: Response;
       if (file instanceof File) {
         const arrayBuffer = await file.arrayBuffer();
-        const baseUrl = getApiUrl();
-        response = await fetch(new URL('/api/import/parse-excel', baseUrl).toString(), {
+        response = await fetch(buildUrl('/api/import/parse-excel'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream' },
           credentials: 'include',
@@ -101,8 +99,7 @@ export default function ImportOKRScreen() {
         const binary = atob(base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const baseUrl = getApiUrl();
-        response = await fetch(new URL('/api/import/parse-excel', baseUrl).toString(), {
+        response = await fetch(buildUrl('/api/import/parse-excel'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream' },
           credentials: 'include',
