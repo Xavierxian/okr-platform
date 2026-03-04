@@ -8,7 +8,7 @@ function getStorage() {
   return new Storage({ apiEndpoint: "https://storage.googleapis.com" });
 }
 
-const LOCAL_UPLOAD_DIR = path.resolve(process.cwd(), "uploads", "progress-images");
+const LOCAL_UPLOAD_DIR = path.resolve(process.cwd(), "assets", "uploads");
 
 function ensureLocalDir() {
   if (!fs.existsSync(LOCAL_UPLOAD_DIR)) {
@@ -39,11 +39,11 @@ export async function uploadFile(
   ensureLocalDir();
   const localPath = path.join(LOCAL_UPLOAD_DIR, fileName);
   fs.writeFileSync(localPath, buffer);
-  return `/uploads/progress-images/${fileName}`;
+  return `/assets/uploads/${fileName}`;
 }
 
 export async function deleteFile(publicUrl: string): Promise<void> {
-  const match = publicUrl.match(/\/progress-images\/(.+)$/);
+  const match = publicUrl.match(/\/(?:uploads|progress-images)\/([^/]+)$/);
   if (!match) return;
 
   if (bucketId) {
