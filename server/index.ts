@@ -206,6 +206,7 @@ function configureExpoAndLanding(app: express.Application) {
   });
 
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
+  app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
   if (webBuildExists) {
     app.use(express.static(webBuildDir));
