@@ -91,18 +91,24 @@ export default function DashboardScreen() {
   const { objectives, keyResults, departments, assignedKRs, collaboratingKRs, isLoading } = useOKR();
   const { user } = useAuth();
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'vp' || user?.role === 'center_head';
 
   const allMyObjectives = useMemo(() => {
     // 获取当前用户的部门ID列表
     const userDeptIds = (user as any)?.departmentIds || (user?.departmentId ? [user?.departmentId] : []);
     
-    // 显示：1) 自己创建的目标，或 2) 用户所在部门的目标
+    // 普通用户只能看到自己创建的目标
+    if (!isAdmin) {
+      return objectives.filter(obj => obj.createdBy === user?.id);
+    }
+    
+    // 管理员可以看自己创建的和所在部门的
     return objectives.filter(obj => {
       const isCreator = obj.createdBy === user?.id;
       const isInMyDept = userDeptIds.includes(obj.departmentId);
       return isCreator || isInMyDept;
     });
-  }, [objectives, user]);
+  }, [objectives, user, isAdmin]);
 
   const myObjectives = useMemo(() => {
     if (selectedDeptIds.length === 0) return allMyObjectives;
@@ -151,7 +157,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {usedDepts.length > 0 && (
+        {usedDepts.length > 0 && isAdmin && (
           <View style={styles.deptFilter}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.deptFilterRow}>
@@ -274,58 +280,58 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingHorizontal: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  greeting: { fontFamily: 'Inter_700Bold', fontSize: 24, color: Colors.text },
-  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 4 },
-  addBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: '#F5F6F7' },
+  scrollContent: { paddingHorizontal: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 4 },
+  greeting: { fontFamily: 'Inter_700Bold', fontSize: 24, color: '#171A1D', letterSpacing: -0.3 },
+  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 13, color: '#5E6D82', marginTop: 4 },
+  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0082EF', alignItems: 'center', justifyContent: 'center', shadowColor: '#0082EF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, color: Colors.text, flex: 1 },
-  sectionBadge: { backgroundColor: Colors.primary + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
-  sectionBadgeText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: Colors.primary },
-  emptySectionCard: { backgroundColor: Colors.card, borderRadius: 14, padding: 20, alignItems: 'center', marginBottom: 8 },
-  emptySectionText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textTertiary },
-  objCard: { backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 12 },
+  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 17, color: '#171A1D', flex: 1 },
+  sectionBadge: { backgroundColor: '#E6F4FF', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
+  sectionBadgeText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: '#0082EF' },
+  emptySectionCard: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 24, alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#EBEEF5' },
+  emptySectionText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#8F9BB3' },
+  objCard: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 12, shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#EBEEF5' },
   objHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  objTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.text, flex: 1, marginRight: 8 },
-  objBadge: { backgroundColor: Colors.primary + '20', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  objBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: Colors.primary },
-  objMeta: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  objDept: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary },
-  objKRCount: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary },
-  objProgressBar: { height: 4, backgroundColor: Colors.backgroundTertiary, borderRadius: 2, marginTop: 12, overflow: 'hidden' },
+  objTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#171A1D', flex: 1, marginRight: 8 },
+  objBadge: { backgroundColor: '#E6F4FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  objBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: '#0082EF' },
+  objMeta: { flexDirection: 'row', gap: 12, marginTop: 10 },
+  objDept: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#5E6D82' },
+  objKRCount: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#8F9BB3' },
+  objProgressBar: { height: 4, backgroundColor: '#E8EAEF', borderRadius: 2, marginTop: 12, overflow: 'hidden' },
   objProgressFill: { height: 4, borderRadius: 2 },
-  objProgressText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textTertiary, marginTop: 6 },
-  krCard: { backgroundColor: Colors.card, borderRadius: 14, padding: 14, marginBottom: 10 },
+  objProgressText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3', marginTop: 6 },
+  krCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: '#0082EF', shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
   krHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   krDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
-  krTitle: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.text, flex: 1 },
-  krObjName: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 4, marginLeft: 16 },
-  krDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 4, marginLeft: 16 },
+  krTitle: { fontFamily: 'Inter_500Medium', fontSize: 14, color: '#171A1D', flex: 1 },
+  krObjName: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#8F9BB3', marginTop: 4, marginLeft: 16 },
+  krDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#5E6D82', marginTop: 4, marginLeft: 16 },
   krMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  krProgressBarOuter: { flex: 1, height: 4, backgroundColor: Colors.backgroundTertiary, borderRadius: 2, overflow: 'hidden' },
+  krProgressBarOuter: { flex: 1, height: 4, backgroundColor: '#E8EAEF', borderRadius: 2, overflow: 'hidden' },
   krProgressBarInner: { height: 4, borderRadius: 2 },
   krPercent: { fontFamily: 'Inter_600SemiBold', fontSize: 13, width: 40, textAlign: 'right' },
   krStatusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   krStatusText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   krLastUpdate: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, marginLeft: 16 },
-  krLastUpdateText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textTertiary, flex: 1 },
+  krLastUpdateText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3', flex: 1 },
   krScoreRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, marginLeft: 16 },
-  krScoreText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: Colors.warning },
-  krScoreNote: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.textTertiary, flex: 1 },
+  krScoreText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: '#FAAD14' },
+  krScoreNote: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3', flex: 1 },
   krActions: { flexDirection: 'row', gap: 10, marginTop: 10, marginLeft: 16 },
-  krActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.backgroundTertiary },
-  krActionText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.textSecondary },
+  krActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#F5F6F7' },
+  krActionText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82' },
   emptyState: { alignItems: 'center', paddingVertical: 60, gap: 12 },
-  emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 20, color: Colors.text },
-  emptyText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, textAlign: 'center', paddingHorizontal: 40 },
-  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginTop: 8 },
-  emptyBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.white },
+  emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 20, color: '#171A1D' },
+  emptyText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#5E6D82', textAlign: 'center', paddingHorizontal: 40 },
+  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0082EF', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginTop: 8, shadowColor: '#0082EF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
+  emptyBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#FFFFFF' },
   deptFilter: { marginBottom: 16 },
   deptFilterRow: { flexDirection: 'row', gap: 8 },
-  deptChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
-  deptChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  deptChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
-  deptChipTextActive: { color: Colors.white },
+  deptChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EBEEF5' },
+  deptChipActive: { backgroundColor: '#0082EF', borderColor: '#0082EF' },
+  deptChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: '#5E6D82' },
+  deptChipTextActive: { color: '#FFFFFF' },
 });

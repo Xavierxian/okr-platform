@@ -90,19 +90,17 @@ export default function ProfileScreen() {
     }
   };
 
-  const topPadding = Platform.OS === 'web' ? 67 : insets.top;
+  const topPadding = Platform.OS === 'web' ? 20 : insets.top;
 
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 16, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 8, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>我的</Text>
-
         <Animated.View entering={FadeInDown.duration(400)} style={styles.avatarSection}>
           <View style={styles.avatar}>
-            <Ionicons name="person" size={36} color={Colors.primary} />
+            <Text style={styles.avatarText}>{(user?.displayName || '用户').charAt(0)}</Text>
           </View>
           <Text style={styles.userName}>{user?.displayName || '用户'}</Text>
           <Text style={styles.userRole}>{ROLE_LABELS[user?.role || ''] || user?.role}</Text>
@@ -229,28 +227,29 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingHorizontal: 20 },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 28, color: Colors.text, marginBottom: 24 },
-  avatarSection: { alignItems: 'center', marginBottom: 24 },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  userName: { fontFamily: 'Inter_600SemiBold', fontSize: 20, color: Colors.text },
-  userRole: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
-  userDept: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.primary, marginTop: 4 },
-  section: { backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 16 },
-  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.text, marginBottom: 14 },
+  container: { flex: 1, backgroundColor: '#F5F6F7' },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 },
+  title: { fontFamily: 'Inter_700Bold', fontSize: 24, color: '#171A1D', marginBottom: 20, letterSpacing: -0.3, paddingHorizontal: 4 },
+  avatarSection: { alignItems: 'center', marginBottom: 24, backgroundColor: '#FFFFFF', borderRadius: 16, paddingVertical: 20, marginHorizontal: 4, shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3, borderWidth: 1, borderColor: '#EBEEF5' },
+  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#0082EF', alignItems: 'center', justifyContent: 'center', marginBottom: 12, shadowColor: '#0082EF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 4 },
+  avatarText: { fontFamily: 'Inter_700Bold', fontSize: 32, color: '#FFFFFF' },
+  userName: { fontFamily: 'Inter_700Bold', fontSize: 20, color: '#171A1D' },
+  userRole: { fontFamily: 'Inter_500Medium', fontSize: 13, color: '#0082EF', marginTop: 6, backgroundColor: '#E6F4FF', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
+  userDept: { fontFamily: 'Inter_400Regular', fontSize: 13, color: '#5E6D82', marginTop: 8 },
+  section: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 16, shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#EBEEF5' },
+  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#171A1D', marginBottom: 14 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statItem: { flex: 1, minWidth: '40%', backgroundColor: Colors.backgroundTertiary, borderRadius: 12, padding: 14, alignItems: 'center' },
-  statValue: { fontFamily: 'Inter_700Bold', fontSize: 22, color: Colors.text },
-  statLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 4 },
-  assessRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  assessLabel: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary },
-  assessValue: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.text },
-  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  settingIcon: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  settingText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.text, flex: 1 },
-  badge: { backgroundColor: Colors.danger, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, marginRight: 4 },
-  badgeText: { fontFamily: 'Inter_600SemiBold', fontSize: 11, color: Colors.white },
-  footerSection: { alignItems: 'center', paddingVertical: 20 },
-  version: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary },
+  statItem: { flex: 1, minWidth: '40%', backgroundColor: '#F8FAFC', borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#EBEEF5' },
+  statValue: { fontFamily: 'Inter_700Bold', fontSize: 22, color: '#171A1D' },
+  statLabel: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82', marginTop: 6 },
+  assessRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F5F6F7' },
+  assessLabel: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#5E6D82' },
+  assessValue: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#171A1D' },
+  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F5F6F7' },
+  settingIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  settingText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: '#171A1D', flex: 1 },
+  badge: { backgroundColor: '#FF4D4F', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, marginRight: 4 },
+  badgeText: { fontFamily: 'Inter_600SemiBold', fontSize: 11, color: '#FFFFFF' },
+  footerSection: { alignItems: 'center', paddingVertical: 24 },
+  version: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#8F9BB3' },
 });
