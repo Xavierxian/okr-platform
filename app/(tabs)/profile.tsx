@@ -201,13 +201,16 @@ export default function ProfileScreen() {
 
         <Animated.View entering={FadeInDown.delay(isAdmin ? 400 : 300).duration(400)} style={styles.section}>
           <Text style={styles.sectionTitle}>账号</Text>
-          <Pressable onPress={() => router.push('/change-password')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
-            <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
-              <Ionicons name="key-outline" size={18} color={Colors.primary} />
-            </View>
-            <Text style={styles.settingText}>修改密码</Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
-          </Pressable>
+          {/* 只有非钉钉登录用户才显示修改密码 */}
+          {!(user as any)?.dingtalkUserId && (
+            <Pressable onPress={() => router.push('/change-password')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
+              <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
+                <Ionicons name="key-outline" size={18} color={Colors.primary} />
+              </View>
+              <Text style={styles.settingText}>修改密码</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            </Pressable>
+          )}
           <Pressable onPress={handleLogout} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
             <View style={[styles.settingIcon, { backgroundColor: Colors.danger + '20' }]}>
               <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
