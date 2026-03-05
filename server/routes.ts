@@ -649,11 +649,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       deptName = dept?.name || "";
     }
 
+    // 获取当前用户的钉钉ID作为默认创建人ID
+    const creatorDingtalkId = user?.dingtalkUserId || "";
+
     const headers = ["部门", "目标名称", "KR名称", "执行人", "周期", "OKR类型", "关联上级", "权重", "创建人ID"];
     const rows = [
-      [deptName, "提高产品质量", "单元测试覆盖率达到80%", "", defaultCycle, "承诺型", "否", 1, ""],
-      [deptName, "提高产品质量", "代码审查通过率95%", "", defaultCycle, "承诺型", "否", 1, ""],
-      [deptName, "提升用户满意度", "NPS分数提升到8.5", "", defaultCycle, "挑战型", "是", 1, ""],
+      [deptName, "提高产品质量", "单元测试覆盖率达到80%", "", defaultCycle, "承诺型", "否", 1, creatorDingtalkId],
+      [deptName, "提高产品质量", "代码审查通过率95%", "", defaultCycle, "承诺型", "否", 1, creatorDingtalkId],
+      [deptName, "提升用户满意度", "NPS分数提升到8.5", "", defaultCycle, "挑战型", "是", 1, creatorDingtalkId],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);

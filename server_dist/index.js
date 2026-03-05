@@ -1390,11 +1390,12 @@ async function registerRoutes(app2) {
       const dept = allDepts.find((d) => d.id === user.departmentId);
       deptName = dept?.name || "";
     }
+    const creatorDingtalkId = user?.dingtalkUserId || "";
     const headers = ["\u90E8\u95E8", "\u76EE\u6807\u540D\u79F0", "KR\u540D\u79F0", "\u6267\u884C\u4EBA", "\u5468\u671F", "OKR\u7C7B\u578B", "\u5173\u8054\u4E0A\u7EA7", "\u6743\u91CD", "\u521B\u5EFA\u4EBAID"];
     const rows = [
-      [deptName, "\u63D0\u9AD8\u4EA7\u54C1\u8D28\u91CF", "\u5355\u5143\u6D4B\u8BD5\u8986\u76D6\u7387\u8FBE\u523080%", "", defaultCycle, "\u627F\u8BFA\u578B", "\u5426", 1, ""],
-      [deptName, "\u63D0\u9AD8\u4EA7\u54C1\u8D28\u91CF", "\u4EE3\u7801\u5BA1\u67E5\u901A\u8FC7\u738795%", "", defaultCycle, "\u627F\u8BFA\u578B", "\u5426", 1, ""],
-      [deptName, "\u63D0\u5347\u7528\u6237\u6EE1\u610F\u5EA6", "NPS\u5206\u6570\u63D0\u5347\u52308.5", "", defaultCycle, "\u6311\u6218\u578B", "\u662F", 1, ""]
+      [deptName, "\u63D0\u9AD8\u4EA7\u54C1\u8D28\u91CF", "\u5355\u5143\u6D4B\u8BD5\u8986\u76D6\u7387\u8FBE\u523080%", "", defaultCycle, "\u627F\u8BFA\u578B", "\u5426", 1, creatorDingtalkId],
+      [deptName, "\u63D0\u9AD8\u4EA7\u54C1\u8D28\u91CF", "\u4EE3\u7801\u5BA1\u67E5\u901A\u8FC7\u738795%", "", defaultCycle, "\u627F\u8BFA\u578B", "\u5426", 1, creatorDingtalkId],
+      [deptName, "\u63D0\u5347\u7528\u6237\u6EE1\u610F\u5EA6", "NPS\u5206\u6570\u63D0\u5347\u52308.5", "", defaultCycle, "\u6311\u6218\u578B", "\u662F", 1, creatorDingtalkId]
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     ws["!cols"] = [
