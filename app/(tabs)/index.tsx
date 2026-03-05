@@ -93,7 +93,15 @@ export default function DashboardScreen() {
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
 
   const allMyObjectives = useMemo(() => {
-    return objectives.filter(obj => obj.createdBy === user?.id);
+    // 获取当前用户的部门ID列表
+    const userDeptIds = (user as any)?.departmentIds || (user?.departmentId ? [user?.departmentId] : []);
+    
+    // 显示：1) 自己创建的目标，或 2) 用户所在部门的目标
+    return objectives.filter(obj => {
+      const isCreator = obj.createdBy === user?.id;
+      const isInMyDept = userDeptIds.includes(obj.departmentId);
+      return isCreator || isInMyDept;
+    });
   }, [objectives, user]);
 
   const myObjectives = useMemo(() => {
