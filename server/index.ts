@@ -265,11 +265,12 @@ function setupErrorHandler(app: express.Application) {
   setupErrorHandler(app);
 
   const port = parseInt(process.env.PORT || "5000", 10);
+  const isWindows = process.platform === "win32";
   server.listen(
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
+      ...(isWindows ? {} : { reusePort: true }),
     },
     () => {
       log(`express server serving on port ${port}`);

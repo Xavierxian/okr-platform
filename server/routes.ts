@@ -649,17 +649,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       deptName = dept?.name || "";
     }
 
-    const headers = ["部门", "目标名称", "KR名称", "执行人", "周期", "OKR类型", "关联上级", "权重"];
+    const headers = ["部门", "目标名称", "KR名称", "执行人", "周期", "OKR类型", "关联上级", "权重", "创建人ID"];
     const rows = [
-      [deptName, "提高产品质量", "单元测试覆盖率达到80%", "", defaultCycle, "承诺型", "否", 1],
-      [deptName, "提高产品质量", "代码审查通过率95%", "", defaultCycle, "承诺型", "否", 1],
-      [deptName, "提升用户满意度", "NPS分数提升到8.5", "", defaultCycle, "挑战型", "是", 1],
+      [deptName, "提高产品质量", "单元测试覆盖率达到80%", "", defaultCycle, "承诺型", "否", 1, ""],
+      [deptName, "提高产品质量", "代码审查通过率95%", "", defaultCycle, "承诺型", "否", 1, ""],
+      [deptName, "提升用户满意度", "NPS分数提升到8.5", "", defaultCycle, "挑战型", "是", 1, ""],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     ws["!cols"] = [
       { wch: 14 }, { wch: 20 }, { wch: 24 }, { wch: 12 },
-      { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 8 },
+      { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 20 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "OKR导入模板");
@@ -769,6 +769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const weight = Number.isFinite(parsed) ? parsed : 1;
         const cycle = row["周期"]?.trim() || defaultCycle;
         const deptName = row["部门"]?.trim() || "";
+        const creatorDingtalkId = row["创建人ID"]?.trim() || "";
 
         if (!objTitle) {
           errors.push(`第${i + 2}行: 目标名称不能为空`);
@@ -798,7 +799,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        const objKey = `${objTitle}|${deptId}|${cycle}`;
+        // 根据创建人ID（钉钉ID）查找用户
+        let creatorId: string | null = null;
+        if (creatorDingtalkId) {
+          const matchCreator = allUsers.find(u => u.dingtalkUserId === creatorDingtalkId);
+          if (matchCreator) {
+            creatorId = matchCreator.id;
+          } else {
+            errors.push(`第${i + 2}行: 创建人ID"${creatorDingtalkId}"未匹配到系统用户，将使用当前登录用户作为创建人`);
+          }
+        }
+
+        const objKey = `${objTitle}|${deptId}|${cycle}|${creatorId || user.id}`;
         if (!objectiveMap.has(objKey)) {
           const validOkrType = okrType === "挑战型" ? "挑战型" : "承诺型";
           const obj = await createObjectiveInDb({
@@ -810,7 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isCollaborative: false,
             collaborativeDeptIds: [],
             collaborativeUserIds: [],
-            createdBy: user.id,
+            createdBy: creatorId || user.id, // 使用创建人ID（钉钉ID匹配的用户）或当前登录用户
             linkedToParent,
             okrType: validOkrType,
           });
@@ -1015,6 +1027,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ message: "已全部标记已读" });
     } catch (err) {
       return res.status(500).json({ message: "标记失败" });
+    }
+  });
+
+  // 清除所有 OKR 数据（仅超级管理员可用）
+  app.delete("/api/okr/clear-all", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { keyResults, objectives } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      // 先删除所有关键结果
+      const deletedKRs = await db.delete(keyResults).returning();
+      // 再删除所有目标
+      const deletedObjectives = await db.delete(objectives).returning();
+      
+      return res.json({ 
+        message: `已清除所有 OKR 数据`,
+        deletedObjectives: deletedObjectives.length,
+        deletedKRs: deletedKRs.length
+      });
+    } catch (err) {
+      console.error("Clear OKR error:", err);
+      return res.status(500).json({ message: "清除失败" });
     }
   });
 

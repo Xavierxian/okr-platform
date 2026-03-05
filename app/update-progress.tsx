@@ -55,14 +55,19 @@ export default function UpdateProgressScreen() {
     uploadingRef.current = true;
     setUploading(true);
     try {
-      const uploadUrl = buildUrl('/api/upload/image');
+      // 使用当前页面 origin 作为 base URL
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const uploadUrl = `${baseUrl}/api/upload/image`;
+      console.log('Uploading to:', uploadUrl);
       const resp = await fetch(uploadUrl, {
         method: 'POST',
         headers: { 'Content-Type': blob.type || 'image/png' },
         body: blob,
         credentials: 'include',
       });
+      console.log('Upload response:', resp.status);
       const data = await resp.json();
+      console.log('Upload data:', data);
       if (data.url) {
         setImages(prev => [...prev, data.url]);
       }

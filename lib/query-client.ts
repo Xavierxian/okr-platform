@@ -6,6 +6,12 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
  * @returns {string} The API base URL
  */
 export function getApiUrl(): string {
+  // Web 环境下使用当前页面 origin
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+
+  // 非 Web 环境使用环境变量
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
   if (!host) {

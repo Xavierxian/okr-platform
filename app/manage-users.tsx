@@ -88,6 +88,35 @@ export default function ManageUsersScreen() {
     setRoleModalUser(user);
   };
 
+  const handleClearAllOKR = async () => {
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm('警告：确定要清除所有 OKR 数据吗？\n\n此操作将删除所有目标和关键结果，且不可恢复！')
+      : await new Promise<boolean>(resolve => {
+          Alert.alert(
+            '⚠️ 危险操作',
+            '确定要清除所有 OKR 数据吗？\n\n此操作将删除所有目标和关键结果，且不可恢复！',
+            [
+              { text: '取消', style: 'cancel', onPress: () => resolve(false) },
+              { text: '确认清除', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
+    if (!confirmed) return;
+    try {
+      const res = await apiRequest("DELETE", "/api/okr/clear-all");
+      const data = await res.json();
+      if (Platform.OS === 'web') {
+        window.alert(`清除成功！\n已删除 ${data.deletedObjectives} 个目标\n已删除 ${data.deletedKRs} 个关键结果`);
+      } else {
+        Alert.alert('清除成功', `已删除 ${data.deletedObjectives} 个目标，${data.deletedKRs} 个关键结果`);
+      }
+    } catch (err: any) {
+      const msg = err?.message || '清除失败';
+      if (Platform.OS === 'web') { window.alert(msg); }
+      else { Alert.alert('错误', msg); }
+    }
+  };
+
   const applyRoleChange = async (newRole: string) => {
     if (!roleModalUser) return;
     try {
@@ -186,6 +215,13 @@ export default function ManageUsersScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>用户管理</Text>
         <View style={styles.headerRight}>
+          <Pressable
+            onPress={handleClearAllOKR}
+            style={({ pressed }) => [styles.clearBtn, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="trash-bin" size={18} color={Colors.danger} />
+            <Text style={styles.clearBtnText}>清除OKR</Text>
+          </Pressable>
           <Pressable
             onPress={() => router.push('/create-user')}
             style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}
@@ -355,4 +391,6 @@ const styles = StyleSheet.create({
   deptHint: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, textAlign: 'center', paddingVertical: 20 },
   deptSaveBtn: { backgroundColor: Colors.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   deptSaveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.white },
+  clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.danger + '15', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 8 },
+  clearBtnText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.danger },
 });
