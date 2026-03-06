@@ -8,6 +8,7 @@ import Colors from '@/constants/colors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import NotificationBell from '@/components/NotificationBell';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 function getScoreColor(score: number): string {
   if (score >= 0.7) return Colors.success;
@@ -555,7 +556,7 @@ export default function AnalyticsScreen() {
                 ) : null}
                 {aiAnalysis ? (
                   <View style={styles.aiResult}>
-                    <Text style={styles.aiText}>{aiAnalysis}</Text>
+                    <MarkdownRenderer content={aiAnalysis} />
                     {isStreaming && (
                       <View style={styles.streamingIndicator}>
                         <ActivityIndicator size="small" color="#8B5CF6" />
@@ -633,8 +634,7 @@ const styles = StyleSheet.create({
   aiErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.danger + '10', borderRadius: 10, padding: 12 },
   aiErrorText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.danger, flex: 1 },
   aiRetry: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.primary },
-  aiResult: { backgroundColor: Colors.background, borderRadius: 12, padding: 16 },
-  aiText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.text, lineHeight: 22 },
-  streamingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, padding: 8, backgroundColor: Colors.background + '80', borderRadius: 8 },
+  aiResult: { backgroundColor: Colors.background, borderRadius: 12, padding: 0 },
+  streamingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, padding: 16, backgroundColor: Colors.background + '80', borderRadius: 8 },
   streamingText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#8B5CF6' },
 });
