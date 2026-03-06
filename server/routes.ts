@@ -907,6 +907,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cycle, departmentId } = req.body;
       if (!cycle) return res.status(400).json({ message: "请选择周期" });
 
+      // 检查环境变量
+      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+        console.error("AI_INTEGRATIONS_OPENAI_API_KEY 环境变量未设置");
+        return res.status(500).json({ 
+          message: "AI服务配置错误：缺少API密钥",
+          debug: "请检查服务器环境变量配置"
+        });
+      }
+
       const { generateOKRAnalysis } = await import("./ai-analysis");
       const allDepts = await getDepartments();
       let allObjs = await getAllObjectives();
@@ -930,9 +939,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         departmentName: deptName,
       });
       return res.json({ analysis });
-    } catch (err) {
+    } catch (err: any) {
       console.error("AI analysis error:", err);
-      return res.status(500).json({ message: "AI 分析生成失败" });
+      // 提供更详细的错误信息
+      if (err.message && err.message.includes("AI_INTEGRATIONS_OPENAI_API_KEY")) {
+        return res.status(500).json({ 
+          message: "AI服务配置错误",
+          debug: err.message
+        });
+      }
+      return res.status(500).json({ 
+        message: "AI 分析生成失败",
+        debug: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
     }
   });
 

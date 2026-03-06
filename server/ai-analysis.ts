@@ -1,8 +1,16 @@
 import OpenAI from "openai";
 
+// 环境变量检查
+const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+
+if (!apiKey) {
+  throw new Error("AI_INTEGRATIONS_OPENAI_API_KEY 环境变量未设置");
+}
+
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: apiKey,
+  baseURL: baseURL || undefined,
 });
 
 interface OKRDataForAnalysis {

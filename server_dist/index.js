@@ -233,13 +233,18 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
   });
   return response.choices[0]?.message?.content || "\u5206\u6790\u751F\u6210\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002";
 }
-var openai;
+var apiKey, baseURL, openai;
 var init_ai_analysis = __esm({
   "server/ai-analysis.ts"() {
     "use strict";
+    apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    if (!apiKey) {
+      throw new Error("AI_INTEGRATIONS_OPENAI_API_KEY \u73AF\u5883\u53D8\u91CF\u672A\u8BBE\u7F6E");
+    }
     openai = new OpenAI({
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL
+      apiKey,
+      baseURL: baseURL || void 0
     });
   }
 });
@@ -1630,6 +1635,13 @@ async function registerRoutes(app2) {
     try {
       const { cycle, departmentId } = req.body;
       if (!cycle) return res.status(400).json({ message: "\u8BF7\u9009\u62E9\u5468\u671F" });
+      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+        console.error("AI_INTEGRATIONS_OPENAI_API_KEY \u73AF\u5883\u53D8\u91CF\u672A\u8BBE\u7F6E");
+        return res.status(500).json({
+          message: "AI\u670D\u52A1\u914D\u7F6E\u9519\u8BEF\uFF1A\u7F3A\u5C11API\u5BC6\u94A5",
+          debug: "\u8BF7\u68C0\u67E5\u670D\u52A1\u5668\u73AF\u5883\u53D8\u91CF\u914D\u7F6E"
+        });
+      }
       const { generateOKRAnalysis: generateOKRAnalysis2 } = await Promise.resolve().then(() => (init_ai_analysis(), ai_analysis_exports));
       const allDepts = await getDepartments();
       let allObjs = await getAllObjectives();
@@ -1653,7 +1665,16 @@ async function registerRoutes(app2) {
       return res.json({ analysis });
     } catch (err) {
       console.error("AI analysis error:", err);
-      return res.status(500).json({ message: "AI \u5206\u6790\u751F\u6210\u5931\u8D25" });
+      if (err.message && err.message.includes("AI_INTEGRATIONS_OPENAI_API_KEY")) {
+        return res.status(500).json({
+          message: "AI\u670D\u52A1\u914D\u7F6E\u9519\u8BEF",
+          debug: err.message
+        });
+      }
+      return res.status(500).json({
+        message: "AI \u5206\u6790\u751F\u6210\u5931\u8D25",
+        debug: process.env.NODE_ENV === "development" ? err.message : void 0
+      });
     }
   });
   app2.get("/api/kr-comments/:krId", requireAuth, async (req, res) => {
