@@ -153,7 +153,8 @@ var init_db = __esm({
 // server/ai-analysis.ts
 var ai_analysis_exports = {};
 __export(ai_analysis_exports, {
-  generateOKRAnalysis: () => generateOKRAnalysis
+  generateOKRAnalysis: () => generateOKRAnalysis,
+  streamOKRAnalysis: () => streamOKRAnalysis
 });
 import OpenAI from "openai";
 async function generateOKRAnalysis(data) {
@@ -232,6 +233,89 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
     max_completion_tokens: 4096
   });
   return response.choices[0]?.message?.content || "\u5206\u6790\u751F\u6210\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002";
+}
+async function* streamOKRAnalysis(data) {
+  const { objectives: objectives2, keyResults: keyResults2, departments: departments2, cycle, departmentName } = data;
+  const totalObj = objectives2.length;
+  const totalKR = keyResults2.length;
+  const completedKR = keyResults2.filter((kr) => kr.status === "completed").length;
+  const behindKR = keyResults2.filter((kr) => kr.status === "behind").length;
+  const overdueKR = keyResults2.filter((kr) => kr.status === "overdue").length;
+  const avgProgress = totalKR > 0 ? Math.round(keyResults2.reduce((s, kr) => s + kr.progress, 0) / totalKR) : 0;
+  const scoredKR = keyResults2.filter((kr) => kr.selfScore !== null && kr.selfScore !== void 0);
+  const avgScore = scoredKR.length > 0 ? (scoredKR.reduce((s, kr) => s + kr.selfScore, 0) / scoredKR.length).toFixed(2) : "\u6682\u65E0";
+  const deptBreakdown = departments2.map((dept) => {
+    const deptObjs = objectives2.filter((o) => o.departmentId === dept.id);
+    const deptKRs = keyResults2.filter((kr) => deptObjs.some((o) => o.id === kr.objectiveId));
+    const deptAvg = deptKRs.length > 0 ? Math.round(deptKRs.reduce((s, kr) => s + kr.progress, 0) / deptKRs.length) : 0;
+    const deptScored = deptKRs.filter((kr) => kr.selfScore !== null && kr.selfScore !== void 0);
+    const deptAvgScore = deptScored.length > 0 ? (deptScored.reduce((s, kr) => s + kr.selfScore, 0) / deptScored.length).toFixed(2) : "\u6682\u65E0";
+    return {
+      name: dept.name,
+      objectives: deptObjs.length,
+      krs: deptKRs.length,
+      avgProgress: deptAvg,
+      avgScore: deptAvgScore,
+      completed: deptKRs.filter((kr) => kr.status === "completed").length,
+      behind: deptKRs.filter((kr) => kr.status === "behind").length,
+      overdue: deptKRs.filter((kr) => kr.status === "overdue").length
+    };
+  }).filter((d) => d.krs > 0);
+  const objDetails = objectives2.map((obj) => {
+    const objKRs = keyResults2.filter((kr) => kr.objectiveId === obj.id);
+    return {
+      title: obj.title,
+      type: obj.okrType || "\u627F\u8BFA\u578B",
+      department: departments2.find((d) => d.id === obj.departmentId)?.name || "\u672A\u77E5",
+      krs: objKRs.map((kr) => ({
+        title: kr.title,
+        progress: kr.progress,
+        status: kr.status,
+        selfScore: kr.selfScore,
+        type: kr.okrType || "\u627F\u8BFA\u578B"
+      }))
+    };
+  });
+  const scope = departmentName ? `${departmentName}\u90E8\u95E8` : "\u5168\u7EC4\u7EC7";
+  const prompt = `\u4F60\u662F\u4E00\u4F4D\u4E13\u4E1A\u7684OKR\u7BA1\u7406\u987E\u95EE\u3002\u8BF7\u57FA\u4E8E\u4EE5\u4E0B${cycle}\u5468\u671F${scope}\u7684OKR\u6570\u636E\uFF0C\u64B0\u5199\u4E00\u4EFD\u5168\u9762\u7684\u5206\u6790\u62A5\u544A\u3002
+
+## \u6574\u4F53\u6570\u636E
+- \u76EE\u6807\u6570: ${totalObj}
+- \u5173\u952E\u7ED3\u679C\u6570: ${totalKR}
+- \u5DF2\u5B8C\u6210KR: ${completedKR}
+- \u8FDB\u5EA6\u6EDE\u540EKR: ${behindKR}
+- \u5DF2\u903E\u671FKR: ${overdueKR}
+- \u5E73\u5747\u8FDB\u5EA6: ${avgProgress}%
+- \u5E73\u5747\u81EA\u8BC4\u5206: ${avgScore}
+
+## \u5404\u90E8\u95E8\u6570\u636E
+${deptBreakdown.map((d) => `- ${d.name}: ${d.objectives}\u4E2A\u76EE\u6807, ${d.krs}\u4E2AKR, \u5E73\u5747\u8FDB\u5EA6${d.avgProgress}%, \u5E73\u5747\u81EA\u8BC4${d.avgScore}, \u5DF2\u5B8C\u6210${d.completed}, \u6EDE\u540E${d.behind}, \u903E\u671F${d.overdue}`).join("\n")}
+
+## \u5404\u76EE\u6807\u8BE6\u60C5
+${objDetails.map((o) => `### ${o.title} (${o.type}, ${o.department})
+${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001${kr.status}, \u81EA\u8BC4${kr.selfScore ?? "\u672A\u8BC4"}, \u7C7B\u578B${kr.type}`).join("\n")}`).join("\n\n")}
+
+\u8BF7\u6309\u4EE5\u4E0B\u7ED3\u6784\u8F93\u51FA\u5206\u6790\u62A5\u544A\uFF08\u4F7F\u7528Markdown\u683C\u5F0F\uFF09\uFF1A
+1. **\u603B\u4F53\u8BC4\u4F30** - \u5BF9\u672C\u5468\u671FOKR\u6267\u884C\u60C5\u51B5\u7684\u6574\u4F53\u8BC4\u4EF7
+2. **\u4EAE\u70B9\u4E0E\u6210\u5C31** - \u505A\u5F97\u597D\u7684\u65B9\u9762
+3. **\u98CE\u9669\u4E0E\u95EE\u9898** - \u9700\u8981\u5173\u6CE8\u7684\u98CE\u9669\u9879\u548C\u95EE\u9898
+4. **\u90E8\u95E8\u5BF9\u6BD4\u5206\u6790** - \u5404\u90E8\u95E8\u7684\u8868\u73B0\u5BF9\u6BD4
+5. **\u6539\u8FDB\u5EFA\u8BAE** - \u5177\u4F53\u7684\u3001\u53EF\u6267\u884C\u7684\u6539\u8FDB\u5EFA\u8BAE
+6. **\u4E0B\u5468\u671F\u5C55\u671B** - \u5BF9\u4E0B\u4E2A\u5468\u671F\u7684\u5EFA\u8BAE\u548C\u91CD\u70B9\u65B9\u5411
+
+\u8BF7\u7528\u7B80\u6D01\u3001\u4E13\u4E1A\u7684\u4E2D\u6587\u64B0\u5199\uFF0C\u7A81\u51FA\u6570\u636E\u9A71\u52A8\u7684\u6D1E\u5BDF\u3002`;
+  const stream = await openai.chat.completions.create({
+    model: "DeepSeek-V3.2",
+    messages: [{ role: "user", content: prompt }],
+    max_completion_tokens: 4096,
+    stream: true
+  });
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || "";
+    if (content) {
+      yield content;
+    }
+  }
 }
 var apiKey, baseURL, openai;
 var init_ai_analysis = __esm({
@@ -1633,7 +1717,7 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/analytics/ai-analysis", requireAuth, async (req, res) => {
     try {
-      const { cycle, departmentId } = req.body;
+      const { cycle, departmentId, stream = false } = req.body;
       if (!cycle) return res.status(400).json({ message: "\u8BF7\u9009\u62E9\u5468\u671F" });
       if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
         console.error("AI_INTEGRATIONS_OPENAI_API_KEY \u73AF\u5883\u53D8\u91CF\u672A\u8BBE\u7F6E");
@@ -1642,7 +1726,7 @@ async function registerRoutes(app2) {
           debug: "\u8BF7\u68C0\u67E5\u670D\u52A1\u5668\u73AF\u5883\u53D8\u91CF\u914D\u7F6E"
         });
       }
-      const { generateOKRAnalysis: generateOKRAnalysis2 } = await Promise.resolve().then(() => (init_ai_analysis(), ai_analysis_exports));
+      const { generateOKRAnalysis: generateOKRAnalysis2, streamOKRAnalysis: streamOKRAnalysis2 } = await Promise.resolve().then(() => (init_ai_analysis(), ai_analysis_exports));
       const allDepts = await getDepartments();
       let allObjs = await getAllObjectives();
       allObjs = allObjs.filter((o) => o.cycle === cycle);
@@ -1652,17 +1736,57 @@ async function registerRoutes(app2) {
       const objIds = allObjs.map((o) => o.id);
       const allKRs = objIds.length > 0 ? await getKeyResultsForObjectives(objIds) : [];
       if (allObjs.length === 0) {
-        return res.json({ analysis: "\u8BE5\u5468\u671F\u6682\u65E0OKR\u6570\u636E\uFF0C\u65E0\u6CD5\u751F\u6210\u5206\u6790\u62A5\u544A\u3002" });
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.write(`data: ${JSON.stringify({ content: "\u8BE5\u5468\u671F\u6682\u65E0OKR\u6570\u636E\uFF0C\u65E0\u6CD5\u751F\u6210\u5206\u6790\u62A5\u544A\u3002" })}
+
+`);
+          res.write(`data: ${JSON.stringify({ done: true })}
+
+`);
+          res.end();
+          return;
+        } else {
+          return res.json({ analysis: "\u8BE5\u5468\u671F\u6682\u65E0OKR\u6570\u636E\uFF0C\u65E0\u6CD5\u751F\u6210\u5206\u6790\u62A5\u544A\u3002" });
+        }
       }
       const deptName = departmentId ? allDepts.find((d) => d.id === departmentId)?.name : void 0;
-      const analysis = await generateOKRAnalysis2({
+      const analysisData = {
         objectives: allObjs,
         keyResults: allKRs,
         departments: allDepts,
         cycle,
         departmentName: deptName
-      });
-      return res.json({ analysis });
+      };
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        try {
+          for await (const chunk of streamOKRAnalysis2(analysisData)) {
+            res.write(`data: ${JSON.stringify({ content: chunk })}
+
+`);
+          }
+          res.write(`data: ${JSON.stringify({ done: true })}
+
+`);
+          res.end();
+        } catch (streamError) {
+          console.error("Stream error:", streamError);
+          if (!res.headersSent) {
+            res.write(`data: ${JSON.stringify({ error: "AI\u5206\u6790\u8FC7\u7A0B\u4E2D\u51FA\u73B0\u9519\u8BEF" })}
+
+`);
+            res.end();
+          }
+        }
+      } else {
+        const analysis = await generateOKRAnalysis2(analysisData);
+        return res.json({ analysis });
+      }
     } catch (err) {
       console.error("AI analysis error:", err);
       if (err.message && err.message.includes("AI_INTEGRATIONS_OPENAI_API_KEY")) {

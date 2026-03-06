@@ -904,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/analytics/ai-analysis", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { cycle, departmentId } = req.body;
+      const { cycle, departmentId, stream = false } = req.body;
       if (!cycle) return res.status(400).json({ message: "请选择周期" });
 
       // 检查环境变量
@@ -916,7 +916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { generateOKRAnalysis } = await import("./ai-analysis");
+      const { generateOKRAnalysis, streamOKRAnalysis } = await import("./ai-analysis");
       const allDepts = await getDepartments();
       let allObjs = await getAllObjectives();
       allObjs = allObjs.filter(o => o.cycle === cycle);
@@ -927,18 +927,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allKRs = objIds.length > 0 ? await getKeyResultsForObjectives(objIds) : [];
 
       if (allObjs.length === 0) {
-        return res.json({ analysis: '该周期暂无OKR数据，无法生成分析报告。' });
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.write(`data: ${JSON.stringify({ content: '该周期暂无OKR数据，无法生成分析报告。' })}\n\n`);
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          res.end();
+          return;
+        } else {
+          return res.json({ analysis: '该周期暂无OKR数据，无法生成分析报告。' });
+        }
       }
 
       const deptName = departmentId ? allDepts.find(d => d.id === departmentId)?.name : undefined;
-      const analysis = await generateOKRAnalysis({
+      const analysisData = {
         objectives: allObjs,
         keyResults: allKRs,
         departments: allDepts,
         cycle,
         departmentName: deptName,
-      });
-      return res.json({ analysis });
+      };
+
+      if (stream) {
+        // 流式响应
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+
+        try {
+          for await (const chunk of streamOKRAnalysis(analysisData)) {
+            res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+          }
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          res.end();
+        } catch (streamError) {
+          console.error("Stream error:", streamError);
+          if (!res.headersSent) {
+            res.write(`data: ${JSON.stringify({ error: "AI分析过程中出现错误" })}\n\n`);
+            res.end();
+          }
+        }
+      } else {
+        // 非流式响应（保持向后兼容）
+        const analysis = await generateOKRAnalysis(analysisData);
+        return res.json({ analysis });
+      }
     } catch (err: any) {
       console.error("AI analysis error:", err);
       // 提供更详细的错误信息

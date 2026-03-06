@@ -58,6 +58,7 @@ export default function AnalyticsScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [aiError, setAiError] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const cycles = useMemo(() => {
     return [...new Set(objectives.map(o => o.cycle))].sort();
@@ -201,17 +202,71 @@ export default function AnalyticsScreen() {
     setAiLoading(true);
     setAiError('');
     setAiAnalysis('');
+    setIsStreaming(true);
+    
     try {
-      const res = await apiRequest("POST", "/api/analytics/ai-analysis", {
-        cycle: selectedCycle,
-        departmentId: selectedDeptId || undefined,
+      const response = await fetch('/api/analytics/ai-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cycle: selectedCycle,
+          departmentId: selectedDeptId || undefined,
+          stream: true,
+        }),
       });
-      const data = await res.json();
-      setAiAnalysis(data.analysis);
+
+      if (!response.ok) {
+        throw new Error('网络请求失败');
+      }
+
+      if (!response.body) {
+        throw new Error('响应体为空');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.content) {
+                  accumulatedText += data.content;
+                  setAiAnalysis(accumulatedText);
+                }
+                if (data.done) {
+                  break;
+                }
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+              } catch (parseError) {
+                console.warn('解析SSE数据失败:', parseError);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
     } catch (err: any) {
-      setAiError('AI 分析失败，请重试');
+      console.error('AI分析错误:', err);
+      setAiError(err.message || 'AI 分析失败，请重试');
+    } finally {
+      setAiLoading(false);
+      setIsStreaming(false);
     }
-    setAiLoading(false);
   }, [selectedCycle, selectedDeptId, aiLoading]);
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
@@ -486,7 +541,7 @@ export default function AnalyticsScreen() {
                 {aiLoading && (
                   <View style={styles.aiLoading}>
                     <ActivityIndicator size="small" color="#8B5CF6" />
-                    <Text style={styles.aiLoadingText}>AI 正在分析数据...</Text>
+                    <Text style={styles.aiLoadingText}>{isStreaming ? 'AI 正在生成分析...' : 'AI 正在分析数据...'}</Text>
                   </View>
                 )}
                 {aiError ? (
@@ -501,6 +556,12 @@ export default function AnalyticsScreen() {
                 {aiAnalysis ? (
                   <View style={styles.aiResult}>
                     <Text style={styles.aiText}>{aiAnalysis}</Text>
+                    {isStreaming && (
+                      <View style={styles.streamingIndicator}>
+                        <ActivityIndicator size="small" color="#8B5CF6" />
+                        <Text style={styles.streamingText}>正在生成分析...</Text>
+                      </View>
+                    )}
                   </View>
                 ) : null}
               </Animated.View>
@@ -574,4 +635,6 @@ const styles = StyleSheet.create({
   aiRetry: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.primary },
   aiResult: { backgroundColor: Colors.background, borderRadius: 12, padding: 16 },
   aiText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.text, lineHeight: 22 },
+  streamingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, padding: 8, backgroundColor: Colors.background + '80', borderRadius: 8 },
+  streamingText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#8B5CF6' },
 });
