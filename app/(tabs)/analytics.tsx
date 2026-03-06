@@ -288,8 +288,16 @@ export default function AnalyticsScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 16, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <Text style={styles.title}>数据分析</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingTop: topPadding + 16 }}>
+          <View style={styles.pageHeader}>
+            <View style={styles.headerIconContainer}>
+              <Ionicons name="analytics" size={28} color="#8B5CF6" />
+            </View>
+            <View>
+              <Text style={styles.pageTitle}>数据分析</Text>
+              <Text style={styles.pageSubtitle}>洞察团队绩效表现</Text>
+            </View>
+          </View>
           <NotificationBell />
         </View>
 
@@ -577,7 +585,17 @@ export default function AnalyticsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scrollContent: { paddingHorizontal: 20 },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 28, color: Colors.text, marginBottom: 16 },
+  pageHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#F0F0FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 28, color: Colors.text, letterSpacing: -0.5 },
+  pageSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 2 },
   filterSection: { marginBottom: 12 },
   filterLabel: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
   chipRow: { flexDirection: 'row', gap: 8 },

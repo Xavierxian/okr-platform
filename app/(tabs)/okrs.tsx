@@ -223,114 +223,148 @@ export default function OKRsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
-        <Text style={styles.headerTitle}>目标管理</Text>
-        <View style={styles.headerActions}>
+      {/* 固定在顶部的标题栏 */}
+      <View style={[styles.stickyHeader, { paddingTop: topPadding }]}> 
+        <View style={styles.titleSection}>
+          <View style={styles.titleRow}>
+            <View style={styles.titleIconContainer}>
+              <Ionicons name="flag" size={28} color="#0082EF" />
+            </View>
+            <View>
+              <Text style={styles.mainTitle}>目标管理</Text>
+              <Text style={styles.subtitle}>追踪团队目标进展</Text>
+            </View>
+          </View>
+            
+          {/* 功能按钮组 */}
+          <View style={styles.actionButtons}>
+            <Pressable 
+              onPress={() => router.push('/import-okr')} 
+              style={({ pressed }) => [styles.actionButton, styles.importButton, { opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="cloud-upload-outline" size={20} color="#0082EF" />
+            </Pressable>
+              
+            <Pressable 
+              onPress={() => router.push('/create-objective')} 
+              style={({ pressed }) => [styles.actionButton, styles.addButton, { opacity: pressed ? 0.9 : 1 }]}
+            >
+              <Ionicons name="add" size={24} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        </View>
+          
+        {/* 通知区域 */}
+        <View style={styles.notificationArea}>
           <NotificationBell />
-          <Pressable onPress={() => router.push('/import-okr')} style={({ pressed }) => [styles.importBtn, { opacity: pressed ? 0.8 : 1 }]}>
-            <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} />
-          </Pressable>
-          <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
-            <Ionicons name="add" size={24} color={Colors.white} />
-          </Pressable>
         </View>
       </View>
-
-      <View style={styles.filters}>
-        {/* 部门筛选器：普通用户显示自己的中心（只读），管理员可切换 */}
-        {usedDepts.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 8 }}>
-            {isAdmin ? (
-              <>
-                <Pressable
-                  onPress={() => { setSelectedDeptIds([]); setSelectedUserId(null); }}
-                  style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipActive]}
-                >
-                  <Text style={[styles.filterText, selectedDeptIds.length === 0 && styles.filterTextActive]}>全部中心</Text>
-                </Pressable>
-                {usedDepts.map(d => {
-                  const isActive = selectedDeptIds.includes(d.id);
-                  return (
-                    <Pressable key={d.id} onPress={() => toggleDept(d.id)} style={[styles.filterChip, isActive && styles.filterChipActive]}>
-                      {isActive && <Ionicons name="checkmark" size={14} color={Colors.white} style={{ marginRight: 2 }} />}
-                      <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{d.name}</Text>
+  
+      {/* 筛选器区域 - 卡片化设计 */}
+      <View style={[styles.filterSection, { paddingTop: topPadding + 80 }]}>
+        <View style={styles.filterCard}>
+          {/* 部门筛选器 */}
+          {usedDepts.length > 0 && (
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterGroupTitle}>部门筛选</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsContainer}>
+                {isAdmin ? (
+                  <>
+                    <Pressable
+                      onPress={() => { setSelectedDeptIds([]); setSelectedUserId(null); }}
+                      style={[styles.modernFilterChip, selectedDeptIds.length === 0 && styles.modernFilterChipActive]}
+                    >
+                      <Text style={[styles.modernFilterText, selectedDeptIds.length === 0 && styles.modernFilterTextActive]}>全部中心</Text>
                     </Pressable>
-                  );
-                })}
-              </>
-            ) : (
-              // 普通用户只显示自己所在的中心（只读展示）
-              usedDepts.map(d => (
-                <View key={d.id} style={[styles.filterChip, styles.filterChipActive]}>
-                  <Ionicons name="checkmark" size={14} color={Colors.white} style={{ marginRight: 2 }} />
-                  <Text style={[styles.filterText, styles.filterTextActive]}>{d.name}</Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        )}
-
-        {/* 人员筛选器：普通用户默认选中自己，可切换查看同中心人员 */}
-        {showUserFilter && visibleUsers.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 8 }}>
-            {isAdmin ? (
-              // 管理员显示全部人员选项
-              <>
-                <Pressable
-                  onPress={() => setSelectedUserId(null)}
-                  style={[styles.filterChip, !selectedUserId && styles.filterChipUserActive]}
-                >
-                  <Text style={[styles.filterText, !selectedUserId && styles.filterTextActive]}>全部人员</Text>
-                </Pressable>
-                {visibleUsers.map(u => {
-                  const isActive = selectedUserId === u.id;
-                  return (
-                    <Pressable key={u.id} onPress={() => setSelectedUserId(isActive ? null : u.id)} style={[styles.filterChip, isActive && styles.filterChipUserActive]}>
-                      <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{u.displayName}</Text>
+                    {usedDepts.map(d => {
+                      const isActive = selectedDeptIds.includes(d.id);
+                      return (
+                        <Pressable key={d.id} onPress={() => toggleDept(d.id)} style={[styles.modernFilterChip, isActive && styles.modernFilterChipActive]}>
+                          {isActive && <Ionicons name="checkmark" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />}
+                          <Text style={[styles.modernFilterText, isActive && styles.modernFilterTextActive]}>{d.name}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </>
+                ) : (
+                  usedDepts.map(d => (
+                    <View key={d.id} style={[styles.modernFilterChip, styles.modernFilterChipActive]}>
+                      <Ionicons name="checkmark" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                      <Text style={[styles.modernFilterText, styles.modernFilterTextActive]}>{d.name}</Text>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          )}
+  
+          {/* 人员筛选器 */}
+          {showUserFilter && visibleUsers.length > 0 && (
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterGroupTitle}>人员筛选</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsContainer}>
+                {isAdmin ? (
+                  <>
+                    <Pressable
+                      onPress={() => setSelectedUserId(null)}
+                      style={[styles.modernFilterChip, !selectedUserId && styles.modernFilterChipUserActive]}
+                    >
+                      <Text style={[styles.modernFilterText, !selectedUserId && styles.modernFilterTextActive]}>全部人员</Text>
                     </Pressable>
-                  );
-                })}
-              </>
-            ) : (
-              // 普通用户显示自己中心的人员，默认选中自己
-              visibleUsers.map(u => {
-                const isActive = selectedUserId === u.id || (selectedUserId === null && u.id === user?.id);
-                return (
-                  <Pressable key={u.id} onPress={() => setSelectedUserId(u.id)} style={[styles.filterChip, isActive && styles.filterChipUserActive]}>
-                    <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{u.displayName}{u.id === user?.id ? ' (我)' : ''}</Text>
+                    {visibleUsers.map(u => {
+                      const isActive = selectedUserId === u.id;
+                      return (
+                        <Pressable key={u.id} onPress={() => setSelectedUserId(isActive ? null : u.id)} style={[styles.modernFilterChip, isActive && styles.modernFilterChipUserActive]}>
+                          <Text style={[styles.modernFilterText, isActive && styles.modernFilterTextActive]}>{u.displayName}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </>
+                ) : (
+                  visibleUsers.map(u => {
+                    const isActive = selectedUserId === u.id || (selectedUserId === null && u.id === user?.id);
+                    return (
+                      <Pressable key={u.id} onPress={() => setSelectedUserId(u.id)} style={[styles.modernFilterChip, isActive && styles.modernFilterChipUserActive]}>
+                        <Text style={[styles.modernFilterText, isActive && styles.modernFilterTextActive]}>{u.displayName}{u.id === user?.id ? ' (我)' : ''}</Text>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </ScrollView>
+            </View>
+          )}
+  
+          {/* 周期筛选器 */}
+          {cycles.length > 0 && (
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterGroupTitle}>周期筛选</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsContainer}>
+                <Pressable
+                  onPress={() => setSelectedCycle(null)}
+                  style={[styles.modernFilterChip, !selectedCycle && styles.modernFilterChipActive]}
+                >
+                  <Text style={[styles.modernFilterText, !selectedCycle && styles.modernFilterTextActive]}>全部周期</Text>
+                </Pressable>
+                {cycles.map(c => (
+                  <Pressable
+                    key={c}
+                    onPress={() => setSelectedCycle(selectedCycle === c ? null : c)}
+                    style={[styles.modernFilterChip, selectedCycle === c && styles.modernFilterChipActive]}
+                  >
+                    <Text style={[styles.modernFilterText, selectedCycle === c && styles.modernFilterTextActive]}>{c}</Text>
                   </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
-        )}
-
-        {cycles.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
-            <Pressable
-              onPress={() => setSelectedCycle(null)}
-              style={[styles.filterChip, !selectedCycle && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterText, !selectedCycle && styles.filterTextActive]}>全部周期</Text>
-            </Pressable>
-            {cycles.map(c => (
-              <Pressable
-                key={c}
-                onPress={() => setSelectedCycle(selectedCycle === c ? null : c)}
-                style={[styles.filterChip, selectedCycle === c && styles.filterChipActive]}
-              >
-                <Text style={[styles.filterText, selectedCycle === c && styles.filterTextActive]}>{c}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
       </View>
 
       <FlatList
         data={filteredObjectives}
         keyExtractor={item => item.id}
         renderItem={renderObjective}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100, paddingTop: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100, paddingTop: 20 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!!filteredObjectives.length}
         ListEmptyComponent={
@@ -347,6 +381,145 @@ export default function OKRsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F6F7' },
+  
+  // 固定在顶部的头部
+  stickyHeader: { 
+    backgroundColor: '#FFFFFF', 
+    paddingHorizontal: 20, 
+    paddingVertical: 16,
+    borderBottomWidth: 1, 
+    borderBottomColor: '#EBEEF5',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 100,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  titleSection: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'flex-start',
+    marginTop: 16,
+  },
+  titleRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 12 
+  },
+  titleIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#E6F4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainTitle: { 
+    fontFamily: 'Inter_800ExtraBold', 
+    fontSize: 28, 
+    color: '#171A1D', 
+    letterSpacing: -0.5 
+  },
+  subtitle: { 
+    fontFamily: 'Inter_400Regular', 
+    fontSize: 14, 
+    color: '#8F9BB3', 
+    marginTop: 2 
+  },
+  actionButtons: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 12 
+  },
+  actionButton: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 14, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  importButton: { 
+    backgroundColor: '#FFFFFF', 
+    borderWidth: 1, 
+    borderColor: '#EBEEF5' 
+  },
+  addButton: { 
+    backgroundColor: '#0082EF' 
+  },
+  notificationArea: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+  },
+  
+  // 筛选器区域
+  filterSection: {
+    backgroundColor: '#F5F6F7',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  filterCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#EBEEF5',
+  },
+  filterGroup: {
+    marginBottom: 20,
+  },
+  filterGroupTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: '#171A1D',
+    marginBottom: 12,
+  },
+  filterChipsContainer: {
+    gap: 8,
+  },
+  modernFilterChip: { 
+    flexDirection: 'row' as const, 
+    alignItems: 'center' as const, 
+    paddingHorizontal: 16, 
+    paddingVertical: 8, 
+    borderRadius: 20, 
+    backgroundColor: '#F5F6F7',
+    borderWidth: 1,
+    borderColor: '#EBEEF5',
+  },
+  modernFilterChipActive: { 
+    backgroundColor: '#0082EF',
+    borderColor: '#0082EF',
+  },
+  modernFilterChipUserActive: { 
+    backgroundColor: '#52C41A',
+    borderColor: '#52C41A',
+  },
+  modernFilterText: { 
+    fontFamily: 'Inter_500Medium', 
+    fontSize: 13, 
+    color: '#5E6D82' 
+  },
+  modernFilterTextActive: { 
+    color: '#FFFFFF' 
+  },
+  
+  // 旧样式保持兼容
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#EBEEF5' },
   headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 24, color: '#171A1D', letterSpacing: -0.3 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },

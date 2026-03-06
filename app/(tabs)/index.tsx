@@ -126,24 +126,35 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 16, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>{user?.displayName || 'OKR'} 的仪表盘</Text>
-            <Text style={styles.subtitle}>
-              {myObjectives.length} 个目标 · {assignedKRs.length} 个协同KR · {collaboratingKRs.length} 个跨部门协同
-            </Text>
+      {/* 固定在顶部的仪表盘标题 */}
+      <View style={[styles.stickyHeader, { paddingTop: topPadding }]}> 
+        <View style={styles.headerContent}>
+          <View style={styles.titleSection}>
+            <View style={styles.iconContainer}>
+              <Ionicons name="stats-chart" size={28} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.mainTitle}>{user?.displayName || 'OKR'} 的仪表盘</Text>
+              <Text style={styles.subtitle}>
+                {myObjectives.length} 个目标 · {assignedKRs.length} 个协同KR · {collaboratingKRs.length} 个跨部门协同
+              </Text>
+            </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            
+          <View style={styles.headerActions}>
             <NotificationBell />
-            <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.8 : 1 }]}>
-              <Ionicons name="add" size={24} color={Colors.white} />
+            <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.fabButton, { opacity: pressed ? 0.9 : 1 }]}> 
+              <Ionicons name="add" size={24} color="#FFFFFF" />
             </Pressable>
           </View>
         </View>
+      </View>
+  
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 80, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
+        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
+      >
 
         {/* 部门筛选器已移除 - 所有用户只能查看自己的OKR */}
 
@@ -250,10 +261,74 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F6F7' },
-  scrollContent: { paddingHorizontal: 16 },
+  scrollContent: { paddingHorizontal: 20 },
+  scrollView: { flex: 1 },
+  
+  // 固定在顶部的头部
+  stickyHeader: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EBEEF5',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 100,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  titleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainTitle: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 24,
+    color: '#171A1D',
+    letterSpacing: -0.3,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  fabButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#0082EF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0082EF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  
+  // 保持原有样式兼容
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 4 },
-  greeting: { fontFamily: 'Inter_700Bold', fontSize: 24, color: '#171A1D', letterSpacing: -0.3 },
-  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 13, color: '#5E6D82', marginTop: 4 },
+
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0082EF', alignItems: 'center', justifyContent: 'center', shadowColor: '#0082EF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 17, color: '#171A1D', flex: 1 },
