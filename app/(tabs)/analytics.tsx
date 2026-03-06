@@ -270,7 +270,7 @@ export default function AnalyticsScreen() {
     }
   }, [selectedCycle, selectedDeptId, aiLoading]);
 
-  const topPadding = Platform.OS === 'web' ? 67 : insets.top;
+  const topPadding = Platform.OS === 'web' ? 20 : insets.top;
 
   if (isLoading) {
     return (
@@ -288,7 +288,7 @@ export default function AnalyticsScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 16, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingTop: topPadding + 16 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <View style={styles.pageHeader}>
             <View style={styles.headerIconContainer}>
               <Ionicons name="analytics" size={28} color="#8B5CF6" />

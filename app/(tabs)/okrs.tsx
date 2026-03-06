@@ -152,7 +152,7 @@ export default function OKRsScreen() {
     setSelectedUserId(null);
   };
 
-  const topPadding = Platform.OS === 'web' ? 67 : insets.top;
+  const topPadding = Platform.OS === 'web' ? 20 : insets.top;
 
   if (isLoading) {
     return (
