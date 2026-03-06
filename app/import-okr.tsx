@@ -8,7 +8,7 @@ import { apiRequest, buildUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
-const COLUMNS = ['部门', '目标名称', 'KR名称', '执行人', '周期', 'OKR类型', '关联上级', '权重', '创建人'];
+const COLUMNS = ['部门', '目标名称', 'KR名称', '执行人', '周期', 'OKR类型', '关联上级', '权重', '创建人ID', '上传人'];
 
 function WebFileInput({ onFileSelected }: { onFileSelected: (file: File) => void }) {
   if (Platform.OS !== 'web') return null;
@@ -298,10 +298,10 @@ export default function ImportOKRScreen() {
                               {row[col] || '否'}
                             </Text>
                           </Pressable>
-                        ) : col === '创建人' ? (
-                          // 创建人列只读，显示当前用户
-                          <View style={[styles.typeBadge, { backgroundColor: Colors.success + '15' }]}>
-                            <Text style={[styles.typeBadgeText, { color: Colors.success }]}>
+                        ) : col === '上传人' ? (
+                          // 上传人列只读，显示当前上传用户
+                          <View style={[styles.typeBadge, { backgroundColor: Colors.info + '15' }]}>
+                            <Text style={[styles.typeBadgeText, { color: Colors.info }]}>
                               {user?.displayName || user?.username || '当前用户'}
                             </Text>
                           </View>
@@ -368,7 +368,8 @@ export default function ImportOKRScreen() {
           <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>执行人</Text>：填写系统用户的姓名或用户名</Text>
           <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>权重</Text>：默认为1，可调整KR权重</Text>
           <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>周期/部门</Text>：留空则使用当前周期和您所在部门</Text>
-          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>创建人</Text>：自动显示为当前登录用户</Text>
+          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>创建人ID</Text>：填写目标创建人的钉钉ID（留空则使用当前用户）</Text>
+          <Text style={styles.tipsItem}>• <Text style={styles.tipsBold}>上传人</Text>：自动显示为当前上传用户</Text>
         </View>
       </ScrollView>
     </View>

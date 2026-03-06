@@ -44,14 +44,28 @@ export default function OKRsScreen() {
     return (user as any)?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
   }, [user]);
 
+  // 获取当前用户作为创建人的OKR下的所有执行人
+  const myCreatedKRAssigneeIds = useMemo(() => {
+    const myCreatedObjIds = new Set(objectives.filter(o => o.createdBy === user?.id).map(o => o.id));
+    const assigneeIds = new Set<string>();
+    keyResults.forEach(kr => {
+      if (kr.objectiveId && myCreatedObjIds.has(kr.objectiveId) && kr.assigneeId) {
+        assigneeIds.add(kr.assigneeId);
+      }
+    });
+    return assigneeIds;
+  }, [objectives, keyResults, user]);
+
   const visibleUsers = useMemo(() => {
     let baseUsers = allUsers;
     
-    // 普通用户只能看到自己中心的人员
+    // 普通用户只能看到自己中心的人员，以及自己创建OKR的执行人
     if (userRole === 'member') {
       baseUsers = allUsers.filter(u => {
         const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
-        return uDepts.some((d: string) => myDeptIds.includes(d));
+        const isInMyDept = uDepts.some((d: string) => myDeptIds.includes(d));
+        const isMyKRExecutor = myCreatedKRAssigneeIds.has(u.id);
+        return isInMyDept || isMyKRExecutor;
       });
     } else if (userRole === 'center_head') {
       baseUsers = allUsers.filter(u => u.role === 'center_head');
@@ -66,16 +80,42 @@ export default function OKRsScreen() {
     }
     
     return baseUsers;
-  }, [allUsers, userRole, myDeptIds, selectedDeptIds]);
+  }, [allUsers, userRole, myDeptIds, selectedDeptIds, myCreatedKRAssigneeIds]);
 
   const filteredObjectives = useMemo(() => {
     let filtered = objectives;
     
-    // 普通用户默认只显示自己的OKR，管理员显示所有
+    // 普通用户默认只显示自己的OKR，但创建人可以看到执行人的OKR
     if (!isAdmin) {
+      // 获取当前用户作为创建人的所有OKR
+      const myCreatedObjIds = new Set(objectives.filter(o => o.createdBy === user?.id).map(o => o.id));
+      
+      // 获取这些OKR下的所有KR的执行人ID
+      const myCreatedKRAssignees = new Set<string>();
+      keyResults.forEach(kr => {
+        if (kr.objectiveId && myCreatedObjIds.has(kr.objectiveId) && kr.assigneeId) {
+          myCreatedKRAssignees.add(kr.assigneeId);
+        }
+      });
+      
       // 如果用户没有主动选择其他人，默认只显示自己的OKR
       const targetUserId = selectedUserId || user?.id;
-      filtered = filtered.filter(o => o.createdBy === targetUserId);
+      
+      // 过滤逻辑：
+      // 1. 显示目标用户创建的OKR
+      // 2. 或者当前用户是创建人，且目标用户是该OKR下KR的执行人
+      filtered = filtered.filter(o => {
+        // 目标用户创建的OKR
+        if (o.createdBy === targetUserId) return true;
+        
+        // 当前用户是创建人，且目标用户是该OKR的执行人
+        if (o.createdBy === user?.id) {
+          const objKRs = keyResults.filter(kr => kr.objectiveId === o.id);
+          return objKRs.some(kr => kr.assigneeId === targetUserId);
+        }
+        
+        return false;
+      });
       
       // 普通用户只能看到自己部门的OKR
       if (myDeptIds.length > 0) {
@@ -89,7 +129,7 @@ export default function OKRsScreen() {
     
     if (selectedCycle) filtered = filtered.filter(o => o.cycle === selectedCycle);
     return filtered;
-  }, [objectives, selectedDeptIds, selectedUserId, selectedCycle, isAdmin, user, myDeptIds]);
+  }, [objectives, keyResults, selectedDeptIds, selectedUserId, selectedCycle, isAdmin, user, myDeptIds]);
 
   const cycles = useMemo(() => {
     const set = new Set(objectives.map(o => o.cycle));

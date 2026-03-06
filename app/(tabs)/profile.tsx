@@ -197,10 +197,10 @@ export default function ProfileScreen() {
           </Animated.View>
         )}
 
-        <Animated.View entering={FadeInDown.delay(isAdmin ? 400 : 300).duration(400)} style={styles.section}>
-          <Text style={styles.sectionTitle}>账号</Text>
-          {/* 只有非钉钉登录用户才显示修改密码 */}
-          {!(user as any)?.dingtalkUserId && (
+        {/* 只有非钉钉登录用户才显示账号设置（修改密码和退出登录） */}
+        {!(user as any)?.dingtalkUserId && (
+          <Animated.View entering={FadeInDown.delay(isAdmin ? 400 : 300).duration(400)} style={styles.section}>
+            <Text style={styles.sectionTitle}>账号</Text>
             <Pressable onPress={() => router.push('/change-password')} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
               <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
                 <Ionicons name="key-outline" size={18} color={Colors.primary} />
@@ -208,15 +208,15 @@ export default function ProfileScreen() {
               <Text style={styles.settingText}>修改密码</Text>
               <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
             </Pressable>
-          )}
-          <Pressable onPress={handleLogout} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
-            <View style={[styles.settingIcon, { backgroundColor: Colors.danger + '20' }]}>
-              <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
-            </View>
-            <Text style={[styles.settingText, { color: Colors.danger }]}>退出登录</Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
-          </Pressable>
-        </Animated.View>
+            <Pressable onPress={handleLogout} style={({ pressed }) => [styles.settingRow, { opacity: pressed ? 0.8 : 1 }]}>
+              <View style={[styles.settingIcon, { backgroundColor: Colors.danger + '20' }]}>
+                <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
+              </View>
+              <Text style={[styles.settingText, { color: Colors.danger }]}>退出登录</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            </Pressable>
+          </Animated.View>
+        )}
 
         <View style={styles.footerSection}>
           <Text style={styles.version}>OKR 管理平台 v1.0.0</Text>
