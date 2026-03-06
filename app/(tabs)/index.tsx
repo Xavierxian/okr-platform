@@ -131,7 +131,7 @@ export default function DashboardScreen() {
         <View style={styles.headerContent}>
           <View style={styles.titleSection}>
             <View style={styles.iconContainer}>
-              <Ionicons name="stats-chart" size={28} color="#FFFFFF" />
+              <Ionicons name="stats-chart" size={28} color="#0082EF" />
             </View>
             <View>
               <Text style={styles.mainTitle}>{user?.displayName || 'OKR'} 的仪表盘</Text>
@@ -150,7 +150,7 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 120, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 80, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
@@ -295,17 +295,15 @@ const styles = StyleSheet.create({
   
   // 固定在顶部的头部
   stickyHeader: {
-    backgroundColor: '#0082EF',
+    backgroundColor: 'transparent',
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#0082EF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
     zIndex: 100,
     position: 'absolute',
     top: 0,
@@ -327,20 +325,20 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#E6F4FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   mainTitle: {
     fontFamily: 'Inter_800ExtraBold',
     fontSize: 28,
-    color: '#FFFFFF',
+    color: '#171A1D',
     letterSpacing: -0.5,
   },
   subtitle: {
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#5E6D82',
     marginTop: 4,
   },
   headerActions: {
@@ -352,13 +350,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#0082EF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: 'rgba(0, 0, 0, 0.2)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowColor: '#0082EF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 4,
   },
   
