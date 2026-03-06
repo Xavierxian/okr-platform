@@ -27,8 +27,10 @@ export default function OKRsScreen() {
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
 
   const userRole = user?.role || 'member';
+  const isAdmin = userRole === 'center_head' || userRole === 'vp' || userRole === 'super_admin';
+  // 普通用户只能看自己中心的OKR，管理员可以看多个中心
+  const showDeptFilter = isAdmin;
   const showUserFilter = true;
-  const showDeptFilter = userRole === 'center_head' || userRole === 'vp' || userRole === 'super_admin';
 
   useEffect(() => {
     apiRequest("GET", "/api/users/all-safe")
@@ -37,10 +39,16 @@ export default function OKRsScreen() {
       .catch(() => {});
   }, []);
 
+  // 获取当前用户所在部门ID列表
+  const myDeptIds = useMemo(() => {
+    return (user as any)?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
+  }, [user]);
+
   const visibleUsers = useMemo(() => {
     let baseUsers = allUsers;
+    
+    // 普通用户只能看到自己中心的人员
     if (userRole === 'member') {
-      const myDeptIds = (user as any)?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
       baseUsers = allUsers.filter(u => {
         const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
         return uDepts.some((d: string) => myDeptIds.includes(d));
@@ -48,32 +56,56 @@ export default function OKRsScreen() {
     } else if (userRole === 'center_head') {
       baseUsers = allUsers.filter(u => u.role === 'center_head');
     }
+    
+    // 如果有选中的部门，进一步过滤
     if (selectedDeptIds.length > 0) {
       baseUsers = baseUsers.filter(u => {
         const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
         return uDepts.some((d: string) => selectedDeptIds.includes(d));
       });
     }
+    
     return baseUsers;
-  }, [allUsers, userRole, user, selectedDeptIds]);
+  }, [allUsers, userRole, myDeptIds, selectedDeptIds]);
 
   const filteredObjectives = useMemo(() => {
     let filtered = objectives;
-    if (selectedDeptIds.length > 0) filtered = filtered.filter(o => selectedDeptIds.includes(o.departmentId));
-    if (selectedUserId) filtered = filtered.filter(o => o.createdBy === selectedUserId);
+    
+    // 普通用户默认只显示自己的OKR，管理员显示所有
+    if (!isAdmin) {
+      // 如果用户没有主动选择其他人，默认只显示自己的OKR
+      const targetUserId = selectedUserId || user?.id;
+      filtered = filtered.filter(o => o.createdBy === targetUserId);
+      
+      // 普通用户只能看到自己部门的OKR
+      if (myDeptIds.length > 0) {
+        filtered = filtered.filter(o => myDeptIds.includes(o.departmentId));
+      }
+    } else {
+      // 管理员逻辑
+      if (selectedDeptIds.length > 0) filtered = filtered.filter(o => selectedDeptIds.includes(o.departmentId));
+      if (selectedUserId) filtered = filtered.filter(o => o.createdBy === selectedUserId);
+    }
+    
     if (selectedCycle) filtered = filtered.filter(o => o.cycle === selectedCycle);
     return filtered;
-  }, [objectives, selectedDeptIds, selectedUserId, selectedCycle]);
+  }, [objectives, selectedDeptIds, selectedUserId, selectedCycle, isAdmin, user, myDeptIds]);
 
   const cycles = useMemo(() => {
     const set = new Set(objectives.map(o => o.cycle));
     return Array.from(set);
   }, [objectives]);
 
+  // 部门筛选：普通用户只能看到自己的中心，管理员可以看到所有中心
   const usedDepts = useMemo(() => {
+    if (userRole === 'member') {
+      // 普通用户只能看到自己所在的部门
+      return departments.filter(d => myDeptIds.includes(d.id));
+    }
+    // 管理员可以看到所有有OKR的部门
     const ids = new Set(objectives.map(o => o.departmentId));
     return departments.filter(d => ids.has(d.id));
-  }, [objectives, departments]);
+  }, [objectives, departments, userRole, myDeptIds]);
 
   const toggleDept = (id: string) => {
     setSelectedDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
@@ -165,42 +197,71 @@ export default function OKRsScreen() {
       </View>
 
       <View style={styles.filters}>
-        {showDeptFilter && usedDepts.length > 0 && (
+        {/* 部门筛选器：普通用户显示自己的中心（只读），管理员可切换 */}
+        {usedDepts.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 8 }}>
-            <Pressable
-              onPress={() => { setSelectedDeptIds([]); setSelectedUserId(null); }}
-              style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterText, selectedDeptIds.length === 0 && styles.filterTextActive]}>全部中心</Text>
-            </Pressable>
-            {usedDepts.map(d => {
-              const isActive = selectedDeptIds.includes(d.id);
-              return (
-                <Pressable key={d.id} onPress={() => toggleDept(d.id)} style={[styles.filterChip, isActive && styles.filterChipActive]}>
-                  {isActive && <Ionicons name="checkmark" size={14} color={Colors.white} style={{ marginRight: 2 }} />}
-                  <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{d.name}</Text>
+            {isAdmin ? (
+              <>
+                <Pressable
+                  onPress={() => { setSelectedDeptIds([]); setSelectedUserId(null); }}
+                  style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipActive]}
+                >
+                  <Text style={[styles.filterText, selectedDeptIds.length === 0 && styles.filterTextActive]}>全部中心</Text>
                 </Pressable>
-              );
-            })}
+                {usedDepts.map(d => {
+                  const isActive = selectedDeptIds.includes(d.id);
+                  return (
+                    <Pressable key={d.id} onPress={() => toggleDept(d.id)} style={[styles.filterChip, isActive && styles.filterChipActive]}>
+                      {isActive && <Ionicons name="checkmark" size={14} color={Colors.white} style={{ marginRight: 2 }} />}
+                      <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{d.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </>
+            ) : (
+              // 普通用户只显示自己所在的中心（只读展示）
+              usedDepts.map(d => (
+                <View key={d.id} style={[styles.filterChip, styles.filterChipActive]}>
+                  <Ionicons name="checkmark" size={14} color={Colors.white} style={{ marginRight: 2 }} />
+                  <Text style={[styles.filterText, styles.filterTextActive]}>{d.name}</Text>
+                </View>
+              ))
+            )}
           </ScrollView>
         )}
 
+        {/* 人员筛选器：普通用户默认选中自己，可切换查看同中心人员 */}
         {showUserFilter && visibleUsers.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 8 }}>
-            <Pressable
-              onPress={() => setSelectedUserId(null)}
-              style={[styles.filterChip, !selectedUserId && styles.filterChipUserActive]}
-            >
-              <Text style={[styles.filterText, !selectedUserId && styles.filterTextActive]}>全部人员</Text>
-            </Pressable>
-            {visibleUsers.map(u => {
-              const isActive = selectedUserId === u.id;
-              return (
-                <Pressable key={u.id} onPress={() => setSelectedUserId(isActive ? null : u.id)} style={[styles.filterChip, isActive && styles.filterChipUserActive]}>
-                  <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{u.displayName}</Text>
+            {isAdmin ? (
+              // 管理员显示全部人员选项
+              <>
+                <Pressable
+                  onPress={() => setSelectedUserId(null)}
+                  style={[styles.filterChip, !selectedUserId && styles.filterChipUserActive]}
+                >
+                  <Text style={[styles.filterText, !selectedUserId && styles.filterTextActive]}>全部人员</Text>
                 </Pressable>
-              );
-            })}
+                {visibleUsers.map(u => {
+                  const isActive = selectedUserId === u.id;
+                  return (
+                    <Pressable key={u.id} onPress={() => setSelectedUserId(isActive ? null : u.id)} style={[styles.filterChip, isActive && styles.filterChipUserActive]}>
+                      <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{u.displayName}</Text>
+                    </Pressable>
+                  );
+                })}
+              </>
+            ) : (
+              // 普通用户显示自己中心的人员，默认选中自己
+              visibleUsers.map(u => {
+                const isActive = selectedUserId === u.id || (selectedUserId === null && u.id === user?.id);
+                return (
+                  <Pressable key={u.id} onPress={() => setSelectedUserId(u.id)} style={[styles.filterChip, isActive && styles.filterChipUserActive]}>
+                    <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{u.displayName}{u.id === user?.id ? ' (我)' : ''}</Text>
+                  </Pressable>
+                );
+              })
+            )}
           </ScrollView>
         )}
 

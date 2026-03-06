@@ -94,21 +94,9 @@ export default function DashboardScreen() {
   const isAdmin = user?.role === 'super_admin' || user?.role === 'vp' || user?.role === 'center_head';
 
   const allMyObjectives = useMemo(() => {
-    // 获取当前用户的部门ID列表
-    const userDeptIds = (user as any)?.departmentIds || (user?.departmentId ? [user?.departmentId] : []);
-    
-    // 普通用户只能看到自己创建的目标
-    if (!isAdmin) {
-      return objectives.filter(obj => obj.createdBy === user?.id);
-    }
-    
-    // 管理员可以看自己创建的和所在部门的
-    return objectives.filter(obj => {
-      const isCreator = obj.createdBy === user?.id;
-      const isInMyDept = userDeptIds.includes(obj.departmentId);
-      return isCreator || isInMyDept;
-    });
-  }, [objectives, user, isAdmin]);
+    // 所有用户（包括管理员）只能看到自己创建的目标
+    return objectives.filter(obj => obj.createdBy === user?.id);
+  }, [objectives, user]);
 
   const myObjectives = useMemo(() => {
     if (selectedDeptIds.length === 0) return allMyObjectives;
@@ -157,26 +145,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {usedDepts.length > 0 && isAdmin && (
-          <View style={styles.deptFilter}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.deptFilterRow}>
-                <Pressable onPress={() => setSelectedDeptIds([])} style={[styles.deptChip, selectedDeptIds.length === 0 && styles.deptChipActive]}>
-                  <Text style={[styles.deptChipText, selectedDeptIds.length === 0 && styles.deptChipTextActive]}>全部部门</Text>
-                </Pressable>
-                {usedDepts.map(d => {
-                  const isActive = selectedDeptIds.includes(d.id);
-                  return (
-                    <Pressable key={d.id} onPress={() => toggleDept(d.id)} style={[styles.deptChip, isActive && styles.deptChipActive]}>
-                      {isActive && <Ionicons name="checkmark" size={14} color={Colors.white} />}
-                      <Text style={[styles.deptChipText, isActive && styles.deptChipTextActive]}>{d.name}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
-        )}
+        {/* 部门筛选器已移除 - 所有用户只能查看自己的OKR */}
 
         {!hasContent ? (
           <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyState}>
