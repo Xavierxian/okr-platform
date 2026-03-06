@@ -142,31 +142,60 @@ export default function DashboardScreen() {
           </View>
             
           <View style={styles.headerActions}>
-            <NotificationBell />
             <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.fabButton, { opacity: pressed ? 0.9 : 1 }]}> 
               <Ionicons name="add" size={24} color="#FFFFFF" />
             </Pressable>
           </View>
         </View>
       </View>
-  
+
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 80, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
 
-        {/* 部门筛选器已移除 - 所有用户只能查看自己的OKR */}
-
         {!hasContent ? (
           <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyState}>
-            <Ionicons name="flag-outline" size={48} color={Colors.textTertiary} />
-            <Text style={styles.emptyTitle}>暂无 OKR</Text>
-            <Text style={styles.emptyText}>创建你的第一个目标，开始追踪团队目标进展</Text>
-            <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.emptyBtn, { opacity: pressed ? 0.8 : 1 }]}>
-              <Ionicons name="add" size={20} color={Colors.white} />
-              <Text style={styles.emptyBtnText}>创建目标</Text>
-            </Pressable>
+            <View style={styles.emptyStateCard}>
+              <View style={styles.emptyStateIcon}>
+                <Ionicons name="flag" size={64} color="#0082EF" />
+              </View>
+              <Text style={styles.emptyStateTitle}>开始你的 OKR 之旅</Text>
+              <Text style={styles.emptyStateText}>
+                创建你的第一个目标，开始追踪团队目标进展。
+                OKR 帮助你明确方向，聚焦重点，实现团队协作。
+              </Text>
+              <View style={styles.emptyStateActions}>
+                <Pressable 
+                  onPress={() => router.push('/create-objective')} 
+                  style={({ pressed }) => [styles.primaryButton, { opacity: pressed ? 0.9 : 1 }]}
+                >
+                  <Ionicons name="add" size={20} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>创建目标</Text>
+                </Pressable>
+                <Pressable 
+                  onPress={() => router.push('/okrs')} 
+                  style={({ pressed }) => [styles.secondaryButton, { opacity: pressed ? 0.9 : 1 }]}
+                >
+                  <Text style={styles.secondaryButtonText}>查看目标</Text>
+                </Pressable>
+              </View>
+              <View style={styles.emptyStateFeatures}>
+                <View style={styles.featureItem}>
+                  <Ionicons name="target" size={20} color="#10B981" />
+                  <Text style={styles.featureText}>明确目标方向</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="trending-up" size={20} color="#3B82F6" />
+                  <Text style={styles.featureText}>追踪进度</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="people" size={20} color="#8B5CF6" />
+                  <Text style={styles.featureText}>团队协作</Text>
+                </View>
+              </View>
+            </View>
           </Animated.View>
         ) : (
           <>
@@ -378,4 +407,105 @@ const styles = StyleSheet.create({
   deptChipActive: { backgroundColor: '#0082EF', borderColor: '#0082EF' },
   deptChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: '#5E6D82' },
   deptChipTextActive: { color: '#FFFFFF' },
+  // 新的空状态样式
+  emptyStateCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#EBEEF5',
+    marginHorizontal: 20,
+  },
+  emptyStateIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#E6F4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyStateTitle: {
+    fontFamily: 'Inter_800ExtraBold',
+    fontSize: 28,
+    color: '#171A1D',
+    textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: -0.5,
+  },
+  emptyStateText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 16,
+    color: '#5E6D82',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  emptyStateActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 32,
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0082EF',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: '#0082EF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  primaryButtonText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EBEEF5',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  secondaryButtonText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 16,
+    color: '#0082EF',
+  },
+  emptyStateFeatures: {
+    flexDirection: 'row',
+    gap: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#EBEEF5',
+  },
+  featureItem: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  featureText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: '#5E6D82',
+  },
 });
