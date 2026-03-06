@@ -91,7 +91,7 @@ ${o.krs.map((kr: any) => `  - ${kr.title}: 进度${kr.progress}%, 状态${kr.sta
 请用简洁、专业的中文撰写，突出数据驱动的洞察。`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "DeepSeek-V3.2",
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: 4096,
   });

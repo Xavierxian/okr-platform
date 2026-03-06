@@ -227,7 +227,7 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
 
 \u8BF7\u7528\u7B80\u6D01\u3001\u4E13\u4E1A\u7684\u4E2D\u6587\u64B0\u5199\uFF0C\u7A81\u51FA\u6570\u636E\u9A71\u52A8\u7684\u6D1E\u5BDF\u3002`;
   const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "DeepSeek-V3.2",
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: 4096
   });

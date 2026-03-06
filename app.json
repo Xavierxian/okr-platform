@@ -26,6 +26,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       }
     },
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
