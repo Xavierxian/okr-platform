@@ -131,7 +131,7 @@ export default function DashboardScreen() {
         <View style={styles.headerContent}>
           <View style={styles.titleSection}>
             <View style={styles.iconContainer}>
-              <Ionicons name="stats-chart" size={28} color="#10B981" />
+              <Ionicons name="stats-chart" size={28} color="#FFFFFF" />
             </View>
             <View>
               <Text style={styles.mainTitle}>{user?.displayName || 'OKR'} 的仪表盘</Text>
@@ -150,7 +150,7 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 80, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 120, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
@@ -295,16 +295,17 @@ const styles = StyleSheet.create({
   
   // 固定在顶部的头部
   stickyHeader: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EBEEF5',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 4,
+    backgroundColor: '#0082EF',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#0082EF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
     zIndex: 100,
     position: 'absolute',
     top: 0,
@@ -319,22 +320,28 @@ const styles = StyleSheet.create({
   titleSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
     flex: 1,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#ECFDF5',
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   mainTitle: {
     fontFamily: 'Inter_800ExtraBold',
-    fontSize: 24,
-    color: '#171A1D',
-    letterSpacing: -0.3,
+    fontSize: 28,
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 4,
   },
   headerActions: {
     flexDirection: 'row',
@@ -342,17 +349,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   fabButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#0082EF',
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0082EF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: 'rgba(0, 0, 0, 0.2)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   
   // 保持原有样式兼容
