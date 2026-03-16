@@ -9,6 +9,7 @@ import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 
 const STATUS_LABELS: Record<string, string> = {
   normal: '正常', behind: '滞后', completed: '已完成', overdue: '已逾期', paused: '已暂停',
@@ -108,6 +109,32 @@ export default function ObjectiveDetailScreen() {
   const [mentionedIds, setMentionedIds] = useState<string[]>([]);
   const [mentionSearch, setMentionSearch] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [krList, setKrList] = useState<any[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // 同步 objKRs 到 krList（按 sortOrder 排序）
+  useEffect(() => {
+    const sorted = [...objKRs].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    setKrList(sorted);
+  }, [objKRs]);
+
+  // 拖拽排序处理（保存到后端）
+  const handleDragEnd = async ({ data }: { data: any[] }) => {
+    setKrList(data);
+    setIsDragging(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // 保存排序到后端
+    try {
+      const orders = data.map((kr, index) => ({ id: kr.id, sortOrder: index }));
+      console.log('Saving order:', orders);
+      const res = await apiRequest('PUT', '/api/key-results/reorder', { orders });
+      console.log('Order saved:', res.status);
+    } catch (err) {
+      console.error('Failed to save order:', err);
+      Alert.alert('保存失败', '排序无法保存，请重试');
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -323,7 +350,7 @@ export default function ObjectiveDetailScreen() {
 
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
           <View style={styles.krHeader}>
-            <Text style={styles.krSectionTitle}>关键结果 ({objKRs.length})</Text>
+            <Text style={styles.krSectionTitle}>关键结果 ({krList.length})</Text>
             {canEditObj && (
               <Pressable
                 onPress={() => {
@@ -338,22 +365,37 @@ export default function ObjectiveDetailScreen() {
             )}
           </View>
 
-          {objKRs.length === 0 ? (
+          {krList.length === 0 ? (
             <View style={styles.emptyKR}>
               <Ionicons name="key-outline" size={32} color={Colors.textTertiary} />
               <Text style={styles.emptyKRText}>暂无关键结果</Text>
             </View>
           ) : (
-            objKRs.map((kr, idx) => {
-              const krEditable = canEditKR(kr);
-              const krComments = comments[kr.id] || [];
-              const isCommenting = commentKrId === kr.id;
-              return (
-                <Animated.View key={kr.id} entering={FadeInDown.delay(300 + idx * 100).duration(300)} style={styles.krCard}>
-                  <View style={styles.krTop}>
-                    <View style={[styles.krStatusDot, { backgroundColor: getStatusColor(kr.status) }]} />
-                    <Text style={styles.krTitle} numberOfLines={2}>{kr.title}</Text>
-                  </View>
+            <DraggableFlatList
+              data={krList}
+              keyExtractor={(item) => item.id}
+              onDragBegin={() => setIsDragging(true)}
+              onDragEnd={handleDragEnd}
+              scrollEnabled={false}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              renderItem={({ item: kr, drag, isActive }: RenderItemParams<any>) => {
+                const krEditable = canEditKR(kr);
+                const krComments = comments[kr.id] || [];
+                const isCommenting = commentKrId === kr.id;
+                return (
+                  <ScaleDecorator>
+                    <Animated.View 
+                      style={[styles.krCard, isActive && styles.krCardActive]} 
+                      entering={FadeInDown.duration(300)}
+                    >
+                      {/* 拖拽手柄 */}
+                      <Pressable onLongPress={drag} style={styles.krTop}>
+                        <View style={[styles.krStatusDot, { backgroundColor: getStatusColor(kr.status) }]} />
+                        <Text style={styles.krTitle} numberOfLines={2}>{kr.title}</Text>
+                        <View style={styles.dragHandle}>
+                          <Ionicons name="reorder-three" size={20} color={Colors.textTertiary} />
+                        </View>
+                      </Pressable>
                   <View style={styles.krMeta}>
                     {kr.assigneeName ? (
                       <View style={styles.krMetaItem}>
@@ -523,9 +565,11 @@ export default function ObjectiveDetailScreen() {
                       ))}
                     </View>
                   )}
-                </Animated.View>
-              );
-            })
+                    </Animated.View>
+                  </ScaleDecorator>
+                );
+              }}
+            />
           )}
         </Animated.View>
       </ScrollView>
@@ -608,7 +652,9 @@ const styles = StyleSheet.create({
   emptyKR: { alignItems: 'center', paddingVertical: 40, gap: 8 },
   emptyKRText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#8F9BB3' },
   krCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#EBEEF5' },
-  krTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  krCardActive: { backgroundColor: '#F0F9FF', borderColor: Colors.primary, shadowOpacity: 0.1 },
+  krTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' },
+  dragHandle: { padding: 4, marginLeft: 'auto' },
   krStatusDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   krTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#171A1D', flex: 1 },
   krMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, marginLeft: 18 },

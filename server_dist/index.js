@@ -71,6 +71,7 @@ var init_schema = __esm({
       linkedToParent: boolean("linked_to_parent").notNull().default(false),
       okrType: text("okr_type").notNull().default("\u627F\u8BFA\u578B"),
       createdBy: varchar("created_by"),
+      sortOrder: integer("sort_order").notNull().default(0),
       createdAt: timestamp("created_at").defaultNow()
     });
     keyResults = pgTable("key_results", {
@@ -91,6 +92,7 @@ var init_schema = __esm({
       selfScore: real("self_score"),
       selfScoreNote: text("self_score_note").notNull().default(""),
       progressHistory: jsonb("progress_history").$type().default([]),
+      sortOrder: integer("sort_order").notNull().default(0),
       createdAt: timestamp("created_at").defaultNow()
     });
     krComments = pgTable("kr_comments", {
@@ -455,10 +457,21 @@ async function getAllUserDepartments() {
   return db.select().from(userDepartments);
 }
 async function getObjectivesForUser(user) {
+  const sortObjs = (objs) => {
+    return objs.sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+      const numA = parseInt(a.title.match(/O(\d+)/i)?.[1] || "0");
+      const numB = parseInt(b.title.match(/O(\d+)/i)?.[1] || "0");
+      return numA - numB;
+    });
+  };
   if (user.role === "super_admin" || user.role === "vp") {
-    return db.select().from(objectives);
+    const objs = await db.select().from(objectives);
+    return sortObjs(objs);
   }
-  const allObjs = await db.select().from(objectives);
+  const allObjs = sortObjs(await db.select().from(objectives));
   if (user.role === "center_head") {
     const allUsers = await getAllUsers();
     const centerHeadIds = new Set(allUsers.filter((u) => u.role === "center_head").map((u) => u.id));
@@ -499,7 +512,15 @@ async function getKRsCollaboratingUser(userId) {
   return allKRs.filter((kr) => objMap.has(kr.objectiveId)).map((kr) => ({ kr, objective: objMap.get(kr.objectiveId) }));
 }
 async function getAllObjectives() {
-  return db.select().from(objectives);
+  const objs = await db.select().from(objectives).orderBy(asc(objectives.sortOrder));
+  return objs.sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) {
+      return a.sortOrder - b.sortOrder;
+    }
+    const numA = parseInt(a.title.match(/O(\d+)/i)?.[1] || "0");
+    const numB = parseInt(b.title.match(/O(\d+)/i)?.[1] || "0");
+    return numA - numB;
+  });
 }
 async function createObjectiveInDb(data) {
   const [obj] = await db.insert(objectives).values({
@@ -542,8 +563,15 @@ async function createKeyResultInDb(data) {
   return kr;
 }
 async function updateKeyResultInDb(id, updates) {
-  const [kr] = await db.update(keyResults).set(updates).where(eq(keyResults.id, id)).returning();
-  return kr;
+  console.log("updateKeyResultInDb called:", id, updates);
+  try {
+    const [kr] = await db.update(keyResults).set(updates).where(eq(keyResults.id, id)).returning();
+    console.log("updateKeyResultInDb success:", kr?.id);
+    return kr;
+  } catch (err) {
+    console.error("updateKeyResultInDb error:", err.message);
+    throw err;
+  }
 }
 async function deleteKeyResultInDb(id) {
   await db.delete(keyResults).where(eq(keyResults.id, id));
@@ -1434,6 +1462,38 @@ async function registerRoutes(app2) {
       return res.json(kr);
     } catch (err) {
       return res.status(500).json({ message: "\u521B\u5EFA\u5173\u952E\u7ED3\u679C\u5931\u8D25" });
+    }
+  });
+  app2.put("/api/objectives/reorder", requireAuth, async (req, res) => {
+    try {
+      const { orders } = req.body;
+      if (!Array.isArray(orders)) {
+        return res.status(400).json({ message: "\u65E0\u6548\u7684\u6392\u5E8F\u6570\u636E" });
+      }
+      for (const item of orders) {
+        await updateObjectiveInDb(item.id, { sortOrder: item.sortOrder });
+      }
+      return res.json({ message: "\u6392\u5E8F\u5DF2\u4FDD\u5B58" });
+    } catch (err) {
+      console.error("Reorder Objective error:", err);
+      return res.status(500).json({ message: err.message || "\u6392\u5E8F\u4FDD\u5B58\u5931\u8D25" });
+    }
+  });
+  app2.put("/api/key-results/reorder", requireAuth, async (req, res) => {
+    try {
+      const { orders } = req.body;
+      console.log("Reorder request:", orders);
+      if (!Array.isArray(orders)) {
+        return res.status(400).json({ message: "\u65E0\u6548\u7684\u6392\u5E8F\u6570\u636E" });
+      }
+      for (const item of orders) {
+        console.log("Updating KR:", item.id, "sortOrder:", item.sortOrder);
+        await updateKeyResultInDb(item.id, { sortOrder: item.sortOrder });
+      }
+      return res.json({ message: "\u6392\u5E8F\u5DF2\u4FDD\u5B58" });
+    } catch (err) {
+      console.error("Reorder KR error:", err);
+      return res.status(500).json({ message: err.message || "\u6392\u5E8F\u4FDD\u5B58\u5931\u8D25" });
     }
   });
   app2.put("/api/key-results/:id", requireAuth, async (req, res) => {

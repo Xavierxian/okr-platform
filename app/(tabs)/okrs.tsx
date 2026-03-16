@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList, Pressable, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, Pressable, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -25,6 +27,8 @@ export default function OKRsScreen() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
+  const [isSortMode, setIsSortMode] = useState(false);
+  const [sortedObjectives, setSortedObjectives] = useState<typeof objectives>([]);
 
   const userRole = user?.role || 'member';
   const isAdmin = userRole === 'center_head' || userRole === 'vp' || userRole === 'super_admin';
@@ -38,6 +42,11 @@ export default function OKRsScreen() {
       .then((data: SimpleUser[]) => setAllUsers(data))
       .catch(() => {});
   }, []);
+
+  // 同步 objectives 到 sortedObjectives
+  useEffect(() => {
+    setSortedObjectives(objectives);
+  }, [objectives]);
 
   // 获取当前用户所在部门ID列表
   const myDeptIds = useMemo(() => {
@@ -83,7 +92,7 @@ export default function OKRsScreen() {
   }, [allUsers, userRole, myDeptIds, selectedDeptIds, myCreatedKRAssigneeIds]);
 
   const filteredObjectives = useMemo(() => {
-    let filtered = objectives;
+    let filtered = sortedObjectives;
     
     // 普通用户默认只显示自己的OKR，但创建人可以看到执行人的OKR
     if (!isAdmin) {

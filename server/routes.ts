@@ -594,6 +594,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Objective 排序 API - 必须在 /:id 路由之前定义
+  app.put("/api/objectives/reorder", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { orders } = req.body; // [{ id: string, sortOrder: number }, ...]
+      if (!Array.isArray(orders)) {
+        return res.status(400).json({ message: "无效的排序数据" });
+      }
+      for (const item of orders) {
+        await updateObjectiveInDb(item.id, { sortOrder: item.sortOrder });
+      }
+      return res.json({ message: "排序已保存" });
+    } catch (err: any) {
+      console.error("Reorder Objective error:", err);
+      return res.status(500).json({ message: err.message || "排序保存失败" });
+    }
+  });
+
+  // KR 排序 API - 必须在 /:id 路由之前定义
+  app.put("/api/key-results/reorder", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { orders } = req.body; // [{ id: string, sortOrder: number }, ...]
+      console.log("Reorder request:", orders);
+      if (!Array.isArray(orders)) {
+        return res.status(400).json({ message: "无效的排序数据" });
+      }
+      for (const item of orders) {
+        console.log("Updating KR:", item.id, "sortOrder:", item.sortOrder);
+        await updateKeyResultInDb(item.id, { sortOrder: item.sortOrder });
+      }
+      return res.json({ message: "排序已保存" });
+    } catch (err: any) {
+      console.error("Reorder KR error:", err);
+      return res.status(500).json({ message: err.message || "排序保存失败" });
+    }
+  });
+
   app.put("/api/key-results/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const kr = await updateKeyResultInDb(req.params.id, req.body);

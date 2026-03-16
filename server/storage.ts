@@ -98,11 +98,23 @@ export async function getAllUserDepartments(): Promise<UserDepartment[]> {
 }
 
 export async function getObjectivesForUser(user: User): Promise<Objective[]> {
+  const sortObjs = (objs: Objective[]) => {
+    return objs.sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+      const numA = parseInt(a.title.match(/O(\d+)/i)?.[1] || '0');
+      const numB = parseInt(b.title.match(/O(\d+)/i)?.[1] || '0');
+      return numA - numB;
+    });
+  };
+
   if (user.role === "super_admin" || user.role === "vp") {
-    return db.select().from(objectives);
+    const objs = await db.select().from(objectives);
+    return sortObjs(objs);
   }
 
-  const allObjs = await db.select().from(objectives);
+  const allObjs = sortObjs(await db.select().from(objectives));
 
   if (user.role === "center_head") {
     const allUsers = await getAllUsers();
@@ -160,7 +172,18 @@ export async function getCollaborativeKRsForUser(userId: string): Promise<KeyRes
 }
 
 export async function getAllObjectives(): Promise<Objective[]> {
-  return db.select().from(objectives);
+  // 按 sortOrder 排序，如果相同则按标题中的数字排序
+  const objs = await db.select().from(objectives).orderBy(asc(objectives.sortOrder));
+  return objs.sort((a, b) => {
+    // 如果 sortOrder 不同，按 sortOrder 排序
+    if (a.sortOrder !== b.sortOrder) {
+      return a.sortOrder - b.sortOrder;
+    }
+    // 否则按标题中的数字排序
+    const numA = parseInt(a.title.match(/O(\d+)/i)?.[1] || '0');
+    const numB = parseInt(b.title.match(/O(\d+)/i)?.[1] || '0');
+    return numA - numB;
+  });
 }
 
 export async function createObjectiveInDb(data: {
@@ -235,8 +258,15 @@ export async function createKeyResultInDb(data: {
 }
 
 export async function updateKeyResultInDb(id: string, updates: Partial<KeyResult>): Promise<KeyResult | undefined> {
-  const [kr] = await db.update(keyResults).set(updates).where(eq(keyResults.id, id)).returning();
-  return kr;
+  console.log("updateKeyResultInDb called:", id, updates);
+  try {
+    const [kr] = await db.update(keyResults).set(updates).where(eq(keyResults.id, id)).returning();
+    console.log("updateKeyResultInDb success:", kr?.id);
+    return kr;
+  } catch (err: any) {
+    console.error("updateKeyResultInDb error:", err.message);
+    throw err;
+  }
 }
 
 export async function deleteKeyResultInDb(id: string): Promise<void> {

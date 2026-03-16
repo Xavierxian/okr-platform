@@ -58,6 +58,7 @@ export const objectives = pgTable("objectives", {
   linkedToParent: boolean("linked_to_parent").notNull().default(false),
   okrType: text("okr_type").notNull().default("承诺型"),
   createdBy: varchar("created_by"),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -81,6 +82,7 @@ export const keyResults = pgTable("key_results", {
   selfScore: real("self_score"),
   selfScoreNote: text("self_score_note").notNull().default(""),
   progressHistory: jsonb("progress_history").$type<ProgressEntry[]>().default([]),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
