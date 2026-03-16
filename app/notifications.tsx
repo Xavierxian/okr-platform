@@ -58,7 +58,7 @@ export default function NotificationsScreen() {
   };
 
   const insets = useSafeAreaInsets();
-  const topPadding = Platform.OS === 'web' ? 67 : insets.top;
+  const topPadding = Platform.OS === 'web' ? 20 : insets.top;
   const unreadCount = notifs.filter(n => !n.isRead).length;
 
   return (
