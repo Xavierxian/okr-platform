@@ -190,7 +190,7 @@ export default function ObjectiveDetailScreen() {
     return Math.round(objKRs.reduce((s, kr) => s + kr.progress, 0) / objKRs.length);
   }, [objKRs]);
 
-  const topPadding = Platform.OS === 'web' ? 67 : insets.top;
+  const topPadding = Platform.OS === 'web' ? 20 : insets.top;
 
   if (!objective) {
     return (

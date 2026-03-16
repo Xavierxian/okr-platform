@@ -148,7 +148,7 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 80, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding + 110, paddingBottom: Platform.OS === 'web' ? 34 + 84 : 100 }]}
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
