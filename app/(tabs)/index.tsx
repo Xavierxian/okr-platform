@@ -130,9 +130,6 @@ export default function DashboardScreen() {
       <View style={[styles.stickyHeader, { paddingTop: topPadding }]}> 
         <View style={styles.headerContent}>
           <View style={styles.titleSection}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="stats-chart" size={28} color="#0082EF" />
-            </View>
             <View>
               <Text style={styles.mainTitle}>{user?.displayName || 'OKR'} 的仪表盘</Text>
               <Text style={styles.subtitle}>
@@ -142,6 +139,7 @@ export default function DashboardScreen() {
           </View>
             
           <View style={styles.headerActions}>
+            <NotificationBell />
             <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.fabButton, { opacity: pressed ? 0.9 : 1 }]}> 
               <Ionicons name="add" size={24} color="#FFFFFF" />
             </Pressable>
@@ -295,13 +293,15 @@ const styles = StyleSheet.create({
   
   // 固定在顶部的头部
   stickyHeader: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 20,
-    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EBEEF5',
+    shadowColor: 'rgba(0, 0, 0, 0.05)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
     zIndex: 100,

@@ -508,7 +508,7 @@ export default function ObjectiveDetailScreen() {
                               <Text style={styles.historyProgress}>{entry.progress}%</Text>
                               <Text style={styles.historyDate}>{new Date(entry.date).toLocaleDateString('zh-CN')}</Text>
                             </View>
-                            {entry.note ? <Text style={styles.historyNote} numberOfLines={2}>{entry.note}</Text> : null}
+                            {entry.note ? <Text style={styles.historyNote}>{entry.note}</Text> : null}
                             {entry.images && entry.images.length > 0 && (
                               <View style={styles.historyImages}>
                                 {entry.images.map((img: string, imgIdx: number) => (
@@ -646,14 +646,14 @@ const styles = StyleSheet.create({
   mentionedLabel: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3' },
   mentionedChip: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#E6F4FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   mentionedChipText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: '#0082EF' },
-  historySection: { marginTop: 12, marginLeft: 18, borderTopWidth: 1, borderTopColor: '#EBEEF5', paddingTop: 10 },
+  historySection: { marginTop: 12, marginLeft: 18, borderTopWidth: 1, borderTopColor: '#EBEEF5', paddingTop: 10, paddingBottom: 8 },
   historyTitle: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#8F9BB3', marginBottom: 8 },
-  historyItem: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  historyItem: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   historyDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#8F9BB3', marginTop: 5 },
   historyTop: { flexDirection: 'row', justifyContent: 'space-between' },
   historyProgress: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#171A1D' },
   historyDate: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3' },
-  historyNote: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#5E6D82', marginTop: 2 },
+  historyNote: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#5E6D82', marginTop: 4, lineHeight: 18 },
   historyImages: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   historyThumb: { width: 60, height: 60, borderRadius: 6, overflow: 'hidden', backgroundColor: '#E8EAEF' },
   historyThumbImg: { width: 60, height: 60 },

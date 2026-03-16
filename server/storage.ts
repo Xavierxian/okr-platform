@@ -195,7 +195,13 @@ export async function deleteObjectiveInDb(id: string): Promise<void> {
 
 export async function getKeyResultsForObjectives(objectiveIds: string[]): Promise<KeyResult[]> {
   if (objectiveIds.length === 0) return [];
-  return db.select().from(keyResults).where(inArray(keyResults.objectiveId, objectiveIds));
+  const results = await db.select().from(keyResults).where(inArray(keyResults.objectiveId, objectiveIds));
+  // 按标题中的数字排序（KR1、KR2、KR3...）
+  return results.sort((a, b) => {
+    const numA = parseInt(a.title.match(/KR(\d+)/i)?.[1] || '0');
+    const numB = parseInt(b.title.match(/KR(\d+)/i)?.[1] || '0');
+    return numA - numB;
+  });
 }
 
 export async function getAllKeyResults(): Promise<KeyResult[]> {

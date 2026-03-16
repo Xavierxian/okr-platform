@@ -238,6 +238,7 @@ export default function OKRsScreen() {
             
           {/* 功能按钮组 */}
           <View style={styles.actionButtons}>
+            <NotificationBell />
             <Pressable 
               onPress={() => router.push('/import-okr')} 
               style={({ pressed }) => [styles.actionButton, styles.importButton, { opacity: pressed ? 0.8 : 1 }]}

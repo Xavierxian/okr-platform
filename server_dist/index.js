@@ -518,7 +518,12 @@ async function deleteObjectiveInDb(id) {
 }
 async function getKeyResultsForObjectives(objectiveIds) {
   if (objectiveIds.length === 0) return [];
-  return db.select().from(keyResults).where(inArray(keyResults.objectiveId, objectiveIds));
+  const results = await db.select().from(keyResults).where(inArray(keyResults.objectiveId, objectiveIds));
+  return results.sort((a, b) => {
+    const numA = parseInt(a.title.match(/KR(\d+)/i)?.[1] || "0");
+    const numB = parseInt(b.title.match(/KR(\d+)/i)?.[1] || "0");
+    return numA - numB;
+  });
 }
 async function getAllKeyResults() {
   return db.select().from(keyResults);
