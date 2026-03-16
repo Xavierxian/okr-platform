@@ -38,25 +38,30 @@ function ClassicTabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.tint,
-        tabBarInactiveTintColor: Colors.tabIconDefault,
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.textTertiary,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : Colors.background,
-          borderTopWidth: isWeb ? 1 : 0,
+          backgroundColor: Colors.card,
+          borderTopWidth: 1,
           borderTopColor: Colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          shadowColor: 'transparent',
+          ...(isWeb ? { height: 64, paddingBottom: 8 } : {}),
         },
         tabBarBackground: () =>
           isIOS ? (
-            <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
-          ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.background }]} />
-          ) : null,
+            <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.card }]} />
+          ),
         tabBarLabelStyle: {
           fontFamily: 'Inter_500Medium',
           fontSize: 11,
+          marginTop: 2,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 6,
         },
       }}
     >
