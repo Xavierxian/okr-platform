@@ -9,6 +9,74 @@ import Colors from '@/constants/colors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import NotificationBell from '@/components/NotificationBell';
 
+function parseQuarterCycle(cycle: string): { year: number; quarter: number } | null {
+  const normalized = cycle.replace(/\s+/g, '');
+  const match = normalized.match(/(\d{4}).*?([一二三四1-4])[季Qq]/);
+  if (!match) return null;
+
+  const quarterMap: Record<string, number> = {
+    '一': 1,
+    '二': 2,
+    '三': 3,
+    '四': 4,
+    '1': 1,
+    '2': 2,
+    '3': 3,
+    '4': 4,
+  };
+
+  const year = parseInt(match[1], 10);
+  const quarter = quarterMap[match[2]];
+  if (!year || !quarter) return null;
+
+  return { year, quarter };
+}
+
+function compareQuarterCycleDesc(a: string, b: string): number {
+  const parsedA = parseQuarterCycle(a);
+  const parsedB = parseQuarterCycle(b);
+
+  if (!parsedA && !parsedB) return b.localeCompare(a, 'zh-CN');
+  if (!parsedA) return 1;
+  if (!parsedB) return -1;
+  if (parsedA.year !== parsedB.year) return parsedB.year - parsedA.year;
+  return parsedB.quarter - parsedA.quarter;
+}
+
+function parseDashboardQuarterCycle(cycle: string): { year: number; quarter: number } | null {
+  const normalized = cycle.replace(/\s+/g, '');
+  const match = normalized.match(/(\d{4}).*?([\u4E00\u4E8C\u4E09\u56DB1-4]).*?(\u5B63\u5EA6|Q)/i);
+  if (!match) return null;
+
+  const quarterMap: Record<string, number> = {
+    '\u4E00': 1,
+    '\u4E8C': 2,
+    '\u4E09': 3,
+    '\u56DB': 4,
+    '1': 1,
+    '2': 2,
+    '3': 3,
+    '4': 4,
+  };
+
+  const year = parseInt(match[1], 10);
+  const quarter = quarterMap[match[2]];
+  if (!year || !quarter) return null;
+
+  return { year, quarter };
+}
+
+function compareDashboardQuarterCycleDesc(a: string, b: string): number {
+  const parsedA = parseDashboardQuarterCycle(a);
+  const parsedB = parseDashboardQuarterCycle(b);
+
+  if (!parsedA && !parsedB) return b.localeCompare(a, 'zh-CN');
+  if (!parsedA) return 1;
+  if (!parsedB) return -1;
+  if (parsedA.year !== parsedB.year) return parsedB.year - parsedA.year;
+  return parsedB.quarter - parsedA.quarter;
+}
+
 function getStatusColor(status: string): string {
   switch (status) {
     case 'normal': return '#10B981';
@@ -91,26 +159,69 @@ export default function DashboardScreen() {
   const { objectives, keyResults, departments, assignedKRs, collaboratingKRs, isLoading } = useOKR();
   const { user } = useAuth();
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'vp' || user?.role === 'center_head';
+  const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const allMyObjectives = useMemo(() => {
     // 所有用户（包括管理员）只能看到自己创建的目标
     return objectives.filter(obj => obj.createdBy === user?.id);
   }, [objectives, user]);
 
+  const dashboardObjectives = useMemo(() => {
+    return isSuperAdmin ? objectives : allMyObjectives;
+  }, [allMyObjectives, isSuperAdmin, objectives]);
+
+  const recentQuarterCycles = useMemo(() => {
+    const uniqueCycles = Array.from(
+      new Set(
+        dashboardObjectives
+          .map(obj => obj.cycle)
+          .filter(cycle => !!parseDashboardQuarterCycle(cycle))
+      )
+    );
+    return uniqueCycles.sort(compareDashboardQuarterCycleDesc).slice(0, 4);
+  }, [dashboardObjectives]);
+
+  const cycleScopedObjectives = useMemo(() => {
+    if (selectedCycle) {
+      return dashboardObjectives.filter(obj => obj.cycle === selectedCycle);
+    }
+    if (recentQuarterCycles.length > 0) {
+      return dashboardObjectives.filter(obj => recentQuarterCycles.includes(obj.cycle));
+    }
+    return dashboardObjectives;
+  }, [dashboardObjectives, recentQuarterCycles, selectedCycle]);
+
   const myObjectives = useMemo(() => {
-    if (selectedDeptIds.length === 0) return allMyObjectives;
-    return allMyObjectives.filter(obj => selectedDeptIds.includes(obj.departmentId));
-  }, [allMyObjectives, selectedDeptIds]);
+    if (selectedDeptIds.length === 0) return cycleScopedObjectives;
+    return cycleScopedObjectives.filter(obj => selectedDeptIds.includes(obj.departmentId));
+  }, [cycleScopedObjectives, selectedDeptIds]);
 
   const usedDepts = useMemo(() => {
-    const ids = new Set(allMyObjectives.map(o => o.departmentId));
+    const ids = new Set(cycleScopedObjectives.map(o => o.departmentId));
     return departments.filter(d => ids.has(d.id));
-  }, [allMyObjectives, departments]);
+  }, [cycleScopedObjectives, departments]);
+
+  const shouldShowDeptFilter = usedDepts.length > 1;
+
+  const allVisibleKRItems = useMemo(() => {
+    if (!isSuperAdmin) return [];
+    const objectiveMap = new Map(myObjectives.map(obj => [obj.id, obj]));
+    return keyResults
+      .filter(kr => objectiveMap.has(kr.objectiveId))
+      .map(kr => ({
+        kr,
+        objective: objectiveMap.get(kr.objectiveId)!,
+      }));
+  }, [isSuperAdmin, keyResults, myObjectives]);
 
   const toggleDept = (id: string) => {
     setSelectedDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
   };
+
+  React.useEffect(() => {
+    setSelectedDeptIds([]);
+  }, [selectedCycle]);
 
   const topPadding = Platform.OS === 'web' ? 20 : insets.top;
 
@@ -122,7 +233,18 @@ export default function DashboardScreen() {
     );
   }
 
-  const hasContent = myObjectives.length > 0 || assignedKRs.length > 0 || collaboratingKRs.length > 0;
+  const hasContent = isSuperAdmin
+    ? myObjectives.length > 0 || allVisibleKRItems.length > 0
+    : myObjectives.length > 0 || assignedKRs.length > 0 || collaboratingKRs.length > 0;
+  const subtitleText = isSuperAdmin
+    ? `${myObjectives.length} 个目标 · ${allVisibleKRItems.length} 个关键结果`
+    : `${myObjectives.length} 个目标 · ${assignedKRs.length} 个协同KR · ${collaboratingKRs.length} 个跨部门协同`;
+  const displayedAssignedKRs = isSuperAdmin ? allVisibleKRItems : assignedKRs;
+  const displayedCollaboratingKRs = isSuperAdmin ? [] : collaboratingKRs;
+  const objectiveSectionTitle = isSuperAdmin ? '全部目标' : '我的目标';
+  const objectiveEmptyText = isSuperAdmin ? '暂无目标数据' : '暂无目标';
+  const assignedSectionTitle = isSuperAdmin ? '全部关键结果' : '本部门协同KR';
+  const assignedEmptyText = isSuperAdmin ? '暂无关键结果' : '暂无本部门协同KR';
 
   return (
     <View style={styles.container}>
@@ -205,6 +327,57 @@ export default function DashboardScreen() {
                   <Text style={styles.sectionBadgeText}>{myObjectives.length}</Text>
                 </View>
               </View>
+              {recentQuarterCycles.length > 0 && (
+                <View style={styles.filterBlock}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                    <Pressable
+                      onPress={() => {
+                        setSelectedCycle(null);
+                        setSelectedDeptIds([]);
+                      }}
+                      style={[styles.filterChip, selectedCycle === null && styles.filterChipActive]}
+                    >
+                      <Text style={[styles.filterChipText, selectedCycle === null && styles.filterChipTextActive]}>最近4个季度</Text>
+                    </Pressable>
+                    {recentQuarterCycles.map(cycle => (
+                      <Pressable
+                        key={cycle}
+                        onPress={() => {
+                          setSelectedCycle(selectedCycle === cycle ? null : cycle);
+                          setSelectedDeptIds([]);
+                        }}
+                        style={[styles.filterChip, selectedCycle === cycle && styles.filterChipActive]}
+                      >
+                        <Text style={[styles.filterChipText, selectedCycle === cycle && styles.filterChipTextActive]}>{cycle}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              {shouldShowDeptFilter && (
+                <View style={styles.filterBlock}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                    <Pressable
+                      onPress={() => setSelectedDeptIds([])}
+                      style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipDeptActive]}
+                    >
+                      <Text style={[styles.filterChipText, selectedDeptIds.length === 0 && styles.filterChipTextActive]}>全部部门</Text>
+                    </Pressable>
+                    {usedDepts.map(dept => {
+                      const isActive = selectedDeptIds.includes(dept.id);
+                      return (
+                        <Pressable
+                          key={dept.id}
+                          onPress={() => toggleDept(dept.id)}
+                          style={[styles.filterChip, isActive && styles.filterChipDeptActive]}
+                        >
+                          <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>{dept.name}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
               {myObjectives.length === 0 ? (
                 <View style={styles.emptySectionCard}>
                   <Text style={styles.emptySectionText}>暂无目标</Text>
@@ -247,20 +420,21 @@ export default function DashboardScreen() {
                 <Ionicons name="people" size={20} color={Colors.success} />
                 <Text style={styles.sectionTitle}>本部门协同 KR</Text>
                 <View style={[styles.sectionBadge, { backgroundColor: Colors.success + '20' }]}>
-                  <Text style={[styles.sectionBadgeText, { color: Colors.success }]}>{assignedKRs.length}</Text>
+                  <Text style={[styles.sectionBadgeText, { color: Colors.success }]}>{displayedAssignedKRs.length}</Text>
                 </View>
               </View>
-              {assignedKRs.length === 0 ? (
+              {displayedAssignedKRs.length === 0 ? (
                 <View style={styles.emptySectionCard}>
                   <Text style={styles.emptySectionText}>暂无本部门协同 KR</Text>
                 </View>
               ) : (
-                assignedKRs.map((item, idx) => (
-                  <KRCard key={item.kr.id} item={item} showActions={true} delay={idx * 50} />
+                displayedAssignedKRs.map((item, idx) => (
+                  <KRCard key={item.kr.id} item={item} showActions={!isSuperAdmin} delay={idx * 50} />
                 ))
               )}
             </Animated.View>
 
+            {!isSuperAdmin && (
             <Animated.View entering={FadeInDown.delay(400).duration(400)} style={{ marginTop: 24 }}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="globe" size={20} color={Colors.info} />
@@ -269,16 +443,17 @@ export default function DashboardScreen() {
                   <Text style={[styles.sectionBadgeText, { color: Colors.info }]}>{collaboratingKRs.length}</Text>
                 </View>
               </View>
-              {collaboratingKRs.length === 0 ? (
+              {displayedCollaboratingKRs.length === 0 ? (
                 <View style={styles.emptySectionCard}>
                   <Text style={styles.emptySectionText}>暂无跨部门协同 KR</Text>
                 </View>
               ) : (
-                collaboratingKRs.map((item, idx) => (
+                displayedCollaboratingKRs.map((item, idx) => (
                   <KRCard key={item.kr.id} item={item} showActions={false} delay={idx * 50} />
                 ))
               )}
             </Animated.View>
+            )}
           </>
         )}
       </ScrollView>
@@ -357,6 +532,13 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: '#171A1D', flex: 1 },
   sectionBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   sectionBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82' },
+  filterBlock: { marginBottom: 12 },
+  filterRow: { gap: 8 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EBEEF5' },
+  filterChipActive: { backgroundColor: '#0082EF', borderColor: '#0082EF' },
+  filterChipDeptActive: { backgroundColor: '#52C41A', borderColor: '#52C41A' },
+  filterChipText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82' },
+  filterChipTextActive: { color: '#FFFFFF' },
   emptySectionCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 24, alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#EBEEF5' },
   emptySectionText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#8F9BB3' },
   objCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#EBEEF5' },

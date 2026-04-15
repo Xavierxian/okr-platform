@@ -1,13 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { StyleSheet, Text, View, Pressable, Platform, ActivityIndicator, ScrollView } from 'react-native';
-import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { StyleSheet, Text, View, Pressable, Platform, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
-import { apiRequest } from '@/lib/query-client';
+import { apiRequest, buildUrl } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -27,8 +26,8 @@ export default function OKRsScreen() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
-  const [isSortMode, setIsSortMode] = useState(false);
   const [sortedObjectives, setSortedObjectives] = useState<typeof objectives>([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   const userRole = user?.role || 'member';
   const isAdmin = userRole === 'center_head' || userRole === 'vp' || userRole === 'super_admin';
@@ -161,6 +160,47 @@ export default function OKRsScreen() {
     setSelectedUserId(null);
   };
 
+  const handleExport = async () => {
+    if (isExporting) return;
+    if (Platform.OS !== 'web') {
+      Alert.alert('暂不支持', '当前仅支持网页端导出');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedDeptIds.length > 0) params.set('departmentIds', selectedDeptIds.join(','));
+      if (selectedUserId) params.set('userId', selectedUserId);
+      if (selectedCycle) params.set('cycle', selectedCycle);
+
+      const url = buildUrl(`/api/export/okr${params.toString() ? `?${params.toString()}` : ''}`);
+      const response = await fetch(url, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || '导出失败');
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `okr_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: any) {
+      Alert.alert('导出失败', err?.message || '请稍后重试');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const topPadding = Platform.OS === 'web' ? 20 : insets.top;
 
   if (isLoading) {
@@ -248,6 +288,17 @@ export default function OKRsScreen() {
           {/* 功能按钮组 */}
           <View style={styles.actionButtons}>
             <NotificationBell />
+            <Pressable
+              onPress={handleExport}
+              style={({ pressed }) => [styles.actionButton, styles.exportButton, { opacity: isExporting ? 0.5 : pressed ? 0.8 : 1 }]}
+              disabled={isExporting}
+            >
+              {isExporting ? (
+                <ActivityIndicator size="small" color="#0082EF" />
+              ) : (
+                <Ionicons name="download-outline" size={20} color="#0082EF" />
+              )}
+            </Pressable>
             <Pressable 
               onPress={() => router.push('/import-okr')} 
               style={({ pressed }) => [styles.actionButton, styles.importButton, { opacity: pressed ? 0.8 : 1 }]}
@@ -460,6 +511,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', 
     borderWidth: 1, 
     borderColor: '#EBEEF5' 
+  },
+  exportButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EBEEF5'
   },
   addButton: { 
     backgroundColor: '#0082EF' 

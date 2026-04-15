@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Image, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Image, ActivityIndicator, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
@@ -138,6 +138,10 @@ export default function UpdateProgressScreen() {
 
   const handleSave = async () => {
     if (saving || !krId) return;
+    if (!note.trim()) {
+      Alert.alert('提示', '执行说明不能为空');
+      return;
+    }
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await reportProgress(krId, progressNum, note.trim(), images.length > 0 ? images : undefined);
@@ -197,7 +201,7 @@ export default function UpdateProgressScreen() {
           <Text style={styles.progressPercent}>{progressNum}%</Text>
         </View>
 
-        <Text style={styles.label}>执行说明</Text>
+        <Text style={styles.label}>执行说明（必填）</Text>
         <View onStartShouldSetResponder={() => false}>
           {Platform.OS === 'web' ? (
             <textarea
@@ -268,10 +272,10 @@ export default function UpdateProgressScreen() {
 
         <Pressable
           onPress={handleSave}
-          disabled={saving || uploading}
+          disabled={saving || uploading || !note.trim()}
           style={({ pressed }) => [
             styles.saveBtn,
-            { opacity: (saving || uploading) ? 0.5 : pressed ? 0.9 : 1 }
+            { opacity: (saving || uploading || !note.trim()) ? 0.5 : pressed ? 0.9 : 1 }
           ]}
         >
           <Ionicons name="checkmark" size={20} color={Colors.white} />

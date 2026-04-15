@@ -1,5 +1,10 @@
+"use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
@@ -7,6 +12,22 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
 // shared/schema.ts
 var schema_exports = {};
@@ -22,111 +43,111 @@ __export(schema_exports, {
   userDepartments: () => userDepartments,
   users: () => users
 });
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, real } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
-var users, departments, userDepartments, cycles, objectives, keyResults, krComments, notifications, insertUserSchema, loginSchema;
+var import_drizzle_orm, import_pg_core, import_drizzle_zod, import_zod, users, departments, userDepartments, cycles, objectives, keyResults, krComments, notifications, insertUserSchema, loginSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
-    users = pgTable("users", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      username: text("username").notNull().unique(),
-      password: text("password").notNull(),
-      displayName: text("display_name").notNull(),
-      role: text("role").notNull().default("member"),
-      departmentId: varchar("department_id"),
-      dingtalkUserId: text("dingtalk_user_id"),
-      createdAt: timestamp("created_at").defaultNow()
+    import_drizzle_orm = require("drizzle-orm");
+    import_pg_core = require("drizzle-orm/pg-core");
+    import_drizzle_zod = require("drizzle-zod");
+    import_zod = require("zod");
+    users = (0, import_pg_core.pgTable)("users", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      username: (0, import_pg_core.text)("username").notNull().unique(),
+      password: (0, import_pg_core.text)("password").notNull(),
+      displayName: (0, import_pg_core.text)("display_name").notNull(),
+      role: (0, import_pg_core.text)("role").notNull().default("member"),
+      departmentId: (0, import_pg_core.varchar)("department_id"),
+      dingtalkUserId: (0, import_pg_core.text)("dingtalk_user_id"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    departments = pgTable("departments", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      name: text("name").notNull(),
-      parentId: varchar("parent_id"),
-      level: integer("level").notNull().default(0)
+    departments = (0, import_pg_core.pgTable)("departments", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      name: (0, import_pg_core.text)("name").notNull(),
+      parentId: (0, import_pg_core.varchar)("parent_id"),
+      level: (0, import_pg_core.integer)("level").notNull().default(0)
     });
-    userDepartments = pgTable("user_departments", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      userId: varchar("user_id").notNull(),
-      departmentId: varchar("department_id").notNull()
+    userDepartments = (0, import_pg_core.pgTable)("user_departments", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      userId: (0, import_pg_core.varchar)("user_id").notNull(),
+      departmentId: (0, import_pg_core.varchar)("department_id").notNull()
     });
-    cycles = pgTable("cycles", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      name: text("name").notNull().unique(),
-      sortOrder: integer("sort_order").notNull().default(0),
-      createdAt: timestamp("created_at").defaultNow()
+    cycles = (0, import_pg_core.pgTable)("cycles", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      name: (0, import_pg_core.text)("name").notNull().unique(),
+      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    objectives = pgTable("objectives", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      title: text("title").notNull(),
-      description: text("description").notNull().default(""),
-      departmentId: varchar("department_id").notNull(),
-      cycle: text("cycle").notNull(),
-      parentObjectiveId: varchar("parent_objective_id"),
-      status: text("status").notNull().default("active"),
-      isCollaborative: boolean("is_collaborative").notNull().default(false),
-      collaborativeDeptIds: jsonb("collaborative_dept_ids").$type().default([]),
-      collaborativeUserIds: jsonb("collaborative_user_ids").$type().default([]),
-      linkedToParent: boolean("linked_to_parent").notNull().default(false),
-      okrType: text("okr_type").notNull().default("\u627F\u8BFA\u578B"),
-      createdBy: varchar("created_by"),
-      sortOrder: integer("sort_order").notNull().default(0),
-      createdAt: timestamp("created_at").defaultNow()
+    objectives = (0, import_pg_core.pgTable)("objectives", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      title: (0, import_pg_core.text)("title").notNull(),
+      description: (0, import_pg_core.text)("description").notNull().default(""),
+      departmentId: (0, import_pg_core.varchar)("department_id").notNull(),
+      cycle: (0, import_pg_core.text)("cycle").notNull(),
+      parentObjectiveId: (0, import_pg_core.varchar)("parent_objective_id"),
+      status: (0, import_pg_core.text)("status").notNull().default("active"),
+      isCollaborative: (0, import_pg_core.boolean)("is_collaborative").notNull().default(false),
+      collaborativeDeptIds: (0, import_pg_core.jsonb)("collaborative_dept_ids").$type().default([]),
+      collaborativeUserIds: (0, import_pg_core.jsonb)("collaborative_user_ids").$type().default([]),
+      linkedToParent: (0, import_pg_core.boolean)("linked_to_parent").notNull().default(false),
+      okrType: (0, import_pg_core.text)("okr_type").notNull().default("\u627F\u8BFA\u578B"),
+      createdBy: (0, import_pg_core.varchar)("created_by"),
+      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    keyResults = pgTable("key_results", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      objectiveId: varchar("objective_id").notNull(),
-      title: text("title").notNull(),
-      description: text("description").notNull().default(""),
-      assigneeId: varchar("assignee_id"),
-      assigneeName: text("assignee_name").notNull().default(""),
-      collaboratorId: varchar("collaborator_id"),
-      collaboratorName: text("collaborator_name").notNull().default(""),
-      startDate: text("start_date").notNull(),
-      endDate: text("end_date").notNull(),
-      progress: integer("progress").notNull().default(0),
-      weight: real("weight").notNull().default(1),
-      status: text("status").notNull().default("normal"),
-      okrType: text("okr_type").notNull().default("\u627F\u8BFA\u578B"),
-      selfScore: real("self_score"),
-      selfScoreNote: text("self_score_note").notNull().default(""),
-      progressHistory: jsonb("progress_history").$type().default([]),
-      sortOrder: integer("sort_order").notNull().default(0),
-      createdAt: timestamp("created_at").defaultNow()
+    keyResults = (0, import_pg_core.pgTable)("key_results", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      objectiveId: (0, import_pg_core.varchar)("objective_id").notNull(),
+      title: (0, import_pg_core.text)("title").notNull(),
+      description: (0, import_pg_core.text)("description").notNull().default(""),
+      assigneeId: (0, import_pg_core.varchar)("assignee_id"),
+      assigneeName: (0, import_pg_core.text)("assignee_name").notNull().default(""),
+      collaboratorId: (0, import_pg_core.varchar)("collaborator_id"),
+      collaboratorName: (0, import_pg_core.text)("collaborator_name").notNull().default(""),
+      startDate: (0, import_pg_core.text)("start_date").notNull(),
+      endDate: (0, import_pg_core.text)("end_date").notNull(),
+      progress: (0, import_pg_core.integer)("progress").notNull().default(0),
+      weight: (0, import_pg_core.real)("weight").notNull().default(1),
+      status: (0, import_pg_core.text)("status").notNull().default("normal"),
+      okrType: (0, import_pg_core.text)("okr_type").notNull().default("\u627F\u8BFA\u578B"),
+      selfScore: (0, import_pg_core.real)("self_score"),
+      selfScoreNote: (0, import_pg_core.text)("self_score_note").notNull().default(""),
+      progressHistory: (0, import_pg_core.jsonb)("progress_history").$type().default([]),
+      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    krComments = pgTable("kr_comments", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      krId: varchar("kr_id").notNull(),
-      userId: varchar("user_id").notNull(),
-      userName: text("user_name").notNull(),
-      content: text("content").notNull(),
-      mentionedUserIds: jsonb("mentioned_user_ids").$type().default([]),
-      createdAt: timestamp("created_at").defaultNow()
+    krComments = (0, import_pg_core.pgTable)("kr_comments", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      krId: (0, import_pg_core.varchar)("kr_id").notNull(),
+      userId: (0, import_pg_core.varchar)("user_id").notNull(),
+      userName: (0, import_pg_core.text)("user_name").notNull(),
+      content: (0, import_pg_core.text)("content").notNull(),
+      mentionedUserIds: (0, import_pg_core.jsonb)("mentioned_user_ids").$type().default([]),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    notifications = pgTable("notifications", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      userId: varchar("user_id").notNull(),
-      type: text("type").notNull().default("comment_mention"),
-      title: text("title").notNull(),
-      content: text("content").notNull(),
-      relatedKrId: varchar("related_kr_id"),
-      relatedObjectiveId: varchar("related_objective_id"),
-      fromUserId: varchar("from_user_id"),
-      fromUserName: text("from_user_name"),
-      isRead: boolean("is_read").notNull().default(false),
-      createdAt: timestamp("created_at").defaultNow()
+    notifications = (0, import_pg_core.pgTable)("notifications", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      userId: (0, import_pg_core.varchar)("user_id").notNull(),
+      type: (0, import_pg_core.text)("type").notNull().default("comment_mention"),
+      title: (0, import_pg_core.text)("title").notNull(),
+      content: (0, import_pg_core.text)("content").notNull(),
+      relatedKrId: (0, import_pg_core.varchar)("related_kr_id"),
+      relatedObjectiveId: (0, import_pg_core.varchar)("related_objective_id"),
+      fromUserId: (0, import_pg_core.varchar)("from_user_id"),
+      fromUserName: (0, import_pg_core.text)("from_user_name"),
+      isRead: (0, import_pg_core.boolean)("is_read").notNull().default(false),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    insertUserSchema = createInsertSchema(users).pick({
+    insertUserSchema = (0, import_drizzle_zod.createInsertSchema)(users).pick({
       username: true,
       password: true,
       displayName: true,
       role: true,
       departmentId: true
     });
-    loginSchema = z.object({
-      username: z.string().min(1),
-      password: z.string().min(1)
+    loginSchema = import_zod.z.object({
+      username: import_zod.z.string().min(1),
+      password: import_zod.z.string().min(1)
     });
   }
 });
@@ -137,18 +158,18 @@ __export(db_exports, {
   db: () => db,
   pool: () => pool
 });
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-var pool, db;
+var import_node_postgres, import_pg, pool, db;
 var init_db = __esm({
   "server/db.ts"() {
     "use strict";
+    import_node_postgres = require("drizzle-orm/node-postgres");
+    import_pg = __toESM(require("pg"));
     init_schema();
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL is not set");
     }
-    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-    db = drizzle(pool, { schema: schema_exports });
+    pool = new import_pg.default.Pool({ connectionString: process.env.DATABASE_URL });
+    db = (0, import_node_postgres.drizzle)(pool, { schema: schema_exports });
   }
 });
 
@@ -158,7 +179,6 @@ __export(ai_analysis_exports, {
   generateOKRAnalysis: () => generateOKRAnalysis,
   streamOKRAnalysis: () => streamOKRAnalysis
 });
-import OpenAI from "openai";
 async function generateOKRAnalysis(data) {
   const { objectives: objectives2, keyResults: keyResults2, departments: departments2, cycle, departmentName } = data;
   const totalObj = objectives2.length;
@@ -319,16 +339,17 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
     }
   }
 }
-var apiKey, baseURL, openai;
+var import_openai, apiKey, baseURL, openai;
 var init_ai_analysis = __esm({
   "server/ai-analysis.ts"() {
     "use strict";
+    import_openai = __toESM(require("openai"));
     apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
     if (!apiKey) {
       throw new Error("AI_INTEGRATIONS_OPENAI_API_KEY \u73AF\u5883\u53D8\u91CF\u672A\u8BBE\u7F6E");
     }
-    openai = new OpenAI({
+    openai = new import_openai.default({
       apiKey,
       baseURL: baseURL || void 0
     });
@@ -336,21 +357,21 @@ var init_ai_analysis = __esm({
 });
 
 // server/index.ts
-import express from "express";
+var import_express = __toESM(require("express"));
 
 // server/routes.ts
+var import_node_http = require("node:http");
+var import_express_session = __toESM(require("express-session"));
+var import_connect_pg_simple = __toESM(require("connect-pg-simple"));
 init_db();
-import { createServer } from "node:http";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
 
 // server/file-upload.ts
-import { Storage } from "@google-cloud/storage";
-import * as fs from "fs";
-import * as path from "path";
+var import_storage = require("@google-cloud/storage");
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
 var bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
 function getStorage() {
-  return new Storage({ apiEndpoint: "https://storage.googleapis.com" });
+  return new import_storage.Storage({ apiEndpoint: "https://storage.googleapis.com" });
 }
 var LOCAL_UPLOAD_DIR = path.resolve(process.cwd(), "assets", "uploads");
 function ensureLocalDir() {
@@ -378,42 +399,42 @@ async function uploadFile(buffer, fileName, contentType) {
 }
 
 // server/storage.ts
+var import_drizzle_orm2 = require("drizzle-orm");
 init_db();
 init_schema();
-import { eq, or, inArray, and, asc } from "drizzle-orm";
-import bcrypt from "bcryptjs";
+var import_bcryptjs = __toESM(require("bcryptjs"));
 async function getUser(id) {
-  const [user] = await db.select().from(users).where(eq(users.id, id));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.id, id));
   return user;
 }
 async function getUserByUsername(username) {
-  const [user] = await db.select().from(users).where(eq(users.username, username));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.username, username));
   return user;
 }
 async function getUserByDingtalkId(dingtalkUserId) {
-  const [user] = await db.select().from(users).where(eq(users.dingtalkUserId, dingtalkUserId));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.dingtalkUserId, dingtalkUserId));
   return user;
 }
 async function createUser(data) {
-  const hashed = await bcrypt.hash(data.password, 10);
+  const hashed = await import_bcryptjs.default.hash(data.password, 10);
   const [user] = await db.insert(users).values({ ...data, password: hashed }).returning();
   return user;
 }
 async function updateUser(id, updates) {
   if (updates.password) {
-    updates.password = await bcrypt.hash(updates.password, 10);
+    updates.password = await import_bcryptjs.default.hash(updates.password, 10);
   }
-  const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+  const [user] = await db.update(users).set(updates).where((0, import_drizzle_orm2.eq)(users.id, id)).returning();
   return user;
 }
 async function deleteUser(id) {
-  await db.delete(users).where(eq(users.id, id));
+  await db.delete(users).where((0, import_drizzle_orm2.eq)(users.id, id));
 }
 async function getAllUsers() {
   return db.select().from(users);
 }
 async function verifyPassword(plaintext, hashed) {
-  return bcrypt.compare(plaintext, hashed);
+  return import_bcryptjs.default.compare(plaintext, hashed);
 }
 async function getDepartments() {
   return db.select().from(departments);
@@ -423,11 +444,11 @@ async function createDepartment(data) {
   return dept;
 }
 async function updateDepartment(id, updates) {
-  const [dept] = await db.update(departments).set(updates).where(eq(departments.id, id)).returning();
+  const [dept] = await db.update(departments).set(updates).where((0, import_drizzle_orm2.eq)(departments.id, id)).returning();
   return dept;
 }
 async function deleteDepartment(id) {
-  await db.delete(departments).where(or(eq(departments.id, id), eq(departments.parentId, id)));
+  await db.delete(departments).where((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(departments.id, id), (0, import_drizzle_orm2.eq)(departments.parentId, id)));
 }
 function getUserDeptIds(userDeptId, allDepts) {
   if (!userDeptId) return [];
@@ -441,14 +462,14 @@ function getUserDeptIds(userDeptId, allDepts) {
   return [...new Set(ids)];
 }
 async function getUsersByDepartment(departmentId) {
-  return db.select().from(users).where(eq(users.departmentId, departmentId));
+  return db.select().from(users).where((0, import_drizzle_orm2.eq)(users.departmentId, departmentId));
 }
 async function getUserDepartmentIds(userId) {
-  const rows = await db.select().from(userDepartments).where(eq(userDepartments.userId, userId));
+  const rows = await db.select().from(userDepartments).where((0, import_drizzle_orm2.eq)(userDepartments.userId, userId));
   return rows.map((r) => r.departmentId);
 }
 async function setUserDepartments(userId, departmentIds) {
-  await db.delete(userDepartments).where(eq(userDepartments.userId, userId));
+  await db.delete(userDepartments).where((0, import_drizzle_orm2.eq)(userDepartments.userId, userId));
   if (departmentIds.length > 0) {
     await db.insert(userDepartments).values(departmentIds.map((deptId) => ({ userId, departmentId: deptId })));
   }
@@ -496,23 +517,23 @@ async function getObjectivesForUser(user) {
   });
 }
 async function getKRsAssignedToUser(userId) {
-  const allKRs = await db.select().from(keyResults).where(eq(keyResults.assigneeId, userId));
+  const allKRs = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.assigneeId, userId));
   if (allKRs.length === 0) return [];
   const objIds = [...new Set(allKRs.map((kr) => kr.objectiveId))];
-  const objs = await db.select().from(objectives).where(inArray(objectives.id, objIds));
+  const objs = await db.select().from(objectives).where((0, import_drizzle_orm2.inArray)(objectives.id, objIds));
   const objMap = new Map(objs.map((o) => [o.id, o]));
   return allKRs.filter((kr) => objMap.has(kr.objectiveId)).map((kr) => ({ kr, objective: objMap.get(kr.objectiveId) }));
 }
 async function getKRsCollaboratingUser(userId) {
-  const allKRs = await db.select().from(keyResults).where(eq(keyResults.collaboratorId, userId));
+  const allKRs = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.collaboratorId, userId));
   if (allKRs.length === 0) return [];
   const objIds = [...new Set(allKRs.map((kr) => kr.objectiveId))];
-  const objs = await db.select().from(objectives).where(inArray(objectives.id, objIds));
+  const objs = await db.select().from(objectives).where((0, import_drizzle_orm2.inArray)(objectives.id, objIds));
   const objMap = new Map(objs.map((o) => [o.id, o]));
   return allKRs.filter((kr) => objMap.has(kr.objectiveId)).map((kr) => ({ kr, objective: objMap.get(kr.objectiveId) }));
 }
 async function getAllObjectives() {
-  const objs = await db.select().from(objectives).orderBy(asc(objectives.sortOrder));
+  const objs = await db.select().from(objectives).orderBy((0, import_drizzle_orm2.asc)(objectives.sortOrder));
   return objs.sort((a, b) => {
     if (a.sortOrder !== b.sortOrder) {
       return a.sortOrder - b.sortOrder;
@@ -530,16 +551,16 @@ async function createObjectiveInDb(data) {
   return obj;
 }
 async function updateObjectiveInDb(id, updates) {
-  const [obj] = await db.update(objectives).set(updates).where(eq(objectives.id, id)).returning();
+  const [obj] = await db.update(objectives).set(updates).where((0, import_drizzle_orm2.eq)(objectives.id, id)).returning();
   return obj;
 }
 async function deleteObjectiveInDb(id) {
-  await db.delete(keyResults).where(eq(keyResults.objectiveId, id));
-  await db.delete(objectives).where(eq(objectives.id, id));
+  await db.delete(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.objectiveId, id));
+  await db.delete(objectives).where((0, import_drizzle_orm2.eq)(objectives.id, id));
 }
 async function getKeyResultsForObjectives(objectiveIds) {
   if (objectiveIds.length === 0) return [];
-  const results = await db.select().from(keyResults).where(inArray(keyResults.objectiveId, objectiveIds));
+  const results = await db.select().from(keyResults).where((0, import_drizzle_orm2.inArray)(keyResults.objectiveId, objectiveIds));
   return results.sort((a, b) => {
     const numA = parseInt(a.title.match(/KR(\d+)/i)?.[1] || "0");
     const numB = parseInt(b.title.match(/KR(\d+)/i)?.[1] || "0");
@@ -565,7 +586,7 @@ async function createKeyResultInDb(data) {
 async function updateKeyResultInDb(id, updates) {
   console.log("updateKeyResultInDb called:", id, updates);
   try {
-    const [kr] = await db.update(keyResults).set(updates).where(eq(keyResults.id, id)).returning();
+    const [kr] = await db.update(keyResults).set(updates).where((0, import_drizzle_orm2.eq)(keyResults.id, id)).returning();
     console.log("updateKeyResultInDb success:", kr?.id);
     return kr;
   } catch (err) {
@@ -574,10 +595,10 @@ async function updateKeyResultInDb(id, updates) {
   }
 }
 async function deleteKeyResultInDb(id) {
-  await db.delete(keyResults).where(eq(keyResults.id, id));
+  await db.delete(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.id, id));
 }
 async function updateKRProgressInDb(id, progress, note, images) {
-  const [existing] = await db.select().from(keyResults).where(eq(keyResults.id, id));
+  const [existing] = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.id, id));
   if (!existing) return void 0;
   const entry = {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -601,14 +622,14 @@ async function updateKRProgressInDb(id, progress, note, images) {
     progress,
     status,
     progressHistory: history
-  }).where(eq(keyResults.id, id)).returning();
+  }).where((0, import_drizzle_orm2.eq)(keyResults.id, id)).returning();
   return kr;
 }
 async function scoreKRInDb(id, score, note) {
   const [kr] = await db.update(keyResults).set({
     selfScore: score,
     selfScoreNote: note
-  }).where(eq(keyResults.id, id)).returning();
+  }).where((0, import_drizzle_orm2.eq)(keyResults.id, id)).returning();
   return kr;
 }
 var DEFAULT_DEPARTMENTS = [
@@ -659,44 +680,44 @@ async function seedDatabase() {
   }
 }
 async function getCycles() {
-  return db.select().from(cycles).orderBy(asc(cycles.sortOrder));
+  return db.select().from(cycles).orderBy((0, import_drizzle_orm2.asc)(cycles.sortOrder));
 }
 async function createCycle(name, sortOrder) {
   const [cycle] = await db.insert(cycles).values({ name, sortOrder }).returning();
   return cycle;
 }
 async function updateCycle(id, data) {
-  const [cycle] = await db.update(cycles).set(data).where(eq(cycles.id, id)).returning();
+  const [cycle] = await db.update(cycles).set(data).where((0, import_drizzle_orm2.eq)(cycles.id, id)).returning();
   return cycle;
 }
 async function deleteCycle(id) {
-  await db.delete(cycles).where(eq(cycles.id, id));
+  await db.delete(cycles).where((0, import_drizzle_orm2.eq)(cycles.id, id));
 }
 async function getCommentsForKR(krId) {
-  return db.select().from(krComments).where(eq(krComments.krId, krId));
+  return db.select().from(krComments).where((0, import_drizzle_orm2.eq)(krComments.krId, krId));
 }
 async function createComment(data) {
   const [comment] = await db.insert(krComments).values(data).returning();
   return comment;
 }
 async function deleteComment(id) {
-  await db.delete(krComments).where(eq(krComments.id, id));
+  await db.delete(krComments).where((0, import_drizzle_orm2.eq)(krComments.id, id));
 }
 async function getNotificationsForUser(userId) {
-  return db.select().from(notifications).where(eq(notifications.userId, userId));
+  return db.select().from(notifications).where((0, import_drizzle_orm2.eq)(notifications.userId, userId));
 }
 async function createNotification(data) {
   const [notif] = await db.insert(notifications).values(data).returning();
   return notif;
 }
 async function markNotificationRead(id) {
-  await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+  await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm2.eq)(notifications.id, id));
 }
 async function markAllNotificationsRead(userId) {
-  await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
+  await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm2.eq)(notifications.userId, userId));
 }
 async function getUnreadNotificationCount(userId) {
-  const rows = await db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+  const rows = await db.select().from(notifications).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(notifications.userId, userId), (0, import_drizzle_orm2.eq)(notifications.isRead, false)));
   return rows.length;
 }
 
@@ -967,12 +988,12 @@ async function requireAdmin(req, res, next) {
   next();
 }
 async function registerRoutes(app2) {
-  const PgStore = connectPgSimple(session);
+  const PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
   const isProd = process.env.NODE_ENV === "production";
   if (isProd) {
     app2.set("trust proxy", 1);
   }
-  const sessionMiddleware = session({
+  const sessionMiddleware = (0, import_express_session.default)({
     store: new PgStore({
       pool,
       createTableIfMissing: true
@@ -1515,6 +1536,9 @@ async function registerRoutes(app2) {
   app2.put("/api/key-results/:id/progress", requireAuth, async (req, res) => {
     try {
       const { progress, note, images } = req.body;
+      if (!note || !String(note).trim()) {
+        return res.status(400).json({ message: "\u6267\u884C\u8BF4\u660E\u4E0D\u80FD\u4E3A\u7A7A" });
+      }
       const kr = await updateKRProgressInDb(req.params.id, progress, note || "", images);
       if (!kr) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
       return res.json(kr);
@@ -1530,6 +1554,219 @@ async function registerRoutes(app2) {
       return res.json(kr);
     } catch (err) {
       return res.status(500).json({ message: "\u8BC4\u5206\u5931\u8D25" });
+    }
+  });
+  app2.get("/api/export/okr", requireAuth, async (req, res) => {
+    try {
+      const XLSX = await import("xlsx");
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const allUsers = await getAllUsers();
+      const allDepartments = await getDepartments();
+      const allVisibleObjectives = await getObjectivesForUser(user);
+      const visibleObjectiveIds = allVisibleObjectives.map((objective) => objective.id);
+      const allVisibleKRs = visibleObjectiveIds.length > 0 ? await getKeyResultsForObjectives(visibleObjectiveIds) : [];
+      const myDeptIds = await getUserDepartmentIds(user.id);
+      const selectedDeptIds = typeof req.query.departmentIds === "string" && req.query.departmentIds ? req.query.departmentIds.split(",").map((id) => id.trim()).filter(Boolean) : [];
+      const selectedUserId = typeof req.query.userId === "string" && req.query.userId ? req.query.userId : null;
+      const selectedCycle = typeof req.query.cycle === "string" && req.query.cycle ? req.query.cycle : null;
+      const userRole = user.role || "member";
+      const isAdmin = userRole === "center_head" || userRole === "vp" || userRole === "super_admin";
+      let filteredObjectives = [...allVisibleObjectives];
+      if (!isAdmin) {
+        const targetUserId = selectedUserId || user.id;
+        filteredObjectives = filteredObjectives.filter((objective) => {
+          if (objective.createdBy === targetUserId) return true;
+          if (objective.createdBy === user.id) {
+            return allVisibleKRs.some(
+              (kr) => kr.objectiveId === objective.id && kr.assigneeId === targetUserId
+            );
+          }
+          return false;
+        });
+        if (myDeptIds.length > 0) {
+          filteredObjectives = filteredObjectives.filter(
+            (objective) => myDeptIds.includes(objective.departmentId)
+          );
+        }
+      } else {
+        if (selectedDeptIds.length > 0) {
+          filteredObjectives = filteredObjectives.filter(
+            (objective) => selectedDeptIds.includes(objective.departmentId)
+          );
+        }
+        if (selectedUserId) {
+          filteredObjectives = filteredObjectives.filter((objective) => objective.createdBy === selectedUserId);
+        }
+      }
+      if (selectedCycle) {
+        filteredObjectives = filteredObjectives.filter((objective) => objective.cycle === selectedCycle);
+      }
+      const objectiveIdSet = new Set(filteredObjectives.map((objective) => objective.id));
+      const filteredKRs = allVisibleKRs.filter((kr) => objectiveIdSet.has(kr.objectiveId));
+      const commentsByKr = /* @__PURE__ */ new Map();
+      for (const kr of filteredKRs) {
+        commentsByKr.set(kr.id, await getCommentsForKR(kr.id));
+      }
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const deptMap = new Map(allDepartments.map((dept) => [dept.id, dept]));
+      const krsByObjective = /* @__PURE__ */ new Map();
+      for (const kr of filteredKRs) {
+        const current = krsByObjective.get(kr.objectiveId) || [];
+        current.push(kr);
+        krsByObjective.set(kr.objectiveId, current);
+      }
+      const summaryHeaders = [
+        "\u90E8\u95E8",
+        "\u5468\u671F",
+        "\u76EE\u6807\u6807\u9898",
+        "\u76EE\u6807\u63CF\u8FF0",
+        "\u76EE\u6807\u521B\u5EFA\u4EBA",
+        "\u5173\u952E\u7ED3\u679C\u6807\u9898",
+        "\u5173\u952E\u7ED3\u679C\u63CF\u8FF0",
+        "\u6267\u884C\u4EBA",
+        "\u534F\u540C\u4EBA",
+        "\u5F00\u59CB\u65E5\u671F",
+        "\u622A\u6B62\u65E5\u671F",
+        "\u6743\u91CD",
+        "\u8FDB\u5EA6",
+        "\u72B6\u6001",
+        "OKR\u7C7B\u578B",
+        "\u81EA\u8BC4\u5206",
+        "\u81EA\u8BC4\u8BF4\u660E",
+        "\u8FDB\u5EA6\u8BB0\u5F55\u6570",
+        "\u8BC4\u8BBA\u6570",
+        "\u6700\u65B0\u8BC4\u8BBA"
+      ];
+      summaryHeaders.push("\u6700\u65B0\u6267\u884C\u8BF4\u660E", "\u6700\u65B0\u6267\u884C\u8BF4\u660E\u65F6\u95F4");
+      const progressHeaders = [
+        "\u90E8\u95E8",
+        "\u5468\u671F",
+        "\u76EE\u6807\u6807\u9898",
+        "\u5173\u952E\u7ED3\u679C\u6807\u9898",
+        "\u8BB0\u5F55\u65E5\u671F",
+        "\u8FDB\u5EA6",
+        "\u5907\u6CE8",
+        "\u56FE\u7247"
+      ];
+      const commentHeaders = [
+        "\u90E8\u95E8",
+        "\u5468\u671F",
+        "\u76EE\u6807\u6807\u9898",
+        "\u5173\u952E\u7ED3\u679C\u6807\u9898",
+        "\u8BC4\u8BBA\u4EBA",
+        "\u8BC4\u8BBA\u5185\u5BB9",
+        "@\u63D0\u53CA",
+        "\u8BC4\u8BBA\u65F6\u95F4"
+      ];
+      const summaryRows = [];
+      const progressRows = [];
+      const commentRows = [];
+      for (const objective of filteredObjectives) {
+        const dept = deptMap.get(objective.departmentId);
+        const creator = objective.createdBy ? userMap.get(objective.createdBy) : null;
+        const objectiveKRs = (krsByObjective.get(objective.id) || []).sort(
+          (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+        );
+        if (objectiveKRs.length === 0) {
+          summaryRows.push([
+            dept?.name || "",
+            objective.cycle,
+            objective.title,
+            objective.description || "",
+            creator?.displayName || "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            objective.okrType || "",
+            "",
+            "",
+            0,
+            0,
+            ""
+          ]);
+          continue;
+        }
+        for (const kr of objectiveKRs) {
+          const comments = commentsByKr.get(kr.id) || [];
+          const progressHistory = kr.progressHistory || [];
+          const latestComment = comments[comments.length - 1];
+          const latestProgressEntry = progressHistory[progressHistory.length - 1];
+          summaryRows.push([
+            dept?.name || "",
+            objective.cycle,
+            objective.title,
+            objective.description || "",
+            creator?.displayName || "",
+            kr.title,
+            kr.description || "",
+            kr.assigneeName || "",
+            kr.collaboratorName || "",
+            kr.startDate,
+            kr.endDate,
+            kr.weight,
+            kr.progress,
+            kr.status,
+            kr.okrType || "",
+            kr.selfScore ?? "",
+            kr.selfScoreNote || "",
+            progressHistory.length,
+            comments.length,
+            latestProgressEntry?.note || "",
+            latestProgressEntry?.date || "",
+            latestComment ? `${latestComment.userName}: ${latestComment.content}` : ""
+          ]);
+          for (const entry of progressHistory) {
+            progressRows.push([
+              dept?.name || "",
+              objective.cycle,
+              objective.title,
+              kr.title,
+              entry.date,
+              entry.progress,
+              entry.note || "",
+              entry.images?.join("\n") || ""
+            ]);
+          }
+          for (const comment of comments) {
+            const mentionedNames = (comment.mentionedUserIds || []).map((mentionedId) => userMap.get(mentionedId)?.displayName || mentionedId).join(", ");
+            commentRows.push([
+              dept?.name || "",
+              objective.cycle,
+              objective.title,
+              kr.title,
+              comment.userName,
+              comment.content,
+              mentionedNames,
+              comment.createdAt
+            ]);
+          }
+        }
+      }
+      const wb = XLSX.utils.book_new();
+      const summarySheet = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryRows]);
+      const progressSheet = XLSX.utils.aoa_to_sheet([progressHeaders, ...progressRows]);
+      const commentSheet = XLSX.utils.aoa_to_sheet([commentHeaders, ...commentRows]);
+      summarySheet["!cols"] = summaryHeaders.map((header) => ({ wch: Math.max(header.length + 2, 14) }));
+      progressSheet["!cols"] = progressHeaders.map((header) => ({ wch: Math.max(header.length + 2, 16) }));
+      commentSheet["!cols"] = commentHeaders.map((header) => ({ wch: Math.max(header.length + 2, 16) }));
+      XLSX.utils.book_append_sheet(wb, summarySheet, "OKR\u6C47\u603B");
+      XLSX.utils.book_append_sheet(wb, progressSheet, "\u8FDB\u5EA6\u8BB0\u5F55");
+      XLSX.utils.book_append_sheet(wb, commentSheet, "\u8BC4\u8BBA\u8BB0\u5F55");
+      const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename=okr_export_${stamp}.xlsx`);
+      return res.send(buf);
+    } catch (err) {
+      console.error("Export OKR error:", err);
+      return res.status(500).json({ message: "\u5BFC\u51FA\u5931\u8D25" });
     }
   });
   app2.get("/api/import/template", requireAuth, async (req, res) => {
@@ -1971,14 +2208,14 @@ async function registerRoutes(app2) {
       return res.status(500).json({ message: "\u6E05\u9664\u5931\u8D25" });
     }
   });
-  const httpServer = createServer(app2);
+  const httpServer = (0, import_node_http.createServer)(app2);
   return httpServer;
 }
 
 // server/index.ts
-import * as fs2 from "fs";
-import * as path2 from "path";
-var app = express();
+var fs2 = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+var app = (0, import_express.default)();
 var log = console.log;
 function setupCors(app2) {
   app2.use((req, res, next) => {
@@ -2010,13 +2247,13 @@ function setupCors(app2) {
 }
 function setupBodyParsing(app2) {
   app2.use(
-    express.json({
+    import_express.default.json({
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       }
     })
   );
-  app2.use(express.urlencoded({ extended: false }));
+  app2.use(import_express.default.urlencoded({ extended: false }));
 }
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
@@ -2123,10 +2360,10 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", express.static(path2.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", express.static(path2.resolve(process.cwd(), "uploads")));
+  app2.use("/assets", import_express.default.static(path2.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", import_express.default.static(path2.resolve(process.cwd(), "uploads")));
   if (webBuildExists) {
-    app2.use(express.static(webBuildDir));
+    app2.use(import_express.default.static(webBuildDir));
     app2.get("/{*splat}", (req, res, next) => {
       if (req.path.startsWith("/api")) return next();
       const platform = req.header("expo-platform");
@@ -2139,7 +2376,7 @@ function configureExpoAndLanding(app2) {
     });
     log("Serving Expo Web build from static-build/web");
   }
-  app2.use(express.static(path2.resolve(process.cwd(), "static-build")));
+  app2.use(import_express.default.static(path2.resolve(process.cwd(), "static-build")));
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 function setupErrorHandler(app2) {

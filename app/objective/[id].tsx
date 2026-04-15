@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Alert, TextInput, FlatList, Modal, Image } from 'react-native';
+import { StyleSheet, Text, View, Pressable, Platform, Alert, TextInput, FlatList, Modal, Image, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,7 +9,6 @@ import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 
 const STATUS_LABELS: Record<string, string> = {
   normal: '正常', behind: '滞后', completed: '已完成', overdue: '已逾期', paused: '已暂停',
@@ -110,7 +109,9 @@ export default function ObjectiveDetailScreen() {
   const [mentionSearch, setMentionSearch] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [krList, setKrList] = useState<any[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const [activeSortKrId, setActiveSortKrId] = useState<string | null>(null);
+  const [draggingKrId, setDraggingKrId] = useState<string | null>(null);
+  const [dragOverKrId, setDragOverKrId] = useState<string | null>(null);
 
   // 同步 objKRs 到 krList（按 sortOrder 排序）
   useEffect(() => {
@@ -119,9 +120,8 @@ export default function ObjectiveDetailScreen() {
   }, [objKRs]);
 
   // 拖拽排序处理（保存到后端）
-  const handleDragEnd = async ({ data }: { data: any[] }) => {
+  const saveKrOrder = async (data: any[]) => {
     setKrList(data);
-    setIsDragging(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
     // 保存排序到后端
@@ -134,6 +134,69 @@ export default function ObjectiveDetailScreen() {
       console.error('Failed to save order:', err);
       Alert.alert('保存失败', '排序无法保存，请重试');
     }
+  };
+
+  const moveKr = async (krId: string, direction: -1 | 1) => {
+    const currentIndex = krList.findIndex((kr) => kr.id === krId);
+    const targetIndex = currentIndex + direction;
+
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= krList.length) {
+      return;
+    }
+
+    const nextList = [...krList];
+    const [item] = nextList.splice(currentIndex, 1);
+    nextList.splice(targetIndex, 0, item);
+    setActiveSortKrId(krId);
+    await saveKrOrder(nextList);
+  };
+
+  const reorderKrList = async (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+
+    const fromIndex = krList.findIndex((kr) => kr.id === fromId);
+    const toIndex = krList.findIndex((kr) => kr.id === toId);
+
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const nextList = [...krList];
+    const [item] = nextList.splice(fromIndex, 1);
+    nextList.splice(toIndex, 0, item);
+    await saveKrOrder(nextList);
+  };
+
+  const handleWebDragStart = (event: any, krId: string) => {
+    if (!canEditObj || Platform.OS !== 'web') return;
+    setDraggingKrId(krId);
+    setActiveSortKrId(null);
+    event.dataTransfer?.setData('text/plain', krId);
+    event.dataTransfer?.setDragImage?.(event.currentTarget, 20, 20);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleWebDragOver = (event: any, krId: string) => {
+    if (!canEditObj || Platform.OS !== 'web') return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (dragOverKrId !== krId) {
+      setDragOverKrId(krId);
+    }
+  };
+
+  const handleWebDrop = async (event: any, krId: string) => {
+    if (!canEditObj || Platform.OS !== 'web') return;
+    event.preventDefault();
+    const sourceId = event.dataTransfer?.getData('text/plain') || draggingKrId;
+    setDragOverKrId(null);
+    setDraggingKrId(null);
+    if (sourceId) {
+      await reorderKrList(sourceId, krId);
+    }
+  };
+
+  const handleWebDragEnd = () => {
+    setDraggingKrId(null);
+    setDragOverKrId(null);
   };
 
   useEffect(() => {
@@ -302,100 +365,150 @@ export default function ObjectiveDetailScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Platform.OS === 'web' ? 34 : 40 }]} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInDown.duration(400)}>
-          <View style={styles.objHeader}>
-            <View style={styles.cycleBadge}>
-              <Text style={styles.cycleBadgeText}>{objective.cycle}</Text>
-            </View>
-            <View style={styles.deptBadge}>
-              <Ionicons name="business-outline" size={12} color={Colors.textSecondary} />
-              <Text style={styles.deptBadgeText}>{dept?.name || '未知'}</Text>
-            </View>
-            <View style={[styles.deptBadge, { backgroundColor: (objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6') + '20' }]}>
-              <Ionicons name={objective.okrType === '挑战型' ? "flash-outline" : "shield-checkmark-outline"} size={12} color={objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6'} />
-              <Text style={[styles.deptBadgeText, { color: objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6' }]}>{objective.okrType || '承诺型'}</Text>
-            </View>
-            {objective.linkedToParent && (
-              <View style={[styles.deptBadge, { backgroundColor: '#8B5CF6' + '20' }]}>
-                <Ionicons name="git-merge-outline" size={12} color="#8B5CF6" />
-                <Text style={[styles.deptBadgeText, { color: '#8B5CF6' }]}>关联上级</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Platform.OS === 'web' ? 34 : 40 }]}
+      >
+            <Animated.View entering={FadeInDown.duration(400)}>
+              <View style={styles.objHeader}>
+                <View style={styles.cycleBadge}>
+                  <Text style={styles.cycleBadgeText}>{objective.cycle}</Text>
+                </View>
+                <View style={styles.deptBadge}>
+                  <Ionicons name="business-outline" size={12} color={Colors.textSecondary} />
+                  <Text style={styles.deptBadgeText}>{dept?.name || '未知'}</Text>
+                </View>
+                <View style={[styles.deptBadge, { backgroundColor: (objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6') + '20' }]}>
+                  <Ionicons name={objective.okrType === '挑战型' ? "flash-outline" : "shield-checkmark-outline"} size={12} color={objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6'} />
+                  <Text style={[styles.deptBadgeText, { color: objective.okrType === '挑战型' ? '#F59E0B' : '#3B82F6' }]}>{objective.okrType || '承诺型'}</Text>
+                </View>
+                {objective.linkedToParent && (
+                  <View style={[styles.deptBadge, { backgroundColor: '#8B5CF6' + '20' }]}>
+                    <Ionicons name="git-merge-outline" size={12} color="#8B5CF6" />
+                    <Text style={[styles.deptBadgeText, { color: '#8B5CF6' }]}>关联上级</Text>
+                  </View>
+                )}
+                {objective.isCollaborative && (
+                  <View style={[styles.deptBadge, { backgroundColor: Colors.accent + '20' }]}>
+                    <Ionicons name="people-outline" size={12} color={Colors.accent} />
+                    <Text style={[styles.deptBadgeText, { color: Colors.accent }]}>跨部门协同</Text>
+                  </View>
+                )}
               </View>
-            )}
-            {objective.isCollaborative && (
-              <View style={[styles.deptBadge, { backgroundColor: Colors.accent + '20' }]}>
-                <Ionicons name="people-outline" size={12} color={Colors.accent} />
-                <Text style={[styles.deptBadgeText, { color: Colors.accent }]}>跨部门协同</Text>
+
+              <Text style={styles.objTitle}>{objective.title}</Text>
+
+              <View style={styles.progressCard}>
+                <View style={styles.progressTop}>
+                  <Text style={styles.progressLabel}>整体进度</Text>
+                  <Text style={[styles.progressValue, {
+                    color: avgProgress >= 70 ? Colors.success : avgProgress >= 40 ? Colors.warning : Colors.danger
+                  }]}>{avgProgress}%</Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, {
+                    width: `${avgProgress}%`,
+                    backgroundColor: avgProgress >= 70 ? Colors.success : avgProgress >= 40 ? Colors.warning : Colors.danger,
+                  }]} />
+                </View>
               </View>
-            )}
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+              <View style={styles.krHeader}>
+                <Text style={styles.krSectionTitle}>关键结果 ({krList.length})</Text>
+                {canEditObj && (
+                  <Pressable
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push({ pathname: '/create-kr', params: { objectiveId: objective.id } });
+                    }}
+                    style={({ pressed }) => [styles.addKRBtn, { opacity: pressed ? 0.8 : 1 }]}
+                  >
+                    <Ionicons name="add" size={18} color={Colors.primary} />
+                    <Text style={styles.addKRText}>添加 KR</Text>
+                  </Pressable>
+                )}
+              </View>
+            </Animated.View>
+        {krList.length === 0 ? (
+          <View style={styles.emptyKR}>
+            <Ionicons name="key-outline" size={32} color={Colors.textTertiary} />
+            <Text style={styles.emptyKRText}>暂无关键结果</Text>
           </View>
-
-          <Text style={styles.objTitle}>{objective.title}</Text>
-
-          <View style={styles.progressCard}>
-            <View style={styles.progressTop}>
-              <Text style={styles.progressLabel}>整体进度</Text>
-              <Text style={[styles.progressValue, {
-                color: avgProgress >= 70 ? Colors.success : avgProgress >= 40 ? Colors.warning : Colors.danger
-              }]}>{avgProgress}%</Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, {
-                width: `${avgProgress}%`,
-                backgroundColor: avgProgress >= 70 ? Colors.success : avgProgress >= 40 ? Colors.warning : Colors.danger,
-              }]} />
-            </View>
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-          <View style={styles.krHeader}>
-            <Text style={styles.krSectionTitle}>关键结果 ({krList.length})</Text>
-            {canEditObj && (
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push({ pathname: '/create-kr', params: { objectiveId: objective.id } });
-                }}
-                style={({ pressed }) => [styles.addKRBtn, { opacity: pressed ? 0.8 : 1 }]}
-              >
-                <Ionicons name="add" size={18} color={Colors.primary} />
-                <Text style={styles.addKRText}>添加 KR</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {krList.length === 0 ? (
-            <View style={styles.emptyKR}>
-              <Ionicons name="key-outline" size={32} color={Colors.textTertiary} />
-              <Text style={styles.emptyKRText}>暂无关键结果</Text>
-            </View>
-          ) : (
-            <DraggableFlatList
-              data={krList}
-              keyExtractor={(item) => item.id}
-              onDragBegin={() => setIsDragging(true)}
-              onDragEnd={handleDragEnd}
-              scrollEnabled={false}
-              contentContainerStyle={{ paddingBottom: 20 }}
-              renderItem={({ item: kr, drag, isActive }: RenderItemParams<any>) => {
-                const krEditable = canEditKR(kr);
-                const krComments = comments[kr.id] || [];
-                const isCommenting = commentKrId === kr.id;
-                return (
-                  <ScaleDecorator>
-                    <Animated.View 
-                      style={[styles.krCard, isActive && styles.krCardActive]} 
-                      entering={FadeInDown.duration(300)}
-                    >
-                      {/* 拖拽手柄 */}
-                      <Pressable onLongPress={drag} style={styles.krTop}>
+        ) : (
+        krList.map((kr, index) => {
+          const krEditable = canEditKR(kr);
+          const krComments = comments[kr.id] || [];
+          const isCommenting = commentKrId === kr.id;
+          const canMoveUp = index > 0;
+          const canMoveDown = index < krList.length - 1;
+          const webDragProps = Platform.OS === 'web' && canEditObj
+            ? {
+                draggable: true,
+                onDragStart: (event: any) => handleWebDragStart(event, kr.id),
+                onDragOver: (event: any) => handleWebDragOver(event, kr.id),
+                onDrop: (event: any) => {
+                  void handleWebDrop(event, kr.id);
+                },
+                onDragEnd: handleWebDragEnd,
+              }
+            : {};
+          return (
+              <View key={kr.id} {...(webDragProps as any)}>
+                <Animated.View
+                  style={[
+                    styles.krCard,
+                    activeSortKrId === kr.id && styles.krCardActive,
+                    draggingKrId === kr.id && styles.krCardDragging,
+                    dragOverKrId === kr.id && styles.krCardDropTarget,
+                  ]}
+                  entering={FadeInDown.duration(300)}
+                >
+                      {/* 仅右上角拖拽手柄可触发拖拽，卡片其他区域保持正常滑动 */}
+                      <View style={styles.krTop}>
                         <View style={[styles.krStatusDot, { backgroundColor: getStatusColor(kr.status) }]} />
                         <Text style={styles.krTitle} numberOfLines={2}>{kr.title}</Text>
-                        <View style={styles.dragHandle}>
-                          <Ionicons name="reorder-three" size={20} color={Colors.textTertiary} />
-                        </View>
+                        {canEditObj ? (
+                          <Pressable
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setActiveSortKrId(activeSortKrId === kr.id ? null : kr.id);
+                            }}
+                            hitSlop={8}
+                            style={styles.dragHandle}
+                          >
+                            <Ionicons name="reorder-three" size={20} color={activeSortKrId === kr.id ? Colors.primary : Colors.textTertiary} />
+                          </Pressable>
+                        ) : null}
+                      </View>
+                  {activeSortKrId === kr.id && canEditObj && (
+                    <View style={styles.sortActions}>
+                      <Pressable
+                        onPress={() => moveKr(kr.id, -1)}
+                        disabled={!canMoveUp}
+                        style={({ pressed }) => [styles.sortBtn, !canMoveUp && styles.sortBtnDisabled, { opacity: !canMoveUp ? 0.45 : pressed ? 0.75 : 1 }]}
+                      >
+                        <Ionicons name="arrow-up" size={14} color={Colors.primary} />
+                        <Text style={styles.sortBtnText}>上移</Text>
                       </Pressable>
+                      <Pressable
+                        onPress={() => moveKr(kr.id, 1)}
+                        disabled={!canMoveDown}
+                        style={({ pressed }) => [styles.sortBtn, !canMoveDown && styles.sortBtnDisabled, { opacity: !canMoveDown ? 0.45 : pressed ? 0.75 : 1 }]}
+                      >
+                        <Ionicons name="arrow-down" size={14} color={Colors.primary} />
+                        <Text style={styles.sortBtnText}>下移</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setActiveSortKrId(null)}
+                        style={({ pressed }) => [styles.sortBtn, styles.sortDoneBtn, { opacity: pressed ? 0.75 : 1 }]}
+                      >
+                        <Ionicons name="checkmark" size={14} color={Colors.success} />
+                        <Text style={[styles.sortBtnText, { color: Colors.success }]}>完成</Text>
+                      </Pressable>
+                    </View>
+                  )}
                   <View style={styles.krMeta}>
                     {kr.assigneeName ? (
                       <View style={styles.krMetaItem}>
@@ -565,13 +678,11 @@ export default function ObjectiveDetailScreen() {
                       ))}
                     </View>
                   )}
-                    </Animated.View>
-                  </ScaleDecorator>
-                );
-              }}
-            />
-          )}
-        </Animated.View>
+                </Animated.View>
+              </View>
+          );
+        })
+        )}
       </ScrollView>
 
       <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
@@ -653,8 +764,15 @@ const styles = StyleSheet.create({
   emptyKRText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#8F9BB3' },
   krCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#EBEEF5' },
   krCardActive: { backgroundColor: '#F0F9FF', borderColor: Colors.primary, shadowOpacity: 0.1 },
+  krCardDragging: { opacity: 0.55, transform: [{ scale: 0.98 }] },
+  krCardDropTarget: { borderColor: Colors.primary, shadowOpacity: 0.14, shadowRadius: 10 },
   krTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' },
   dragHandle: { padding: 4, marginLeft: 'auto' },
+  sortActions: { flexDirection: 'row', gap: 8, marginTop: 10, marginLeft: 18 },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E6F4FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  sortBtnDisabled: { backgroundColor: '#F5F6F7' },
+  sortDoneBtn: { backgroundColor: '#ECFDF3' },
+  sortBtnText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#0082EF' },
   krStatusDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   krTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#171A1D', flex: 1 },
   krMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, marginLeft: 18 },

@@ -651,6 +651,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/key-results/:id/progress", requireAuth, async (req: Request, res: Response) => {
     try {
       const { progress, note, images } = req.body;
+      if (!note || !String(note).trim()) {
+        return res.status(400).json({ message: "执行说明不能为空" });
+      }
       const kr = await updateKRProgressInDb(req.params.id, progress, note || "", images);
       if (!kr) return res.status(404).json({ message: "关键结果不存在" });
       return res.json(kr);
@@ -667,6 +670,254 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(kr);
     } catch (err) {
       return res.status(500).json({ message: "评分失败" });
+    }
+  });
+
+  app.get("/api/export/okr", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const XLSX = await import("xlsx");
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+
+      const allUsers = await getAllUsers();
+      const allDepartments = await getDepartments();
+      const allVisibleObjectives = await getObjectivesForUser(user);
+      const visibleObjectiveIds = allVisibleObjectives.map((objective) => objective.id);
+      const allVisibleKRs = visibleObjectiveIds.length > 0
+        ? await getKeyResultsForObjectives(visibleObjectiveIds)
+        : [];
+      const myDeptIds = await getUserDepartmentIds(user.id);
+
+      const selectedDeptIds = typeof req.query.departmentIds === "string" && req.query.departmentIds
+        ? req.query.departmentIds.split(",").map((id) => id.trim()).filter(Boolean)
+        : [];
+      const selectedUserId = typeof req.query.userId === "string" && req.query.userId
+        ? req.query.userId
+        : null;
+      const selectedCycle = typeof req.query.cycle === "string" && req.query.cycle
+        ? req.query.cycle
+        : null;
+
+      const userRole = user.role || "member";
+      const isAdmin = userRole === "center_head" || userRole === "vp" || userRole === "super_admin";
+
+      let filteredObjectives = [...allVisibleObjectives];
+
+      if (!isAdmin) {
+        const targetUserId = selectedUserId || user.id;
+        filteredObjectives = filteredObjectives.filter((objective) => {
+          if (objective.createdBy === targetUserId) return true;
+          if (objective.createdBy === user.id) {
+            return allVisibleKRs.some(
+              (kr) => kr.objectiveId === objective.id && kr.assigneeId === targetUserId,
+            );
+          }
+          return false;
+        });
+
+        if (myDeptIds.length > 0) {
+          filteredObjectives = filteredObjectives.filter((objective) =>
+            myDeptIds.includes(objective.departmentId),
+          );
+        }
+      } else {
+        if (selectedDeptIds.length > 0) {
+          filteredObjectives = filteredObjectives.filter((objective) =>
+            selectedDeptIds.includes(objective.departmentId),
+          );
+        }
+        if (selectedUserId) {
+          filteredObjectives = filteredObjectives.filter((objective) => objective.createdBy === selectedUserId);
+        }
+      }
+
+      if (selectedCycle) {
+        filteredObjectives = filteredObjectives.filter((objective) => objective.cycle === selectedCycle);
+      }
+
+      const objectiveIdSet = new Set(filteredObjectives.map((objective) => objective.id));
+      const filteredKRs = allVisibleKRs.filter((kr) => objectiveIdSet.has(kr.objectiveId));
+      const commentsByKr = new Map<string, Awaited<ReturnType<typeof getCommentsForKR>>>();
+
+      for (const kr of filteredKRs) {
+        commentsByKr.set(kr.id, await getCommentsForKR(kr.id));
+      }
+
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const deptMap = new Map(allDepartments.map((dept) => [dept.id, dept]));
+      const krsByObjective = new Map<string, typeof filteredKRs>();
+
+      for (const kr of filteredKRs) {
+        const current = krsByObjective.get(kr.objectiveId) || [];
+        current.push(kr);
+        krsByObjective.set(kr.objectiveId, current);
+      }
+
+      const summaryHeaders = [
+        "部门",
+        "周期",
+        "目标标题",
+        "目标描述",
+        "目标创建人",
+        "关键结果标题",
+        "关键结果描述",
+        "执行人",
+        "协同人",
+        "开始日期",
+        "截止日期",
+        "权重",
+        "进度",
+        "状态",
+        "OKR类型",
+        "自评分",
+        "自评说明",
+        "进度记录数",
+        "评论数",
+        "最新评论",
+      ];
+      summaryHeaders.push("最新执行说明", "最新执行说明时间");
+      const progressHeaders = [
+        "部门",
+        "周期",
+        "目标标题",
+        "关键结果标题",
+        "记录日期",
+        "进度",
+        "备注",
+        "图片",
+      ];
+      const commentHeaders = [
+        "部门",
+        "周期",
+        "目标标题",
+        "关键结果标题",
+        "评论人",
+        "评论内容",
+        "@提及",
+        "评论时间",
+      ];
+
+      const summaryRows: any[][] = [];
+      const progressRows: any[][] = [];
+      const commentRows: any[][] = [];
+
+      for (const objective of filteredObjectives) {
+        const dept = deptMap.get(objective.departmentId);
+        const creator = objective.createdBy ? userMap.get(objective.createdBy) : null;
+        const objectiveKRs = (krsByObjective.get(objective.id) || []).sort(
+          (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0),
+        );
+
+        if (objectiveKRs.length === 0) {
+          summaryRows.push([
+            dept?.name || "",
+            objective.cycle,
+            objective.title,
+            objective.description || "",
+            creator?.displayName || "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            objective.okrType || "",
+            "",
+            "",
+            0,
+            0,
+            "",
+          ]);
+          continue;
+        }
+
+        for (const kr of objectiveKRs) {
+          const comments = commentsByKr.get(kr.id) || [];
+          const progressHistory = kr.progressHistory || [];
+          const latestComment = comments[comments.length - 1];
+          const latestProgressEntry = progressHistory[progressHistory.length - 1];
+
+          summaryRows.push([
+            dept?.name || "",
+            objective.cycle,
+            objective.title,
+            objective.description || "",
+            creator?.displayName || "",
+            kr.title,
+            kr.description || "",
+            kr.assigneeName || "",
+            kr.collaboratorName || "",
+            kr.startDate,
+            kr.endDate,
+            kr.weight,
+            kr.progress,
+            kr.status,
+            kr.okrType || "",
+            kr.selfScore ?? "",
+            kr.selfScoreNote || "",
+            progressHistory.length,
+            comments.length,
+            latestProgressEntry?.note || "",
+            latestProgressEntry?.date || "",
+            latestComment ? `${latestComment.userName}: ${latestComment.content}` : "",
+          ]);
+
+          for (const entry of progressHistory) {
+            progressRows.push([
+              dept?.name || "",
+              objective.cycle,
+              objective.title,
+              kr.title,
+              entry.date,
+              entry.progress,
+              entry.note || "",
+              entry.images?.join("\n") || "",
+            ]);
+          }
+
+          for (const comment of comments) {
+            const mentionedNames = (comment.mentionedUserIds || [])
+              .map((mentionedId) => userMap.get(mentionedId)?.displayName || mentionedId)
+              .join(", ");
+            commentRows.push([
+              dept?.name || "",
+              objective.cycle,
+              objective.title,
+              kr.title,
+              comment.userName,
+              comment.content,
+              mentionedNames,
+              comment.createdAt,
+            ]);
+          }
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      const summarySheet = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryRows]);
+      const progressSheet = XLSX.utils.aoa_to_sheet([progressHeaders, ...progressRows]);
+      const commentSheet = XLSX.utils.aoa_to_sheet([commentHeaders, ...commentRows]);
+
+      summarySheet["!cols"] = summaryHeaders.map((header) => ({ wch: Math.max(header.length + 2, 14) }));
+      progressSheet["!cols"] = progressHeaders.map((header) => ({ wch: Math.max(header.length + 2, 16) }));
+      commentSheet["!cols"] = commentHeaders.map((header) => ({ wch: Math.max(header.length + 2, 16) }));
+
+      XLSX.utils.book_append_sheet(wb, summarySheet, "OKR汇总");
+      XLSX.utils.book_append_sheet(wb, progressSheet, "进度记录");
+      XLSX.utils.book_append_sheet(wb, commentSheet, "评论记录");
+
+      const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename=okr_export_${stamp}.xlsx`);
+      return res.send(buf);
+    } catch (err) {
+      console.error("Export OKR error:", err);
+      return res.status(500).json({ message: "导出失败" });
     }
   });
 
