@@ -329,7 +329,7 @@ export default function DashboardScreen() {
               </View>
               {recentQuarterCycles.length > 0 && (
                 <View style={styles.filterBlock}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                  <View style={styles.filterRow}>
                     <Pressable
                       onPress={() => {
                         setSelectedCycle(null);
@@ -351,12 +351,12 @@ export default function DashboardScreen() {
                         <Text style={[styles.filterChipText, selectedCycle === cycle && styles.filterChipTextActive]}>{cycle}</Text>
                       </Pressable>
                     ))}
-                  </ScrollView>
+                  </View>
                 </View>
               )}
               {shouldShowDeptFilter && (
                 <View style={styles.filterBlock}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+                  <View style={styles.filterRow}>
                     <Pressable
                       onPress={() => setSelectedDeptIds([])}
                       style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipDeptActive]}
@@ -375,7 +375,7 @@ export default function DashboardScreen() {
                         </Pressable>
                       );
                     })}
-                  </ScrollView>
+                  </View>
                 </View>
               )}
               {myObjectives.length === 0 ? (
@@ -533,11 +533,11 @@ const styles = StyleSheet.create({
   sectionBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   sectionBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82' },
   filterBlock: { marginBottom: 12 },
-  filterRow: { gap: 8 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EBEEF5' },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterChip: { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EBEEF5' },
   filterChipActive: { backgroundColor: '#0082EF', borderColor: '#0082EF' },
   filterChipDeptActive: { backgroundColor: '#52C41A', borderColor: '#52C41A' },
-  filterChipText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82' },
+  filterChipText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82', flexShrink: 1 },
   filterChipTextActive: { color: '#FFFFFF' },
   emptySectionCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 24, alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#EBEEF5' },
   emptySectionText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#8F9BB3' },

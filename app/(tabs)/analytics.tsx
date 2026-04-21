@@ -303,34 +303,30 @@ export default function AnalyticsScreen() {
 
         <View style={styles.filterSection}>
           <Text style={styles.filterLabel}>周期筛选</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chipRow}>
-              <Pressable onPress={() => { setSelectedCycle(''); setAiAnalysis(''); }} style={[styles.chip, !selectedCycle && styles.chipActive]}>
-                <Text style={[styles.chipText, !selectedCycle && styles.chipTextActive]}>全部</Text>
+          <View style={styles.chipRow}>
+            <Pressable onPress={() => { setSelectedCycle(''); setAiAnalysis(''); }} style={[styles.chip, !selectedCycle && styles.chipActive]}>
+              <Text style={[styles.chipText, !selectedCycle && styles.chipTextActive]}>全部</Text>
+            </Pressable>
+            {cycles.map(c => (
+              <Pressable key={c} onPress={() => { setSelectedCycle(c); setAiAnalysis(''); }} style={[styles.chip, selectedCycle === c && styles.chipActive]}>
+                <Text style={[styles.chipText, selectedCycle === c && styles.chipTextActive]}>{c}</Text>
               </Pressable>
-              {cycles.map(c => (
-                <Pressable key={c} onPress={() => { setSelectedCycle(c); setAiAnalysis(''); }} style={[styles.chip, selectedCycle === c && styles.chipActive]}>
-                  <Text style={[styles.chipText, selectedCycle === c && styles.chipTextActive]}>{c}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
+            ))}
+          </View>
         </View>
 
         <View style={styles.filterSection}>
           <Text style={styles.filterLabel}>部门筛选</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chipRow}>
-              <Pressable onPress={() => { setSelectedDeptId(''); setAiAnalysis(''); }} style={[styles.chip, !selectedDeptId && styles.chipActive]}>
-                <Text style={[styles.chipText, !selectedDeptId && styles.chipTextActive]}>全部</Text>
+          <View style={styles.chipRow}>
+            <Pressable onPress={() => { setSelectedDeptId(''); setAiAnalysis(''); }} style={[styles.chip, !selectedDeptId && styles.chipActive]}>
+              <Text style={[styles.chipText, !selectedDeptId && styles.chipTextActive]}>全部</Text>
+            </Pressable>
+            {departments.map(d => (
+              <Pressable key={d.id} onPress={() => { setSelectedDeptId(d.id); setAiAnalysis(''); }} style={[styles.chip, selectedDeptId === d.id && styles.chipActive]}>
+                <Text style={[styles.chipText, selectedDeptId === d.id && styles.chipTextActive]}>{d.name}</Text>
               </Pressable>
-              {departments.map(d => (
-                <Pressable key={d.id} onPress={() => { setSelectedDeptId(d.id); setAiAnalysis(''); }} style={[styles.chip, selectedDeptId === d.id && styles.chipActive]}>
-                  <Text style={[styles.chipText, selectedDeptId === d.id && styles.chipTextActive]}>{d.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
+            ))}
+          </View>
         </View>
 
         {!hasData ? (
@@ -598,10 +594,10 @@ const styles = StyleSheet.create({
   pageSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 2 },
   filterSection: { marginBottom: 12 },
   filterLabel: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
-  chipRow: { flexDirection: 'row', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  chipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
+  chipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, flexShrink: 1 },
   chipTextActive: { color: Colors.white },
   section: { backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.border },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },

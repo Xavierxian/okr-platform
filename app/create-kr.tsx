@@ -12,11 +12,12 @@ interface SimpleUser {
   username: string;
   displayName: string;
   departmentId: string | null;
+  departmentIds?: string[];
 }
 
 export default function CreateKRScreen() {
   const { objectiveId, editId } = useLocalSearchParams<{ objectiveId: string; editId?: string }>();
-  const { addKeyResult, editKeyResult, objectives, keyResults, departments } = useOKR();
+  const { addKeyResult, editKeyResult, objectives, keyResults, departments, assignedKRs, collaboratingKRs } = useOKR();
 
   const existingKR = editId ? keyResults.find(kr => kr.id === editId) : null;
   const isEditMode = !!editId;
@@ -44,7 +45,9 @@ export default function CreateKRScreen() {
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [collabSearch, setCollabSearch] = useState('');
 
-  const objective = objectives.find(o => o.id === effectiveObjectiveId);
+  const objective = objectives.find(o => o.id === effectiveObjectiveId)
+    || assignedKRs.find(item => item.objective.id === effectiveObjectiveId)?.objective
+    || collaboratingKRs.find(item => item.objective.id === effectiveObjectiveId)?.objective;
 
   useEffect(() => {
     if (isEditMode && existingKR && !hydrated) {
@@ -75,10 +78,20 @@ export default function CreateKRScreen() {
 
   useEffect(() => { loadUsers(); }, []);
 
-  const deptUsers = objective?.departmentId
-    ? allUsers.filter(u => u.departmentId === objective.departmentId)
+  const targetDeptId = objective?.departmentId || null;
+  const getUserDeptIds = (u: SimpleUser) => u.departmentIds && u.departmentIds.length > 0
+    ? u.departmentIds
+    : (u.departmentId ? [u.departmentId] : []);
+
+  const deptUsers = targetDeptId
+    ? allUsers.filter(u => getUserDeptIds(u).includes(targetDeptId))
     : [];
-  const otherDeptUsers = allUsers.filter(u => u.departmentId !== objective?.departmentId);
+  const otherDeptUsers = targetDeptId
+    ? allUsers.filter(u => {
+        const userDeptIds = getUserDeptIds(u);
+        return userDeptIds.length === 0 || !userDeptIds.includes(targetDeptId);
+      })
+    : [];
 
   const filteredDeptUsers = useMemo(() => {
     if (!assigneeSearch.trim()) return deptUsers;
@@ -150,8 +163,8 @@ export default function CreateKRScreen() {
     router.back();
   };
 
-  const deptName = objective?.departmentId
-    ? departments.find(d => d.id === objective.departmentId)?.name || ''
+  const deptName = targetDeptId
+    ? departments.find(d => d.id === targetDeptId)?.name || ''
     : '';
 
   return (
@@ -218,7 +231,13 @@ export default function CreateKRScreen() {
                 })}
               </View>
             ) : (
-              <Text style={styles.emptyHint}>{assigneeSearch.trim() ? '未找到匹配的用户' : '该部门暂无用户'}</Text>
+              <Text style={styles.emptyHint}>
+                {assigneeSearch.trim()
+                  ? '未找到匹配的用户'
+                  : targetDeptId
+                    ? `${deptName || '该部门'}暂无用户`
+                    : '未识别到当前目标所属部门'}
+              </Text>
             )}
           </>
         )}
@@ -262,7 +281,13 @@ export default function CreateKRScreen() {
                 })}
               </View>
             ) : (
-              <Text style={styles.emptyHint}>{collabSearch.trim() ? '未找到匹配的用户' : '无其他部门用户'}</Text>
+              <Text style={styles.emptyHint}>
+                {collabSearch.trim()
+                  ? '未找到匹配的用户'
+                  : targetDeptId
+                    ? '无其他部门用户'
+                    : '未识别到当前目标所属部门'}
+              </Text>
             )}
           </>
         )}

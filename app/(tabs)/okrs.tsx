@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, Pressable, Platform, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +18,13 @@ interface SimpleUser {
   role: string;
 }
 
+function getCurrentQuarterCycle(): string {
+  const now = new Date();
+  const quarter = Math.ceil((now.getMonth() + 1) / 3);
+  const quarterLabel = quarter === 1 ? '一' : quarter === 2 ? '二' : quarter === 3 ? '三' : '四';
+  return `${now.getFullYear()} 第${quarterLabel}季度`;
+}
+
 export default function OKRsScreen() {
   const insets = useSafeAreaInsets();
   const { objectives, keyResults, departments, isLoading } = useOKR();
@@ -28,6 +35,7 @@ export default function OKRsScreen() {
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const [sortedObjectives, setSortedObjectives] = useState<typeof objectives>([]);
   const [isExporting, setIsExporting] = useState(false);
+  const hasInitializedCycleSelection = useRef(false);
 
   const userRole = user?.role || 'member';
   const isAdmin = userRole === 'center_head' || userRole === 'vp' || userRole === 'super_admin';
@@ -143,6 +151,14 @@ export default function OKRsScreen() {
     const set = new Set(objectives.map(o => o.cycle));
     return Array.from(set);
   }, [objectives]);
+
+  useEffect(() => {
+    if (hasInitializedCycleSelection.current || cycles.length === 0) return;
+
+    const currentQuarterCycle = getCurrentQuarterCycle();
+    setSelectedCycle(cycles.includes(currentQuarterCycle) ? currentQuarterCycle : null);
+    hasInitializedCycleSelection.current = true;
+  }, [cycles]);
 
   // 部门筛选：普通用户只能看到自己的中心，管理员可以看到所有中心
   const usedDepts = useMemo(() => {
@@ -327,7 +343,7 @@ export default function OKRsScreen() {
             {usedDepts.length > 0 && (
               <View style={styles.filterGroup}>
                 <Text style={styles.filterGroupTitle}>部门筛选</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsContainer}>
+                <View style={styles.filterChipsContainer}>
                   {isAdmin ? (
                     <>
                       <Pressable
@@ -354,7 +370,7 @@ export default function OKRsScreen() {
                       </View>
                     ))
                   )}
-                </ScrollView>
+                </View>
               </View>
             )}
 
@@ -362,7 +378,7 @@ export default function OKRsScreen() {
             {showUserFilter && visibleUsers.length > 0 && (
               <View style={styles.filterGroup}>
                 <Text style={styles.filterGroupTitle}>人员筛选</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsContainer}>
+                <View style={styles.filterChipsContainer}>
                   {isAdmin ? (
                     <>
                       <Pressable
@@ -390,7 +406,7 @@ export default function OKRsScreen() {
                       );
                     })
                   )}
-                </ScrollView>
+                </View>
               </View>
             )}
 
@@ -398,7 +414,7 @@ export default function OKRsScreen() {
             {cycles.length > 0 && (
               <View style={styles.filterGroup}>
                 <Text style={styles.filterGroupTitle}>周期筛选</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsContainer}>
+                <View style={styles.filterChipsContainer}>
                   <Pressable
                     onPress={() => setSelectedCycle(null)}
                     style={[styles.modernFilterChip, !selectedCycle && styles.modernFilterChipActive]}
@@ -414,7 +430,7 @@ export default function OKRsScreen() {
                       <Text style={[styles.modernFilterText, selectedCycle === c && styles.modernFilterTextActive]}>{c}</Text>
                     </Pressable>
                   ))}
-                </ScrollView>
+                </View>
               </View>
             )}
           </View>
@@ -554,11 +570,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   filterChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   modernFilterChip: { 
     flexDirection: 'row' as const, 
     alignItems: 'center' as const, 
+    alignSelf: 'flex-start' as const,
+    maxWidth: '100%',
     paddingHorizontal: 16, 
     paddingVertical: 8, 
     borderRadius: 20, 
@@ -577,7 +597,8 @@ const styles = StyleSheet.create({
   modernFilterText: { 
     fontFamily: 'Inter_500Medium', 
     fontSize: 13, 
-    color: '#5E6D82' 
+    color: '#5E6D82',
+    flexShrink: 1,
   },
   modernFilterTextActive: { 
     color: '#FFFFFF' 
