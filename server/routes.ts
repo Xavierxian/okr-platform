@@ -24,7 +24,7 @@ import {
   getAllDingtalkUsers,
   getDingtalkCorpId,
   getDingtalkAppKey,
-  getParentDepartmentName,
+  getCenterDepartmentInfo,
 } from "./dingtalk";
 
 declare module "express-session" {
@@ -116,24 +116,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!dtDeptIdList || dtDeptIdList.length === 0) return;
     try {
       console.log(`[DT Sync] userId=${userId}, dtDeptIdList=${JSON.stringify(dtDeptIdList)}`);
-      const existingDepts = await getDepartments();
-      const parentNames = new Set<string>();
+      const knownDepts = [...await getDepartments()];
+      const resolvedDeptIds = new Set<string>();
       for (const dtDeptId of dtDeptIdList) {
         console.log(`[DT Sync] Resolving dept_id=${dtDeptId}`);
-        const parentName = await getParentDepartmentName(dtDeptId);
-        console.log(`[DT Sync] dept_id=${dtDeptId} -> parentName=${parentName}`);
-        if (parentName) parentNames.add(parentName);
-      }
-      const localDeptIds: string[] = [];
-      for (const name of parentNames) {
-        let dept = existingDepts.find(d => d.name === name);
-        if (!dept) {
-          dept = await createDepartment({ name, parentId: null, level: 0 });
+        const deptInfo = await getCenterDepartmentInfo(dtDeptId);
+        console.log(`[DT Sync] dept_id=${dtDeptId} -> deptInfo=${JSON.stringify(deptInfo)}`);
+        if (!deptInfo?.centerName) continue;
+
+        let companyDept = null as typeof knownDepts[number] | null;
+        if (deptInfo.companyName) {
+          companyDept = knownDepts.find(d => d.name === deptInfo.companyName && !d.parentId) || null;
+          if (!companyDept) {
+            companyDept = await createDepartment({ name: deptInfo.companyName, parentId: null, level: 0 });
+            knownDepts.push(companyDept);
+          }
         }
-        localDeptIds.push(dept.id);
+
+        const targetParentId = companyDept?.id || null;
+        const targetLevel = targetParentId ? 1 : 0;
+        let centerDept = knownDepts.find(d => d.name === deptInfo.centerName && d.parentId === targetParentId);
+
+        if (!centerDept) {
+          centerDept = knownDepts.find(d => d.name === deptInfo.centerName) || null;
+          if (centerDept) {
+            await updateDepartment(centerDept.id, { parentId: targetParentId, level: targetLevel });
+            centerDept.parentId = targetParentId;
+            centerDept.level = targetLevel;
+          } else {
+            centerDept = await createDepartment({
+              name: deptInfo.centerName,
+              parentId: targetParentId,
+              level: targetLevel,
+            });
+            knownDepts.push(centerDept);
+          }
+        } else if (centerDept.parentId !== targetParentId || centerDept.level !== targetLevel) {
+          await updateDepartment(centerDept.id, { parentId: targetParentId, level: targetLevel });
+          centerDept.parentId = targetParentId;
+          centerDept.level = targetLevel;
+        }
+
+        resolvedDeptIds.add(centerDept.id);
       }
-      if (localDeptIds.length > 0) {
-        await setUserDepartments(userId, localDeptIds);
+      if (resolvedDeptIds.size > 0) {
+        await setUserDepartments(userId, Array.from(resolvedDeptIds));
       }
     } catch (err) {
       console.error("同步钉钉用户部门失败:", err);
@@ -192,21 +219,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let syncedDepts = 0;
       let syncedUsers = 0;
       const deptIdMap = new Map<number, string>();
+      const knownDepts = [...existingDepts];
+      const pendingDepts = [...dtDepts];
 
-      for (const dtDept of dtDepts) {
-        const existing = existingDepts.find(d => d.name === dtDept.name);
-        if (existing) {
-          deptIdMap.set(dtDept.dept_id, existing.id);
-        } else {
+      while (pendingDepts.length > 0) {
+        let progressed = false;
+
+        for (let i = pendingDepts.length - 1; i >= 0; i--) {
+          const dtDept = pendingDepts[i];
           const parentLocalId = dtDept.parent_id > 1 ? (deptIdMap.get(dtDept.parent_id) || null) : null;
-          const level = parentLocalId ? 1 : 0;
-          const newDept = await createDepartment({
-            name: dtDept.name,
-            parentId: parentLocalId,
-            level,
-          });
-          deptIdMap.set(dtDept.dept_id, newDept.id);
-          syncedDepts++;
+
+          if (dtDept.parent_id > 1 && !parentLocalId) {
+            continue;
+          }
+
+          const targetLevel = parentLocalId ? 1 : 0;
+          const existing = knownDepts.find(d => d.name === dtDept.name && d.parentId === parentLocalId);
+
+          if (existing) {
+            if (existing.level !== targetLevel || existing.parentId !== parentLocalId) {
+              await updateDepartment(existing.id, { parentId: parentLocalId, level: targetLevel });
+            }
+            deptIdMap.set(dtDept.dept_id, existing.id);
+          } else {
+            const fallback = knownDepts.find(d => d.name === dtDept.name && (!d.parentId || d.parentId !== parentLocalId));
+            if (fallback) {
+              await updateDepartment(fallback.id, { parentId: parentLocalId, level: targetLevel });
+              fallback.parentId = parentLocalId;
+              fallback.level = targetLevel;
+              deptIdMap.set(dtDept.dept_id, fallback.id);
+            } else {
+              const newDept = await createDepartment({
+                name: dtDept.name,
+                parentId: parentLocalId,
+                level: targetLevel,
+              });
+              knownDepts.push(newDept);
+              deptIdMap.set(dtDept.dept_id, newDept.id);
+              syncedDepts++;
+            }
+          }
+
+          pendingDepts.splice(i, 1);
+          progressed = true;
+        }
+
+        if (!progressed) {
+          console.warn("[DT Sync] Some departments could not be resolved with parent relationships:", pendingDepts.map(d => ({ dept_id: d.dept_id, name: d.name, parent_id: d.parent_id })));
+          break;
         }
       }
 

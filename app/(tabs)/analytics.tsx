@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, ScrollView, Platform, ActivityIndicator, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useOKR } from '@/lib/okr-context';
-import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
@@ -14,6 +13,13 @@ function getScoreColor(score: number): string {
   if (score >= 0.7) return Colors.success;
   if (score >= 0.3) return Colors.warning;
   return Colors.danger;
+}
+
+function getCurrentQuarterCycle(): string {
+  const now = new Date();
+  const quarter = Math.ceil((now.getMonth() + 1) / 3);
+  const quarterLabel = quarter === 1 ? '一' : quarter === 2 ? '二' : quarter === 3 ? '三' : '四';
+  return `${now.getFullYear()} 第${quarterLabel}季度`;
 }
 
 function Bar({ label, value, maxValue, color, delay, suffix }: { label: string; value: number; maxValue: number; color: string; delay: number; suffix?: string }) {
@@ -55,11 +61,13 @@ export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const { objectives, keyResults, departments, isLoading } = useOKR();
   const [selectedCycle, setSelectedCycle] = useState<string>('');
+  const [selectedCenterId, setSelectedCenterId] = useState<string>('');
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [aiError, setAiError] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const hasInitializedCycle = useRef(false);
 
   const cycles = useMemo(() => {
     return [...new Set(objectives.map(o => o.cycle))].sort();
@@ -69,17 +77,97 @@ export default function AnalyticsScreen() {
     return cycles.slice(-3);
   }, [cycles]);
 
+  const deptById = useMemo(() => new Map(departments.map(d => [d.id, d])), [departments]);
+  const childDeptCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    departments.forEach(d => {
+      if (!d.parentId) return;
+      map.set(d.parentId, (map.get(d.parentId) || 0) + 1);
+    });
+    return map;
+  }, [departments]);
+
+  const deptRootCenterMap = useMemo(() => {
+    const rootMap = new Map<string, string>();
+
+    const findRoot = (deptId: string): string => {
+      if (rootMap.has(deptId)) return rootMap.get(deptId)!;
+      let current = deptById.get(deptId);
+      let rootId = deptId;
+      const visited = new Set<string>();
+
+      while (current && current.parentId && !visited.has(current.id)) {
+        visited.add(current.id);
+        const parent = deptById.get(current.parentId);
+        if (!parent) break;
+        current = parent;
+        rootId = parent.id;
+      }
+
+      rootMap.set(deptId, rootId);
+      return rootId;
+    };
+
+    departments.forEach(d => findRoot(d.id));
+    return rootMap;
+  }, [departments, deptById]);
+
+  const centers = useMemo(() => {
+    // “中心筛选”只展示真正的公司层节点：根节点，并且至少有一个下级部门。
+    return departments.filter(d => (!d.parentId || !deptById.has(d.parentId)) && (childDeptCountMap.get(d.id) || 0) > 0);
+  }, [departments, deptById, childDeptCountMap]);
+
+  const objectiveCountByDept = useMemo(() => {
+    let scoped = objectives;
+    if (selectedCycle) scoped = scoped.filter(o => o.cycle === selectedCycle);
+    if (selectedCenterId) scoped = scoped.filter(o => deptRootCenterMap.get(o.departmentId) === selectedCenterId);
+    const map = new Map<string, number>();
+    scoped.forEach(o => map.set(o.departmentId, (map.get(o.departmentId) || 0) + 1));
+    return map;
+  }, [objectives, selectedCycle, selectedCenterId, deptRootCenterMap]);
+
+  const centerScopedDepartments = useMemo(() => {
+    if (!selectedCenterId) return [];
+    return departments
+      .filter(d => deptRootCenterMap.get(d.id) === selectedCenterId && (objectiveCountByDept.get(d.id) || 0) > 0)
+      .sort((a, b) => {
+        if (a.level !== b.level) return a.level - b.level;
+        return a.name.localeCompare(b.name, 'zh-CN');
+      });
+  }, [departments, deptRootCenterMap, selectedCenterId, objectiveCountByDept]);
+
   const { data: rankingsData } = useQuery({
     queryKey: [selectedCycle ? `/api/analytics/department-rankings?cycle=${encodeURIComponent(selectedCycle)}` : '/api/analytics/department-rankings'],
     enabled: true,
   });
 
+  useEffect(() => {
+    if (hasInitializedCycle.current || cycles.length === 0) return;
+    const currentQuarterCycle = getCurrentQuarterCycle();
+    setSelectedCycle(cycles.includes(currentQuarterCycle) ? currentQuarterCycle : cycles[cycles.length - 1]);
+    hasInitializedCycle.current = true;
+  }, [cycles]);
+
+  useEffect(() => {
+    if (!selectedDeptId) return;
+    if (
+      selectedCenterId &&
+      (
+        deptRootCenterMap.get(selectedDeptId) !== selectedCenterId ||
+        !centerScopedDepartments.some(d => d.id === selectedDeptId)
+      )
+    ) {
+      setSelectedDeptId('');
+    }
+  }, [selectedDeptId, selectedCenterId, deptRootCenterMap, centerScopedDepartments]);
+
   const filteredObjs = useMemo(() => {
     let objs = objectives;
     if (selectedCycle) objs = objs.filter(o => o.cycle === selectedCycle);
+    if (selectedCenterId) objs = objs.filter(o => deptRootCenterMap.get(o.departmentId) === selectedCenterId);
     if (selectedDeptId) objs = objs.filter(o => o.departmentId === selectedDeptId);
     return objs;
-  }, [objectives, selectedCycle, selectedDeptId]);
+  }, [objectives, selectedCycle, selectedCenterId, selectedDeptId, deptRootCenterMap]);
 
   const filteredKRs = useMemo(() => {
     const objIds = new Set(filteredObjs.map(o => o.id));
@@ -196,7 +284,16 @@ export default function AnalyticsScreen() {
     }).filter(d => d.krCount > 0);
   }, [departments, filteredObjs, filteredKRs]);
 
-  const rankings = (rankingsData as any)?.rankings || [];
+  const rankings = useMemo(() => {
+    let list = ((rankingsData as any)?.rankings || []) as any[];
+    if (selectedCenterId) {
+      list = list.filter((r: any) => deptRootCenterMap.get(r.departmentId) === selectedCenterId);
+    }
+    if (selectedDeptId) {
+      list = list.filter((r: any) => r.departmentId === selectedDeptId);
+    }
+    return list;
+  }, [rankingsData, selectedCenterId, selectedDeptId, deptRootCenterMap]);
 
   const handleAiAnalysis = useCallback(async () => {
     if (!selectedCycle || aiLoading) return;
@@ -316,16 +413,37 @@ export default function AnalyticsScreen() {
         </View>
 
         <View style={styles.filterSection}>
-          <Text style={styles.filterLabel}>部门筛选</Text>
+          <Text style={styles.filterLabel}>中心筛选</Text>
           <View style={styles.chipRow}>
-            <Pressable onPress={() => { setSelectedDeptId(''); setAiAnalysis(''); }} style={[styles.chip, !selectedDeptId && styles.chipActive]}>
-              <Text style={[styles.chipText, !selectedDeptId && styles.chipTextActive]}>全部</Text>
+            <Pressable onPress={() => { setSelectedCenterId(''); setSelectedDeptId(''); setAiAnalysis(''); }} style={[styles.chip, !selectedCenterId && styles.chipActive]}>
+              <Text style={[styles.chipText, !selectedCenterId && styles.chipTextActive]}>全部中心</Text>
             </Pressable>
-            {departments.map(d => (
-              <Pressable key={d.id} onPress={() => { setSelectedDeptId(d.id); setAiAnalysis(''); }} style={[styles.chip, selectedDeptId === d.id && styles.chipActive]}>
-                <Text style={[styles.chipText, selectedDeptId === d.id && styles.chipTextActive]}>{d.name}</Text>
+            {centers.map(center => (
+              <Pressable key={center.id} onPress={() => { setSelectedCenterId(center.id); setSelectedDeptId(''); setAiAnalysis(''); }} style={[styles.chip, selectedCenterId === center.id && styles.chipActive]}>
+                <Text style={[styles.chipText, selectedCenterId === center.id && styles.chipTextActive]}>{center.name}</Text>
               </Pressable>
             ))}
+          </View>
+          <Text style={[styles.filterLabel, styles.subFilterLabel]}>部门筛选</Text>
+          <View style={[styles.chipRow, styles.subFilterRow]}>
+            {!selectedCenterId ? (
+              <Text style={styles.filterHintText}>请先选择中心，再选择部门</Text>
+            ) : centerScopedDepartments.length === 0 ? (
+              <Text style={styles.filterHintText}>该中心在当前周期暂无可筛选部门数据</Text>
+            ) : (
+              <>
+                <Pressable onPress={() => { setSelectedDeptId(''); setAiAnalysis(''); }} style={[styles.chip, !selectedDeptId && styles.chipActive]}>
+                  <Text style={[styles.chipText, !selectedDeptId && styles.chipTextActive]}>该中心全部（含本部）</Text>
+                </Pressable>
+                {centerScopedDepartments.map(d => (
+                  <Pressable key={d.id} onPress={() => { setSelectedDeptId(d.id); setAiAnalysis(''); }} style={[styles.chip, selectedDeptId === d.id && styles.chipActive]}>
+                    <Text style={[styles.chipText, selectedDeptId === d.id && styles.chipTextActive]}>
+                      {d.id === selectedCenterId ? `${d.name}（本部）` : d.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </>
+            )}
           </View>
         </View>
 
@@ -594,7 +712,10 @@ const styles = StyleSheet.create({
   pageSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 2 },
   filterSection: { marginBottom: 12 },
   filterLabel: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
+  subFilterLabel: { marginTop: 10 },
+  filterHintText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textTertiary, paddingVertical: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  subFilterRow: { minHeight: 40 },
   chip: { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary, flexShrink: 1 },

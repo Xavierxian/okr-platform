@@ -131,20 +131,23 @@ export async function getDepartmentDetail(deptId: number): Promise<{ dept_id: nu
   }
 }
 
-export async function getParentDepartmentName(deptId: number): Promise<string | null> {
-  console.log(`[DT Dept] getParentDepartmentName called with deptId=${deptId}`);
+export interface DingtalkCenterDepartmentInfo {
+  companyName: string | null;
+  centerName: string | null;
+}
+
+export async function getCenterDepartmentInfo(deptId: number): Promise<DingtalkCenterDepartmentInfo | null> {
+  console.log(`[DT Dept] getCenterDepartmentInfo called with deptId=${deptId}`);
   if (deptId === 1) return null;
 
   const dept = await getDepartmentDetail(deptId);
   if (!dept) return null;
   console.log(`[DT Dept] deptId=${deptId}, name="${dept.name}", parent_id=${dept.parent_id}`);
 
-  if (!dept.parent_id || dept.parent_id <= 0) return null;
-
-  const chain: Array<{ dept_id: number; name: string; parent_id: number }> = [dept];
+  const chain: { dept_id: number; name: string; parent_id: number }[] = [dept];
   let current = dept;
   for (let i = 0; i < 10; i++) {
-    if (current.parent_id === 1) break;
+    if (!current.parent_id || current.parent_id === 1) break;
     const upper = await getDepartmentDetail(current.parent_id);
     if (!upper) break;
     console.log(`[DT Dept] chain: name="${upper.name}", parent_id=${upper.parent_id}`);
@@ -154,22 +157,19 @@ export async function getParentDepartmentName(deptId: number): Promise<string | 
 
   const companyIdx = chain.findIndex(d => d.parent_id === 1);
   if (companyIdx < 0) {
-    console.log(`[DT Dept] -> no company-level dept found, returning "${dept.name}"`);
-    return dept.name;
+    console.log(`[DT Dept] -> no company-level dept found, using current dept "${dept.name}"`);
+    return { companyName: null, centerName: dept.name };
   }
 
+  const companyName = chain[companyIdx].name;
   const targetIdx = companyIdx - 1;
   if (targetIdx >= 0) {
-    console.log(`[DT Dept] -> company="${chain[companyIdx].name}", returning center="${chain[targetIdx].name}"`);
-    return chain[targetIdx].name;
+    console.log(`[DT Dept] -> company="${companyName}", center="${chain[targetIdx].name}"`);
+    return { companyName, centerName: chain[targetIdx].name };
   }
 
-  if (companyIdx === 0) {
-    console.log(`[DT Dept] -> dept "${dept.name}" is direct child of root company, returning itself`);
-    return dept.name;
-  }
-
-  return dept.name;
+  console.log(`[DT Dept] -> dept "${dept.name}" is direct child of root company, treating itself as center under "${companyName}"`);
+  return { companyName, centerName: dept.name };
 }
 
 async function getUserAccessToken(authCode: string): Promise<string> {

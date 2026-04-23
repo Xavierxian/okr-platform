@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, Pressable, Platform, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { StyleSheet, Text, View, Pressable, Platform, ActivityIndicator, ScrollView, Alert, TextInput } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +32,8 @@ export default function OKRsScreen() {
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
+  const [expandedDeptIds, setExpandedDeptIds] = useState<Record<string, boolean>>({});
+  const [userSearchKeyword, setUserSearchKeyword] = useState('');
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const [sortedObjectives, setSortedObjectives] = useState<typeof objectives>([]);
   const [isExporting, setIsExporting] = useState(false);
@@ -98,6 +100,17 @@ export default function OKRsScreen() {
     return baseUsers;
   }, [allUsers, userRole, myDeptIds, selectedDeptIds, myCreatedKRAssigneeIds]);
 
+  const searchedUsers = useMemo(() => {
+    const keyword = userSearchKeyword.trim().toLowerCase();
+    if (!keyword) return [];
+    return visibleUsers.filter(u => u.displayName.toLowerCase().includes(keyword));
+  }, [visibleUsers, userSearchKeyword]);
+
+  const selectedUser = useMemo(() => {
+    if (!selectedUserId) return null;
+    return visibleUsers.find(u => u.id === selectedUserId) || null;
+  }, [visibleUsers, selectedUserId]);
+
   const filteredObjectives = useMemo(() => {
     let filtered = sortedObjectives;
     
@@ -151,6 +164,32 @@ export default function OKRsScreen() {
     const set = new Set(objectives.map(o => o.cycle));
     return Array.from(set);
   }, [objectives]);
+
+  const groupedObjectives = useMemo(() => {
+    const deptNameMap = new Map(departments.map(d => [d.id, d.name]));
+    const deptIndexMap = new Map(departments.map((d, idx) => [d.id, idx]));
+    const groupMap = new Map<string, { id: string; name: string; objectives: typeof filteredObjectives }>();
+
+    filteredObjectives.forEach(obj => {
+      const key = obj.departmentId || '__unknown__';
+      const name = obj.departmentId ? (deptNameMap.get(obj.departmentId) || '未分配部门') : '未分配部门';
+      const existing = groupMap.get(key);
+      if (existing) {
+        existing.objectives.push(obj);
+      } else {
+        groupMap.set(key, { id: key, name, objectives: [obj] });
+      }
+    });
+
+    return Array.from(groupMap.values()).sort((a, b) => {
+      const ai = deptIndexMap.has(a.id) ? (deptIndexMap.get(a.id) as number) : Number.MAX_SAFE_INTEGER;
+      const bi = deptIndexMap.has(b.id) ? (deptIndexMap.get(b.id) as number) : Number.MAX_SAFE_INTEGER;
+      if (ai !== bi) return ai - bi;
+      return a.name.localeCompare(b.name, 'zh-CN');
+    });
+  }, [filteredObjectives, departments]);
+
+  const shouldGroupByDepartmentView = myDeptIds.length > 1;
 
   useEffect(() => {
     if (hasInitializedCycleSelection.current || cycles.length === 0) return;
@@ -378,35 +417,62 @@ export default function OKRsScreen() {
             {showUserFilter && visibleUsers.length > 0 && (
               <View style={styles.filterGroup}>
                 <Text style={styles.filterGroupTitle}>人员筛选</Text>
-                <View style={styles.filterChipsContainer}>
-                  {isAdmin ? (
-                    <>
-                      <Pressable
-                        onPress={() => setSelectedUserId(null)}
-                        style={[styles.modernFilterChip, !selectedUserId && styles.modernFilterChipUserActive]}
-                      >
-                        <Text style={[styles.modernFilterText, !selectedUserId && styles.modernFilterTextActive]}>全部人员</Text>
-                      </Pressable>
-                      {visibleUsers.map(u => {
-                        const isActive = selectedUserId === u.id;
-                        return (
-                          <Pressable key={u.id} onPress={() => setSelectedUserId(isActive ? null : u.id)} style={[styles.modernFilterChip, isActive && styles.modernFilterChipUserActive]}>
-                            <Text style={[styles.modernFilterText, isActive && styles.modernFilterTextActive]}>{u.displayName}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </>
-                  ) : (
-                    visibleUsers.map(u => {
-                      const isActive = selectedUserId === u.id || (selectedUserId === null && u.id === user?.id);
-                      return (
-                        <Pressable key={u.id} onPress={() => setSelectedUserId(u.id)} style={[styles.modernFilterChip, isActive && styles.modernFilterChipUserActive]}>
-                          <Text style={[styles.modernFilterText, isActive && styles.modernFilterTextActive]}>{u.displayName}{u.id === user?.id ? ' (我)' : ''}</Text>
-                        </Pressable>
-                      );
-                    })
+
+                <View style={styles.userSearchBox}>
+                  <Ionicons name="search-outline" size={16} color="#8F9BB3" />
+                  <TextInput
+                    value={userSearchKeyword}
+                    onChangeText={setUserSearchKeyword}
+                    placeholder="输入姓名搜索人员"
+                    placeholderTextColor="#A0AEC0"
+                    style={[
+                      styles.userSearchInput,
+                      Platform.OS === 'web' ? ({ outlineWidth: 0, outlineStyle: 'none', borderWidth: 0 } as any) : null,
+                    ]}
+                    clearButtonMode="while-editing"
+                    underlineColorAndroid="transparent"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={styles.userFilterMetaRow}>
+                  <Text style={styles.userFilterMetaText}>
+                    {selectedUser ? `已选择：${selectedUser.displayName}` : (isAdmin ? '当前：全部人员（未指定）' : '当前：我')}
+                  </Text>
+                  {selectedUserId && (
+                    <Pressable onPress={() => setSelectedUserId(null)} style={styles.userFilterClearBtn}>
+                      <Text style={styles.userFilterClearText}>清除</Text>
+                    </Pressable>
                   )}
                 </View>
+
+                {userSearchKeyword.trim().length === 0 ? (
+                  <Text style={styles.userFilterHintText}>默认不展示全部人员，请先输入姓名搜索</Text>
+                ) : (
+                  <View style={styles.userFilterScrollViewport}>
+                    <ScrollView
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={searchedUsers.length > 8}
+                      style={styles.userFilterScroll}
+                      contentContainerStyle={styles.userFilterScrollContent}
+                    >
+                      {searchedUsers.length === 0 ? (
+                        <Text style={styles.userFilterHintText}>未找到匹配人员</Text>
+                      ) : (
+                        <View style={styles.filterChipsContainer}>
+                          {searchedUsers.map(u => {
+                            const isActive = selectedUserId === u.id || (selectedUserId === null && !isAdmin && u.id === user?.id);
+                            return (
+                              <Pressable key={u.id} onPress={() => setSelectedUserId(isActive ? null : u.id)} style={[styles.modernFilterChip, isActive && styles.modernFilterChipUserActive]}>
+                                <Text style={[styles.modernFilterText, isActive && styles.modernFilterTextActive]}>{u.displayName}{u.id === user?.id ? ' (我)' : ''}</Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
             )}
 
@@ -439,7 +505,44 @@ export default function OKRsScreen() {
         {/* 目标卡片列表 */}
         <View style={styles.objectivesList}>
           {filteredObjectives.length > 0 ? (
-            filteredObjectives.map(objective => renderObjective({ item: objective }))
+            shouldGroupByDepartmentView ? (
+              groupedObjectives.map(group => {
+                const isExpanded = expandedDeptIds[group.id] ?? groupedObjectives.length === 1;
+                return (
+                  <View key={group.id} style={styles.deptGroupCard}>
+                    <Pressable
+                      onPress={() => {
+                        setExpandedDeptIds(prev => ({
+                          ...prev,
+                          [group.id]: !(prev[group.id] ?? groupedObjectives.length === 1),
+                        }));
+                      }}
+                      style={styles.deptGroupHeader}
+                    >
+                      <View style={styles.deptGroupHeaderLeft}>
+                        <Ionicons
+                          name={isExpanded ? "chevron-down" : "chevron-forward"}
+                          size={16}
+                          color="#5E6D82"
+                        />
+                        <Text style={styles.deptGroupTitle}>{group.name}</Text>
+                      </View>
+                      <View style={styles.deptGroupCountChip}>
+                        <Text style={styles.deptGroupCountText}>{group.objectives.length} 个 O</Text>
+                      </View>
+                    </Pressable>
+
+                    {isExpanded && (
+                      <View style={styles.deptGroupBody}>
+                        {group.objectives.map(objective => renderObjective({ item: objective }))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            ) : (
+              filteredObjectives.map(objective => renderObjective({ item: objective }))
+            )
           ) : (
             <View style={styles.empty}>
               <Ionicons name="flag-outline" size={48} color={Colors.textTertiary} />
@@ -456,6 +559,50 @@ export default function OKRsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F6F7' },
   objectivesList: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
+  deptGroupCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8ECF2',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  deptGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#FAFBFD',
+  },
+  deptGroupHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  deptGroupTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: '#171A1D',
+  },
+  deptGroupCountChip: {
+    backgroundColor: '#EEF5FF',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  deptGroupCountText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: '#2C7BE5',
+  },
+  deptGroupBody: {
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 2,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F3F7',
+  },
   
   // 固定在顶部的头部
   stickyHeader: { 
@@ -573,6 +720,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  userSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#D9E2EC',
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    minHeight: 38,
+    marginBottom: 8,
+  },
+  userSearchInput: {
+    flex: 1,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: '#171A1D',
+    lineHeight: 18,
+    paddingVertical: 0,
+  },
+  userFilterMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  userFilterMetaText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: '#7A8AA0',
+  },
+  userFilterClearBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: '#EEF5FF',
+  },
+  userFilterClearText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    color: '#2C7BE5',
+  },
+  userFilterScrollViewport: {
+    maxHeight: 112,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5EAF2',
+    backgroundColor: '#FCFDFF',
+    overflow: 'hidden',
+  },
+  userFilterScroll: {},
+  userFilterScrollContent: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  userFilterHintText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: '#8A97AA',
+    textAlign: 'center',
+    paddingVertical: 10,
   },
   modernFilterChip: { 
     flexDirection: 'row' as const, 
