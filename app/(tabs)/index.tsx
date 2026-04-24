@@ -146,7 +146,10 @@ function groupKRItemsByObjective(items: AssignedKRItem[]): ObjectiveKRGroup[] {
     }
     map.set(key, { objectiveId: key, objective: item.objective, items: [item] });
   });
-  return Array.from(map.values());
+  return Array.from(map.values()).map(group => ({
+    ...group,
+    items: [...group.items].sort(compareKRItemOrder),
+  }));
 }
 
 function extractObjectiveOrder(title: string): number | null {
@@ -166,6 +169,29 @@ function compareObjectiveTitleOrder(aTitle: string, bTitle: string): number {
   if (aOrder !== null && bOrder === null) return -1;
   if (aOrder === null && bOrder !== null) return 1;
   return aTitle.localeCompare(bTitle, 'zh-CN');
+}
+
+function extractKROrder(title: string): number | null {
+  const match = title.match(/[Kk][Rr]\s*(\d+)/);
+  if (!match) return null;
+  const order = Number.parseInt(match[1], 10);
+  return Number.isNaN(order) ? null : order;
+}
+
+function compareKRItemOrder(a: AssignedKRItem, b: AssignedKRItem): number {
+  const aOrder = extractKROrder(a.kr.title);
+  const bOrder = extractKROrder(b.kr.title);
+
+  if (aOrder !== null && bOrder !== null && aOrder !== bOrder) {
+    return aOrder - bOrder;
+  }
+  if (aOrder !== null && bOrder === null) return -1;
+  if (aOrder === null && bOrder !== null) return 1;
+
+  const titleCompare = a.kr.title.localeCompare(b.kr.title, 'zh-CN');
+  if (titleCompare !== 0) return titleCompare;
+
+  return a.kr.id.localeCompare(b.kr.id, 'zh-CN');
 }
 
 function getGroupSourceName(group: ObjectiveKRGroup, userNameMap: Map<string, string>): string {
