@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR, type AssignedKRItem } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
+import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import NotificationBell from '@/components/NotificationBell';
@@ -129,6 +130,11 @@ interface ObjectiveKRGroup {
   items: AssignedKRItem[];
 }
 
+interface SimpleUser {
+  id: string;
+  displayName: string;
+}
+
 function groupKRItemsByObjective(items: AssignedKRItem[]): ObjectiveKRGroup[] {
   const map = new Map<string, ObjectiveKRGroup>();
   items.forEach(item => {
@@ -165,6 +171,7 @@ export default function DashboardScreen() {
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
   const [expandedAssignedObjectives, setExpandedAssignedObjectives] = useState<Record<string, boolean>>({});
   const [expandedCollaboratingObjectives, setExpandedCollaboratingObjectives] = useState<Record<string, boolean>>({});
+  const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const hasInitializedCycleSelection = useRef(false);
 
   const isSuperAdmin = user?.role === 'super_admin';
@@ -176,6 +183,17 @@ export default function DashboardScreen() {
   const dashboardObjectives = useMemo(() => {
     return isSuperAdmin ? objectives : allMyObjectives;
   }, [allMyObjectives, isSuperAdmin, objectives]);
+
+  React.useEffect(() => {
+    apiRequest('GET', '/api/users/all-safe')
+      .then(res => res.json())
+      .then((users: SimpleUser[]) => setAllUsers(users))
+      .catch(() => {});
+  }, []);
+
+  const userNameMap = useMemo(() => {
+    return new Map(allUsers.map(u => [u.id, u.displayName]));
+  }, [allUsers]);
 
   const recentQuarterCycles = useMemo(() => {
     const uniqueCycles = Array.from(
@@ -431,7 +449,8 @@ export default function DashboardScreen() {
               ) : (
                 assignedObjectiveGroups.map((group, groupIdx) => {
                   const isExpanded = !!expandedAssignedObjectives[group.objectiveId];
-                  const sourceLabel = formatSourceLabel(
+                  const objectiveCreatorName = group.objective.createdBy ? userNameMap.get(group.objective.createdBy) : null;
+                  const sourceLabel = objectiveCreatorName || formatSourceLabel(
                     group.items.map(item => item.kr.collaboratorName || item.kr.assigneeName)
                   );
                   return (
@@ -481,7 +500,8 @@ export default function DashboardScreen() {
                 ) : (
                   collaboratingObjectiveGroups.map((group, groupIdx) => {
                     const isExpanded = !!expandedCollaboratingObjectives[group.objectiveId];
-                    const sourceLabel = formatSourceLabel(
+                    const objectiveCreatorName = group.objective.createdBy ? userNameMap.get(group.objective.createdBy) : null;
+                    const sourceLabel = objectiveCreatorName || formatSourceLabel(
                       group.items.map(item => item.kr.assigneeName || item.kr.collaboratorName)
                     );
                     return (
