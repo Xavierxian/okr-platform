@@ -247,19 +247,46 @@ export async function deleteKeyResultInDb(id: string): Promise<void> {
   await db.delete(keyResults).where(eq(keyResults.id, id));
 }
 
-export async function updateKRProgressInDb(id: string, progress: number, note: string, images?: string[]): Promise<KeyResult | undefined> {
+export async function updateKRProgressInDb(
+  id: string,
+  progress: number,
+  note: string,
+  images?: string[],
+  entryId?: string
+): Promise<KeyResult | undefined> {
   const [existing] = await db.select().from(keyResults).where(eq(keyResults.id, id));
   if (!existing) return undefined;
+  const normalizedImages = images && images.length > 0 ? images : undefined;
+  const existingHistory = existing.progressHistory || [];
+  let history: ProgressEntry[];
 
-  const entry: ProgressEntry = {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    date: new Date().toISOString(),
-    progress,
-    note,
-    images: images && images.length > 0 ? images : undefined,
-  };
+  if (entryId) {
+    const historyIndex = existingHistory.findIndex(entry => entry.id === entryId);
+    if (historyIndex === -1) return undefined;
+    history = existingHistory.map((entry, index) => (
+      index === historyIndex
+        ? {
+            ...entry,
+            progress,
+            note,
+            images: normalizedImages,
+          }
+        : entry
+    ));
+  } else {
+    const entry: ProgressEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      date: new Date().toISOString(),
+      progress,
+      note,
+      images: normalizedImages,
+    };
+    history = [...existingHistory, entry];
+  }
 
-  const history = [...(existing.progressHistory || []), entry];
+  const latestProgress = history.length > 0
+    ? (history[history.length - 1]?.progress ?? progress)
+    : progress;
 
   const now = new Date();
   const end = new Date(existing.endDate);
@@ -269,12 +296,12 @@ export async function updateKRProgressInDb(id: string, progress: number, note: s
   const expectedProgress = Math.min(100, (elapsedDays / totalDays) * 100);
 
   let status = "normal";
-  if (progress >= 100) status = "completed";
+  if (latestProgress >= 100) status = "completed";
   else if (now > end) status = "overdue";
-  else if (progress < expectedProgress * 0.8) status = "behind";
+  else if (latestProgress < expectedProgress * 0.8) status = "behind";
 
   const [kr] = await db.update(keyResults).set({
-    progress,
+    progress: latestProgress,
     status,
     progressHistory: history,
   }).where(eq(keyResults.id, id)).returning();

@@ -661,7 +661,18 @@ export default function ObjectiveDetailScreen() {
                           <View style={{ flex: 1 }}>
                             <View style={styles.historyTop}>
                               <Text style={styles.historyProgress}>{entry.progress}%</Text>
-                              <Text style={styles.historyDate}>{new Date(entry.date).toLocaleDateString('zh-CN')}</Text>
+                              <View style={styles.historyTopRight}>
+                                <Text style={styles.historyDate}>{new Date(entry.date).toLocaleDateString('zh-CN')}</Text>
+                                {krEditable && (
+                                  <Pressable
+                                    onPress={() => router.push({ pathname: '/update-progress', params: { krId: kr.id, entryId: entry.id } })}
+                                    style={({ pressed }) => [styles.historyEditBtn, { opacity: pressed ? 0.75 : 1 }]}
+                                  >
+                                    <Ionicons name="create-outline" size={12} color={Colors.primary} />
+                                    <Text style={styles.historyEditText}>编辑</Text>
+                                  </Pressable>
+                                )}
+                              </View>
                             </View>
                             {entry.note ? <Text style={styles.historyNote}>{entry.note}</Text> : null}
                             {entry.images && entry.images.length > 0 && (
@@ -815,8 +826,11 @@ const styles = StyleSheet.create({
   historyItem: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   historyDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#8F9BB3', marginTop: 5 },
   historyTop: { flexDirection: 'row', justifyContent: 'space-between' },
+  historyTopRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   historyProgress: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#171A1D' },
   historyDate: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3' },
+  historyEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: '#E6F4FF', borderRadius: 8 },
+  historyEditText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: '#0082EF' },
   historyNote: { fontFamily: 'Inter_400Regular', fontSize: 12, color: '#5E6D82', marginTop: 4, lineHeight: 18 },
   historyImages: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   historyThumb: { width: 60, height: 60, borderRadius: 6, overflow: 'hidden', backgroundColor: '#E8EAEF' },

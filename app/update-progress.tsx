@@ -9,11 +9,18 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function UpdateProgressScreen() {
-  const { krId } = useLocalSearchParams<{ krId: string }>();
+  const { krId: rawKrId, entryId: rawEntryId } = useLocalSearchParams<{ krId?: string | string[]; entryId?: string | string[] }>();
+  const krId = Array.isArray(rawKrId) ? rawKrId[0] : rawKrId;
+  const entryId = Array.isArray(rawEntryId) ? rawEntryId[0] : rawEntryId;
   const { keyResults, reportProgress } = useOKR();
   const kr = useMemo(() => keyResults.find(k => k.id === krId), [keyResults, krId]);
+  const editingEntry = useMemo(
+    () => (entryId ? kr?.progressHistory?.find(entry => entry.id === entryId) : undefined),
+    [entryId, kr]
+  );
+  const isEditMode = !!editingEntry;
 
-  const [progress, setProgress] = useState(kr?.progress?.toString() || '0');
+  const [progress, setProgress] = useState('0');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [images, setImages] = useState<string[]>([]);
@@ -23,6 +30,19 @@ export default function UpdateProgressScreen() {
   const uploadingRef = useRef(false);
 
   const progressNum = Math.min(100, Math.max(0, parseInt(progress) || 0));
+
+  useEffect(() => {
+    if (!kr) return;
+    if (editingEntry) {
+      setProgress(String(editingEntry.progress));
+      setNote(editingEntry.note || '');
+      setImages(editingEntry.images || []);
+      return;
+    }
+    setProgress(kr.progress?.toString() || '0');
+    setNote('');
+    setImages([]);
+  }, [editingEntry, kr]);
 
   const uploadImageFromUri = async (uri: string, mimeType?: string) => {
     setUploading(true);
@@ -144,7 +164,7 @@ export default function UpdateProgressScreen() {
     }
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await reportProgress(krId, progressNum, note.trim(), images.length > 0 ? images : undefined);
+    await reportProgress(krId, progressNum, note.trim(), images.length > 0 ? images : undefined, entryId);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
   };
@@ -160,7 +180,7 @@ export default function UpdateProgressScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>更新进度</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? '编辑进度' : '更新进度'}</Text>
         <Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
           <Ionicons name="close" size={24} color={Colors.textSecondary} />
         </Pressable>
@@ -279,7 +299,7 @@ export default function UpdateProgressScreen() {
           ]}
         >
           <Ionicons name="checkmark" size={20} color={Colors.white} />
-          <Text style={styles.saveBtnText}>{saving ? '保存中...' : '保存进度'}</Text>
+          <Text style={styles.saveBtnText}>{saving ? '保存中...' : (isEditMode ? '保存修改' : '保存进度')}</Text>
         </Pressable>
       </ScrollView>
     </View>

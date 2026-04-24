@@ -710,11 +710,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/key-results/:id/progress", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { progress, note, images } = req.body;
+      const { progress, note, images, entryId } = req.body;
       if (!note || !String(note).trim()) {
         return res.status(400).json({ message: "执行说明不能为空" });
       }
-      const kr = await updateKRProgressInDb(req.params.id, progress, note || "", images);
+      const kr = await updateKRProgressInDb(
+        req.params.id,
+        progress,
+        note || "",
+        images,
+        entryId ? String(entryId) : undefined
+      );
       if (!kr) return res.status(404).json({ message: "关键结果不存在" });
       return res.json(kr);
     } catch (err) {
