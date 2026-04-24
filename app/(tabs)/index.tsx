@@ -149,6 +149,62 @@ function groupKRItemsByObjective(items: AssignedKRItem[]): ObjectiveKRGroup[] {
   return Array.from(map.values());
 }
 
+function extractObjectiveOrder(title: string): number | null {
+  const match = title.match(/[Oo]\s*(\d+)/);
+  if (!match) return null;
+  const order = Number.parseInt(match[1], 10);
+  return Number.isNaN(order) ? null : order;
+}
+
+function compareObjectiveTitleOrder(aTitle: string, bTitle: string): number {
+  const aOrder = extractObjectiveOrder(aTitle);
+  const bOrder = extractObjectiveOrder(bTitle);
+
+  if (aOrder !== null && bOrder !== null && aOrder !== bOrder) {
+    return aOrder - bOrder;
+  }
+  if (aOrder !== null && bOrder === null) return -1;
+  if (aOrder === null && bOrder !== null) return 1;
+  return aTitle.localeCompare(bTitle, 'zh-CN');
+}
+
+function getGroupSourceName(group: ObjectiveKRGroup, userNameMap: Map<string, string>): string {
+  if (group.objective.createdBy) {
+    return (userNameMap.get(group.objective.createdBy) || '').trim();
+  }
+  return '';
+}
+
+function sortObjectiveGroupsBySourceAndOrder(
+  groups: ObjectiveKRGroup[],
+  userOrderMap: Map<string, number>,
+  userNameMap: Map<string, string>
+): ObjectiveKRGroup[] {
+  return [...groups].sort((a, b) => {
+    const aCreatorOrder = a.objective.createdBy ? userOrderMap.get(a.objective.createdBy) : undefined;
+    const bCreatorOrder = b.objective.createdBy ? userOrderMap.get(b.objective.createdBy) : undefined;
+
+    if (aCreatorOrder !== undefined && bCreatorOrder !== undefined && aCreatorOrder !== bCreatorOrder) {
+      return aCreatorOrder - bCreatorOrder;
+    }
+    if (aCreatorOrder !== undefined && bCreatorOrder === undefined) return -1;
+    if (aCreatorOrder === undefined && bCreatorOrder !== undefined) return 1;
+
+    const aSourceName = getGroupSourceName(a, userNameMap);
+    const bSourceName = getGroupSourceName(b, userNameMap);
+    if (aSourceName && bSourceName && aSourceName !== bSourceName) {
+      return aSourceName.localeCompare(bSourceName, 'zh-CN');
+    }
+    if (aSourceName && !bSourceName) return -1;
+    if (!aSourceName && bSourceName) return 1;
+
+    const titleCompare = compareObjectiveTitleOrder(a.objective.title, b.objective.title);
+    if (titleCompare !== 0) return titleCompare;
+
+    return a.objective.id.localeCompare(b.objective.id, 'zh-CN');
+  });
+}
+
 function formatSourceLabel(names: (string | null | undefined)[]): string {
   const uniqueNames = Array.from(
     new Set(
@@ -193,6 +249,9 @@ export default function DashboardScreen() {
 
   const userNameMap = useMemo(() => {
     return new Map(allUsers.map(u => [u.id, u.displayName]));
+  }, [allUsers]);
+  const userOrderMap = useMemo(() => {
+    return new Map(allUsers.map((u, index) => [u.id, index]));
   }, [allUsers]);
 
   const recentQuarterCycles = useMemo(() => {
@@ -292,8 +351,14 @@ export default function DashboardScreen() {
     [cycleFilteredCollaboratingKRs, isSuperAdmin]
   );
 
-  const assignedObjectiveGroups = useMemo(() => groupKRItemsByObjective(displayedAssignedKRs), [displayedAssignedKRs]);
-  const collaboratingObjectiveGroups = useMemo(() => groupKRItemsByObjective(displayedCollaboratingKRs), [displayedCollaboratingKRs]);
+  const assignedObjectiveGroups = useMemo(
+    () => sortObjectiveGroupsBySourceAndOrder(groupKRItemsByObjective(displayedAssignedKRs), userOrderMap, userNameMap),
+    [displayedAssignedKRs, userNameMap, userOrderMap]
+  );
+  const collaboratingObjectiveGroups = useMemo(
+    () => sortObjectiveGroupsBySourceAndOrder(groupKRItemsByObjective(displayedCollaboratingKRs), userOrderMap, userNameMap),
+    [displayedCollaboratingKRs, userNameMap, userOrderMap]
+  );
 
   const toggleDept = (id: string) => {
     setSelectedDeptIds(prev => (prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]));
