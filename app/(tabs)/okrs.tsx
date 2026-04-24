@@ -41,8 +41,7 @@ export default function OKRsScreen() {
 
   const userRole = user?.role || 'member';
   const isAdmin = userRole === 'center_head' || userRole === 'vp' || userRole === 'super_admin';
-  // 普通用户只能看自己中心的OKR，管理员可以看多个中心
-  const showDeptFilter = isAdmin;
+  const isLeadershipRole = userRole === 'center_head' || userRole === 'vp';
   const showUserFilter = true;
 
   useEffect(() => {
@@ -76,6 +75,16 @@ export default function OKRsScreen() {
 
   const visibleUsers = useMemo(() => {
     let baseUsers = allUsers;
+
+    if (isLeadershipRole) {
+      const ownDeptIdSet = new Set(myDeptIds);
+      baseUsers = allUsers.filter(u => {
+        const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
+        const isInOwnDepartments = uDepts.some((d: string) => ownDeptIdSet.has(d));
+        const isLeadership = u.role === 'center_head' || u.role === 'vp';
+        return isInOwnDepartments || isLeadership;
+      });
+    }
     
     // 普通用户只能看到自己中心的人员，以及自己创建OKR的执行人
     if (userRole === 'member') {
@@ -96,7 +105,7 @@ export default function OKRsScreen() {
     }
     
     return baseUsers;
-  }, [allUsers, userRole, myDeptIds, selectedDeptIds, myCreatedKRAssigneeIds]);
+  }, [allUsers, userRole, myDeptIds, selectedDeptIds, myCreatedKRAssigneeIds, isLeadershipRole]);
 
   const searchedUsers = useMemo(() => {
     const keyword = userSearchKeyword.trim().toLowerCase();
@@ -158,13 +167,25 @@ export default function OKRsScreen() {
       }
     } else {
       // 管理员逻辑
+      if (isLeadershipRole) {
+        const ownDeptIdSet = new Set(myDeptIds);
+        const leadershipUserIds = new Set(
+          allUsers
+            .filter(u => u.role === 'center_head' || u.role === 'vp')
+            .map(u => u.id)
+        );
+        filtered = filtered.filter(o => {
+          if (ownDeptIdSet.has(o.departmentId)) return true;
+          return !!o.createdBy && leadershipUserIds.has(o.createdBy);
+        });
+      }
       if (selectedDeptIds.length > 0) filtered = filtered.filter(o => selectedDeptIds.includes(o.departmentId));
       if (selectedUserId) filtered = filtered.filter(o => o.createdBy === selectedUserId);
     }
     
     if (selectedCycle) filtered = filtered.filter(o => o.cycle === selectedCycle);
     return filtered;
-  }, [objectives, keyResults, selectedDeptIds, selectedUserId, selectedCycle, isAdmin, user, myDeptIds]);
+  }, [objectives, keyResults, selectedDeptIds, selectedUserId, selectedCycle, isAdmin, user, myDeptIds, isLeadershipRole, allUsers, sortedObjectives]);
 
   const cycles = useMemo(() => {
     const set = new Set(objectives.map(o => o.cycle));

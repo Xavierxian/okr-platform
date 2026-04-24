@@ -97,9 +97,28 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
     });
   };
 
-  if (user.role === "super_admin" || user.role === "vp" || user.role === "center_head") {
+  if (user.role === "super_admin") {
     const objs = await db.select().from(objectives);
     return sortObjs(objs);
+  }
+
+  if (user.role === "vp" || user.role === "center_head") {
+    const allObjs = sortObjs(await db.select().from(objectives));
+    const multiDeptIds = await getUserDepartmentIds(user.id);
+    const baseDeptIds = multiDeptIds.length > 0
+      ? multiDeptIds
+      : (user.departmentId ? [user.departmentId] : []);
+    const ownDeptIdSet = new Set(baseDeptIds);
+
+    const leadershipUsers = await db.select().from(users).where(
+      or(eq(users.role, "vp"), eq(users.role, "center_head"))
+    );
+    const leadershipUserIds = new Set(leadershipUsers.map(u => u.id));
+
+    return allObjs.filter(obj => {
+      if (ownDeptIdSet.has(obj.departmentId)) return true;
+      return !!obj.createdBy && leadershipUserIds.has(obj.createdBy);
+    });
   }
 
   const allObjs = sortObjs(await db.select().from(objectives));
