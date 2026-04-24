@@ -62,6 +62,34 @@ export default function OKRsScreen() {
     return (user as any)?.departmentIds || (user?.departmentId ? [user.departmentId] : []);
   }, [user]);
 
+  const myDeptScopeIds = useMemo(() => {
+    if (myDeptIds.length === 0) return [];
+    const scopeIds = new Set<string>(myDeptIds);
+    const queue = [...myDeptIds];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      departments.forEach(dept => {
+        if (dept.parentId === currentId && !scopeIds.has(dept.id)) {
+          scopeIds.add(dept.id);
+          queue.push(dept.id);
+        }
+      });
+    }
+
+    const parentQueue = [...myDeptIds];
+    while (parentQueue.length > 0) {
+      const currentId = parentQueue.shift()!;
+      const parentId = departments.find(dept => dept.id === currentId)?.parentId;
+      if (parentId && !scopeIds.has(parentId)) {
+        scopeIds.add(parentId);
+        parentQueue.push(parentId);
+      }
+    }
+
+    return Array.from(scopeIds);
+  }, [departments, myDeptIds]);
+
   // 获取当前用户作为创建人的OKR下的所有执行人
   const myCreatedKRAssigneeIds = useMemo(() => {
     const myCreatedObjIds = new Set(objectives.filter(o => o.createdBy === user?.id).map(o => o.id));
@@ -86,7 +114,14 @@ export default function OKRsScreen() {
         return isInMyDept || isMyKRExecutor;
       });
     } else if (userRole === 'center_head') {
-      baseUsers = allUsers.filter(u => u.role === 'center_head');
+      if (myDeptScopeIds.length > 0) {
+        baseUsers = allUsers.filter(u => {
+          const uDepts = u.departmentIds || (u.departmentId ? [u.departmentId] : []);
+          return uDepts.some((d: string) => myDeptScopeIds.includes(d));
+        });
+      } else {
+        baseUsers = allUsers.filter(u => u.id === user?.id);
+      }
     }
     
     // 如果有选中的部门，进一步过滤
@@ -98,7 +133,7 @@ export default function OKRsScreen() {
     }
     
     return baseUsers;
-  }, [allUsers, userRole, myDeptIds, selectedDeptIds, myCreatedKRAssigneeIds]);
+  }, [allUsers, userRole, myDeptIds, myDeptScopeIds, selectedDeptIds, myCreatedKRAssigneeIds, user]);
 
   const searchedUsers = useMemo(() => {
     const keyword = userSearchKeyword.trim().toLowerCase();

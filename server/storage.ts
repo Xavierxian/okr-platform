@@ -67,14 +67,31 @@ export async function deleteDepartment(id: string): Promise<void> {
 
 function getUserDeptIds(userDeptId: string | null, allDepts: Department[]): string[] {
   if (!userDeptId) return [];
-  const ids = [userDeptId];
-  const children = allDepts.filter(d => d.parentId === userDeptId);
-  children.forEach(c => ids.push(c.id));
-  const parent = allDepts.find(d => d.id === userDeptId);
-  if (parent?.parentId) {
-    ids.push(parent.parentId);
+  const scopedIds = new Set<string>();
+  const queue: string[] = [userDeptId];
+
+  // Include self and all descendants.
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    if (scopedIds.has(currentId)) continue;
+    scopedIds.add(currentId);
+    const children = allDepts.filter(d => d.parentId === currentId);
+    children.forEach(child => {
+      if (!scopedIds.has(child.id)) {
+        queue.push(child.id);
+      }
+    });
   }
-  return [...new Set(ids)];
+
+  // Include all ancestors so users can still see upper-level center objectives.
+  let parentId = allDepts.find(d => d.id === userDeptId)?.parentId || null;
+  while (parentId) {
+    if (scopedIds.has(parentId)) break;
+    scopedIds.add(parentId);
+    parentId = allDepts.find(d => d.id === parentId)?.parentId || null;
+  }
+
+  return Array.from(scopedIds);
 }
 
 export async function getUsersByDepartment(departmentId: string): Promise<User[]> {
@@ -115,15 +132,6 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
   }
 
   const allObjs = sortObjs(await db.select().from(objectives));
-
-  if (user.role === "center_head") {
-    const allUsers = await getAllUsers();
-    const centerHeadIds = new Set(allUsers.filter(u => u.role === "center_head").map(u => u.id));
-    return allObjs.filter(obj => {
-      if (obj.createdBy && centerHeadIds.has(obj.createdBy)) return true;
-      return false;
-    });
-  }
 
   const allDepts = await getDepartments();
   const multiDeptIds = await getUserDepartmentIds(user.id);

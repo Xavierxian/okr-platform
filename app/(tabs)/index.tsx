@@ -9,40 +9,6 @@ import Colors from '@/constants/colors';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import NotificationBell from '@/components/NotificationBell';
 
-function parseQuarterCycle(cycle: string): { year: number; quarter: number } | null {
-  const normalized = cycle.replace(/\s+/g, '');
-  const match = normalized.match(/(\d{4}).*?([一二三四1-4])[季Qq]/);
-  if (!match) return null;
-
-  const quarterMap: Record<string, number> = {
-    '一': 1,
-    '二': 2,
-    '三': 3,
-    '四': 4,
-    '1': 1,
-    '2': 2,
-    '3': 3,
-    '4': 4,
-  };
-
-  const year = parseInt(match[1], 10);
-  const quarter = quarterMap[match[2]];
-  if (!year || !quarter) return null;
-
-  return { year, quarter };
-}
-
-function compareQuarterCycleDesc(a: string, b: string): number {
-  const parsedA = parseQuarterCycle(a);
-  const parsedB = parseQuarterCycle(b);
-
-  if (!parsedA && !parsedB) return b.localeCompare(a, 'zh-CN');
-  if (!parsedA) return 1;
-  if (!parsedB) return -1;
-  if (parsedA.year !== parsedB.year) return parsedB.year - parsedA.year;
-  return parsedB.quarter - parsedA.quarter;
-}
-
 function parseDashboardQuarterCycle(cycle: string): { year: number; quarter: number } | null {
   const normalized = cycle.replace(/\s+/g, '');
   const match = normalized.match(/(\d{4}).*?([\u4E00\u4E8C\u4E09\u56DB1-4]).*?(\u5B63\u5EA6|Q)/i);
@@ -100,14 +66,16 @@ function getStatusLabel(status: string): string {
 
 function KRCard({ item, showActions, delay }: { item: AssignedKRItem; showActions: boolean; delay: number }) {
   const { kr, objective } = item;
+
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)} style={styles.krCard}>
       <View style={styles.krHeader}>
         <View style={[styles.krDot, { backgroundColor: getStatusColor(kr.status) }]} />
         <Text style={styles.krTitle} numberOfLines={2}>{kr.title}</Text>
       </View>
-      <Text style={styles.krObjName} numberOfLines={1}>目标: {objective.title}</Text>
+      <Text style={styles.krObjName} numberOfLines={1}>目标: {objective.title} ({objective.cycle})</Text>
       {kr.description ? <Text style={styles.krDesc} numberOfLines={2}>{kr.description}</Text> : null}
+
       <View style={styles.krMeta}>
         <View style={styles.krProgressBarOuter}>
           <View style={[styles.krProgressBarInner, { width: `${kr.progress}%`, backgroundColor: getStatusColor(kr.status) }]} />
@@ -117,14 +85,14 @@ function KRCard({ item, showActions, delay }: { item: AssignedKRItem; showAction
           <Text style={[styles.krStatusText, { color: getStatusColor(kr.status) }]}>{getStatusLabel(kr.status)}</Text>
         </View>
       </View>
+
       {kr.progressHistory && kr.progressHistory.length > 0 && (
         <View style={styles.krLastUpdate}>
           <Ionicons name="time-outline" size={12} color={Colors.textTertiary} />
-          <Text style={styles.krLastUpdateText}>
-            最近更新: {kr.progressHistory[kr.progressHistory.length - 1]?.note || '无说明'}
-          </Text>
+          <Text style={styles.krLastUpdateText}>最近更新: {kr.progressHistory[kr.progressHistory.length - 1]?.note || '无说明'}</Text>
         </View>
       )}
+
       {kr.selfScore !== null && (
         <View style={styles.krScoreRow}>
           <Ionicons name="star" size={12} color={Colors.warning} />
@@ -132,6 +100,7 @@ function KRCard({ item, showActions, delay }: { item: AssignedKRItem; showAction
           {kr.selfScoreNote ? <Text style={styles.krScoreNote} numberOfLines={1}> - {kr.selfScoreNote}</Text> : null}
         </View>
       )}
+
       {showActions && (
         <View style={styles.krActions}>
           <Pressable
@@ -154,16 +123,39 @@ function KRCard({ item, showActions, delay }: { item: AssignedKRItem; showAction
   );
 }
 
+interface ObjectiveKRGroup {
+  objectiveId: string;
+  objective: AssignedKRItem['objective'];
+  items: AssignedKRItem[];
+}
+
+function groupKRItemsByObjective(items: AssignedKRItem[]): ObjectiveKRGroup[] {
+  const map = new Map<string, ObjectiveKRGroup>();
+  items.forEach(item => {
+    const key = item.objective.id;
+    const existing = map.get(key);
+    if (existing) {
+      existing.items.push(item);
+      return;
+    }
+    map.set(key, { objectiveId: key, objective: item.objective, items: [item] });
+  });
+  return Array.from(map.values());
+}
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { objectives, keyResults, departments, assignedKRs, collaboratingKRs, isLoading } = useOKR();
   const { user } = useAuth();
+
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
+  const [expandedAssignedObjectives, setExpandedAssignedObjectives] = useState<Record<string, boolean>>({});
+  const [expandedCollaboratingObjectives, setExpandedCollaboratingObjectives] = useState<Record<string, boolean>>({});
+
   const isSuperAdmin = user?.role === 'super_admin';
 
   const allMyObjectives = useMemo(() => {
-    // 所有用户（包括管理员）只能看到自己创建的目标
     return objectives.filter(obj => obj.createdBy === user?.id);
   }, [objectives, user]);
 
@@ -215,12 +207,48 @@ export default function DashboardScreen() {
       }));
   }, [isSuperAdmin, keyResults, myObjectives]);
 
+  const cycleFilteredAssignedKRs = useMemo(() => {
+    if (selectedCycle) {
+      return assignedKRs.filter(item => item.objective?.cycle === selectedCycle);
+    }
+    if (recentQuarterCycles.length > 0) {
+      const cycleSet = new Set(recentQuarterCycles);
+      return assignedKRs.filter(item => cycleSet.has(item.objective?.cycle));
+    }
+    return assignedKRs;
+  }, [assignedKRs, recentQuarterCycles, selectedCycle]);
+
+  const cycleFilteredCollaboratingKRs = useMemo(() => {
+    if (selectedCycle) {
+      return collaboratingKRs.filter(item => item.objective?.cycle === selectedCycle);
+    }
+    if (recentQuarterCycles.length > 0) {
+      const cycleSet = new Set(recentQuarterCycles);
+      return collaboratingKRs.filter(item => cycleSet.has(item.objective?.cycle));
+    }
+    return collaboratingKRs;
+  }, [collaboratingKRs, recentQuarterCycles, selectedCycle]);
+
+  const displayedAssignedKRs = useMemo(
+    () => (isSuperAdmin ? allVisibleKRItems : cycleFilteredAssignedKRs),
+    [allVisibleKRItems, cycleFilteredAssignedKRs, isSuperAdmin]
+  );
+  const displayedCollaboratingKRs = useMemo(
+    () => (isSuperAdmin ? ([] as AssignedKRItem[]) : cycleFilteredCollaboratingKRs),
+    [cycleFilteredCollaboratingKRs, isSuperAdmin]
+  );
+
+  const assignedObjectiveGroups = useMemo(() => groupKRItemsByObjective(displayedAssignedKRs), [displayedAssignedKRs]);
+  const collaboratingObjectiveGroups = useMemo(() => groupKRItemsByObjective(displayedCollaboratingKRs), [displayedCollaboratingKRs]);
+
   const toggleDept = (id: string) => {
-    setSelectedDeptIds(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+    setSelectedDeptIds(prev => (prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]));
   };
 
   React.useEffect(() => {
     setSelectedDeptIds([]);
+    setExpandedAssignedObjectives({});
+    setExpandedCollaboratingObjectives({});
   }, [selectedCycle]);
 
   const topPadding = Platform.OS === 'web' ? 20 : insets.top;
@@ -234,35 +262,22 @@ export default function DashboardScreen() {
   }
 
   const hasContent = isSuperAdmin
-    ? myObjectives.length > 0 || allVisibleKRItems.length > 0
-    : myObjectives.length > 0 || assignedKRs.length > 0 || collaboratingKRs.length > 0;
-  const subtitleText = isSuperAdmin
-    ? `${myObjectives.length} 个目标 · ${allVisibleKRItems.length} 个关键结果`
-    : `${myObjectives.length} 个目标 · ${assignedKRs.length} 个协同KR · ${collaboratingKRs.length} 个跨部门协同`;
-  const displayedAssignedKRs = isSuperAdmin ? allVisibleKRItems : assignedKRs;
-  const displayedCollaboratingKRs = isSuperAdmin ? [] : collaboratingKRs;
-  const objectiveSectionTitle = isSuperAdmin ? '全部目标' : '我的目标';
-  const objectiveEmptyText = isSuperAdmin ? '暂无目标数据' : '暂无目标';
-  const assignedSectionTitle = isSuperAdmin ? '全部关键结果' : '本部门协同KR';
-  const assignedEmptyText = isSuperAdmin ? '暂无关键结果' : '暂无本部门协同KR';
+    ? myObjectives.length > 0 || displayedAssignedKRs.length > 0
+    : myObjectives.length > 0 || displayedAssignedKRs.length > 0 || displayedCollaboratingKRs.length > 0;
 
   return (
     <View style={styles.container}>
-      {/* 固定在顶部的仪表盘标题 */}
-      <View style={[styles.stickyHeader, { paddingTop: topPadding }]}> 
+      <View style={[styles.stickyHeader, { paddingTop: topPadding }]}>
         <View style={styles.headerContent}>
           <View style={styles.titleSection}>
             <View>
               <Text style={styles.mainTitle}>{user?.displayName || 'OKR'} 的仪表盘</Text>
-              <Text style={styles.subtitle}>
-                {myObjectives.length} 个目标 · {assignedKRs.length} 个协同KR · {collaboratingKRs.length} 个跨部门协同
-              </Text>
+              <Text style={styles.subtitle}>{myObjectives.length} 个目标 · {displayedAssignedKRs.length} 个协同KR · {displayedCollaboratingKRs.length} 个跨部门协同</Text>
             </View>
           </View>
-            
           <View style={styles.headerActions}>
             <NotificationBell />
-            <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.fabButton, { opacity: pressed ? 0.9 : 1 }]}> 
+            <Pressable onPress={() => router.push('/create-objective')} style={({ pressed }) => [styles.fabButton, { opacity: pressed ? 0.9 : 1 }]}>
               <Ionicons name="add" size={24} color="#FFFFFF" />
             </Pressable>
           </View>
@@ -274,49 +289,10 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
-
         {!hasContent ? (
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyState}>
-            <View style={styles.emptyStateCard}>
-              <View style={styles.emptyStateIcon}>
-                <Ionicons name="flag" size={64} color="#0082EF" />
-              </View>
-              <Text style={styles.emptyStateTitle}>开始你的 OKR 之旅</Text>
-              <Text style={styles.emptyStateText}>
-                创建你的第一个目标，开始追踪团队目标进展。
-                OKR 帮助你明确方向，聚焦重点，实现团队协作。
-              </Text>
-              <View style={styles.emptyStateActions}>
-                <Pressable 
-                  onPress={() => router.push('/create-objective')} 
-                  style={({ pressed }) => [styles.primaryButton, { opacity: pressed ? 0.9 : 1 }]}
-                >
-                  <Ionicons name="add" size={20} color="#FFFFFF" />
-                  <Text style={styles.primaryButtonText}>创建目标</Text>
-                </Pressable>
-                <Pressable 
-                  onPress={() => router.push('/okrs')} 
-                  style={({ pressed }) => [styles.secondaryButton, { opacity: pressed ? 0.9 : 1 }]}
-                >
-                  <Text style={styles.secondaryButtonText}>查看目标</Text>
-                </Pressable>
-              </View>
-              <View style={styles.emptyStateFeatures}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="target" size={20} color="#10B981" />
-                  <Text style={styles.featureText}>明确目标方向</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="trending-up" size={20} color="#3B82F6" />
-                  <Text style={styles.featureText}>追踪进度</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="people" size={20} color="#8B5CF6" />
-                  <Text style={styles.featureText}>团队协作</Text>
-                </View>
-              </View>
-            </View>
-          </Animated.View>
+          <View style={styles.emptySectionCard}>
+            <Text style={styles.emptySectionText}>暂无数据</Text>
+          </View>
         ) : (
           <>
             <Animated.View entering={FadeInDown.duration(400)}>
@@ -327,6 +303,7 @@ export default function DashboardScreen() {
                   <Text style={styles.sectionBadgeText}>{myObjectives.length}</Text>
                 </View>
               </View>
+
               {recentQuarterCycles.length > 0 && (
                 <View style={styles.filterBlock}>
                   <View style={styles.filterRow}>
@@ -354,23 +331,17 @@ export default function DashboardScreen() {
                   </View>
                 </View>
               )}
+
               {shouldShowDeptFilter && (
                 <View style={styles.filterBlock}>
                   <View style={styles.filterRow}>
-                    <Pressable
-                      onPress={() => setSelectedDeptIds([])}
-                      style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipDeptActive]}
-                    >
+                    <Pressable onPress={() => setSelectedDeptIds([])} style={[styles.filterChip, selectedDeptIds.length === 0 && styles.filterChipDeptActive]}>
                       <Text style={[styles.filterChipText, selectedDeptIds.length === 0 && styles.filterChipTextActive]}>全部部门</Text>
                     </Pressable>
                     {usedDepts.map(dept => {
                       const isActive = selectedDeptIds.includes(dept.id);
                       return (
-                        <Pressable
-                          key={dept.id}
-                          onPress={() => toggleDept(dept.id)}
-                          style={[styles.filterChip, isActive && styles.filterChipDeptActive]}
-                        >
+                        <Pressable key={dept.id} onPress={() => toggleDept(dept.id)} style={[styles.filterChip, isActive && styles.filterChipDeptActive]}>
                           <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>{dept.name}</Text>
                         </Pressable>
                       );
@@ -378,6 +349,7 @@ export default function DashboardScreen() {
                   </View>
                 </View>
               )}
+
               {myObjectives.length === 0 ? (
                 <View style={styles.emptySectionCard}>
                   <Text style={styles.emptySectionText}>暂无目标</Text>
@@ -389,6 +361,7 @@ export default function DashboardScreen() {
                   const avgProg = objKRs.length > 0
                     ? Math.round(objKRs.reduce((s, kr) => s + kr.progress, 0) / objKRs.length)
                     : 0;
+
                   return (
                     <Pressable
                       key={obj.id}
@@ -397,9 +370,7 @@ export default function DashboardScreen() {
                     >
                       <View style={styles.objHeader}>
                         <Text style={styles.objTitle} numberOfLines={1}>{obj.title}</Text>
-                        <View style={styles.objBadge}>
-                          <Text style={styles.objBadgeText}>{obj.cycle}</Text>
-                        </View>
+                        <View style={styles.objBadge}><Text style={styles.objBadgeText}>{obj.cycle}</Text></View>
                       </View>
                       <View style={styles.objMeta}>
                         <Text style={styles.objDept}>{dept?.name || '未知'}</Text>
@@ -420,39 +391,87 @@ export default function DashboardScreen() {
                 <Ionicons name="people" size={20} color={Colors.success} />
                 <Text style={styles.sectionTitle}>本部门协同 KR</Text>
                 <View style={[styles.sectionBadge, { backgroundColor: Colors.success + '20' }]}>
-                  <Text style={[styles.sectionBadgeText, { color: Colors.success }]}>{displayedAssignedKRs.length}</Text>
+                  <Text style={[styles.sectionBadgeText, { color: Colors.success }]}>{assignedObjectiveGroups.length}</Text>
                 </View>
               </View>
-              {displayedAssignedKRs.length === 0 ? (
-                <View style={styles.emptySectionCard}>
-                  <Text style={styles.emptySectionText}>暂无本部门协同 KR</Text>
-                </View>
+
+              {assignedObjectiveGroups.length === 0 ? (
+                <View style={styles.emptySectionCard}><Text style={styles.emptySectionText}>暂无本部门协同 KR</Text></View>
               ) : (
-                displayedAssignedKRs.map((item, idx) => (
-                  <KRCard key={item.kr.id} item={item} showActions={!isSuperAdmin} delay={idx * 50} />
-                ))
+                assignedObjectiveGroups.map((group, groupIdx) => {
+                  const isExpanded = !!expandedAssignedObjectives[group.objectiveId];
+                  return (
+                    <View key={group.objectiveId} style={styles.objectiveGroupCard}>
+                      <Pressable
+                        onPress={() => setExpandedAssignedObjectives(prev => ({ ...prev, [group.objectiveId]: !prev[group.objectiveId] }))}
+                        style={({ pressed }) => [styles.objectiveGroupHeader, { opacity: pressed ? 0.85 : 1 }]}
+                      >
+                        <View style={styles.objectiveGroupHeaderLeft}>
+                          <Ionicons name={isExpanded ? 'chevron-down' : 'chevron-forward'} size={16} color={Colors.textSecondary} />
+                          <Text style={styles.objectiveGroupTitle} numberOfLines={1}>{group.objective.title}</Text>
+                        </View>
+                        <View style={styles.objectiveGroupMeta}>
+                          <Text style={styles.objectiveGroupCycle}>{group.objective.cycle}</Text>
+                          <View style={styles.objectiveGroupCountBadge}><Text style={styles.objectiveGroupCountText}>{group.items.length} KR</Text></View>
+                        </View>
+                      </Pressable>
+
+                      {isExpanded && (
+                        <View style={styles.objectiveGroupBody}>
+                          {group.items.map((item, itemIdx) => (
+                            <KRCard key={item.kr.id} item={item} showActions={!isSuperAdmin} delay={(groupIdx * 3 + itemIdx) * 50} />
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })
               )}
             </Animated.View>
 
             {!isSuperAdmin && (
-            <Animated.View entering={FadeInDown.delay(400).duration(400)} style={{ marginTop: 24 }}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="globe" size={20} color={Colors.info} />
-                <Text style={styles.sectionTitle}>跨部门协同 KR</Text>
-                <View style={[styles.sectionBadge, { backgroundColor: Colors.info + '20' }]}>
-                  <Text style={[styles.sectionBadgeText, { color: Colors.info }]}>{collaboratingKRs.length}</Text>
+              <Animated.View entering={FadeInDown.delay(400).duration(400)} style={{ marginTop: 24 }}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="globe" size={20} color={Colors.info} />
+                  <Text style={styles.sectionTitle}>跨部门协同 KR</Text>
+                  <View style={[styles.sectionBadge, { backgroundColor: Colors.info + '20' }]}>
+                    <Text style={[styles.sectionBadgeText, { color: Colors.info }]}>{collaboratingObjectiveGroups.length}</Text>
+                  </View>
                 </View>
-              </View>
-              {displayedCollaboratingKRs.length === 0 ? (
-                <View style={styles.emptySectionCard}>
-                  <Text style={styles.emptySectionText}>暂无跨部门协同 KR</Text>
-                </View>
-              ) : (
-                displayedCollaboratingKRs.map((item, idx) => (
-                  <KRCard key={item.kr.id} item={item} showActions={false} delay={idx * 50} />
-                ))
-              )}
-            </Animated.View>
+
+                {collaboratingObjectiveGroups.length === 0 ? (
+                  <View style={styles.emptySectionCard}><Text style={styles.emptySectionText}>暂无跨部门协同 KR</Text></View>
+                ) : (
+                  collaboratingObjectiveGroups.map((group, groupIdx) => {
+                    const isExpanded = !!expandedCollaboratingObjectives[group.objectiveId];
+                    return (
+                      <View key={group.objectiveId} style={styles.objectiveGroupCard}>
+                        <Pressable
+                          onPress={() => setExpandedCollaboratingObjectives(prev => ({ ...prev, [group.objectiveId]: !prev[group.objectiveId] }))}
+                          style={({ pressed }) => [styles.objectiveGroupHeader, { opacity: pressed ? 0.85 : 1 }]}
+                        >
+                          <View style={styles.objectiveGroupHeaderLeft}>
+                            <Ionicons name={isExpanded ? 'chevron-down' : 'chevron-forward'} size={16} color={Colors.textSecondary} />
+                            <Text style={styles.objectiveGroupTitle} numberOfLines={1}>{group.objective.title}</Text>
+                          </View>
+                          <View style={styles.objectiveGroupMeta}>
+                            <Text style={styles.objectiveGroupCycle}>{group.objective.cycle}</Text>
+                            <View style={styles.objectiveGroupCountBadge}><Text style={styles.objectiveGroupCountText}>{group.items.length} KR</Text></View>
+                          </View>
+                        </Pressable>
+
+                        {isExpanded && (
+                          <View style={styles.objectiveGroupBody}>
+                            {group.items.map((item, itemIdx) => (
+                              <KRCard key={item.kr.id} item={item} showActions={false} delay={(groupIdx * 3 + itemIdx) * 50} />
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+              </Animated.View>
             )}
           </>
         )}
@@ -465,8 +484,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F6F7' },
   scrollContent: { paddingHorizontal: 20 },
   scrollView: { flex: 1 },
-  
-  // 固定在顶部的头部 - 钉钉风格
+
   stickyHeader: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
@@ -480,41 +498,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  titleSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    flex: 1,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 20,
-    backgroundColor: '#E6F4FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mainTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 24,
-    color: '#171A1D',
-  },
-  subtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: '#8F9BB3',
-    marginTop: 4,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
+  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  titleSection: { flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 },
+  mainTitle: { fontFamily: 'Inter_700Bold', fontSize: 24, color: '#171A1D' },
+  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 13, color: '#8F9BB3', marginTop: 4 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   fabButton: {
     width: 44,
     height: 44,
@@ -523,24 +511,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
-  // 保持原有样式兼容
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 4 },
 
-  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0082EF', alignItems: 'center', justifyContent: 'center', shadowColor: '#0082EF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: 8 },
   sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: '#171A1D', flex: 1 },
   sectionBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   sectionBadgeText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82' },
+
   filterBlock: { marginBottom: 12 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  filterChip: { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EBEEF5' },
+  filterChip: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EBEEF5',
+  },
   filterChipActive: { backgroundColor: '#0082EF', borderColor: '#0082EF' },
   filterChipDeptActive: { backgroundColor: '#52C41A', borderColor: '#52C41A' },
   filterChipText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82', flexShrink: 1 },
   filterChipTextActive: { color: '#FFFFFF' },
-  emptySectionCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 24, alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#EBEEF5' },
+
+  emptySectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#EBEEF5',
+  },
   emptySectionText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#8F9BB3' },
+
   objCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#EBEEF5' },
   objHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   objTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#171A1D', flex: 1, marginRight: 8 },
@@ -552,6 +556,30 @@ const styles = StyleSheet.create({
   objProgressBar: { height: 4, backgroundColor: '#E8EAEF', borderRadius: 2, marginTop: 12, overflow: 'hidden' },
   objProgressFill: { height: 4, borderRadius: 2 },
   objProgressText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3', marginTop: 6 },
+
+  objectiveGroupCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EBEEF5',
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  objectiveGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  objectiveGroupHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 },
+  objectiveGroupTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#171A1D', flexShrink: 1 },
+  objectiveGroupMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  objectiveGroupCycle: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3' },
+  objectiveGroupCountBadge: { backgroundColor: '#F5F6F7', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  objectiveGroupCountText: { fontFamily: 'Inter_500Medium', fontSize: 11, color: '#5E6D82' },
+  objectiveGroupBody: { paddingHorizontal: 10, paddingBottom: 10 },
+
   krCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#EBEEF5' },
   krHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   krDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
@@ -572,116 +600,4 @@ const styles = StyleSheet.create({
   krActions: { flexDirection: 'row', gap: 10, marginTop: 10, marginLeft: 16 },
   krActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#F5F6F7' },
   krActionText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82' },
-  emptyState: { alignItems: 'center', paddingVertical: 60, gap: 12 },
-  emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 20, color: '#171A1D' },
-  emptyText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#5E6D82', textAlign: 'center', paddingHorizontal: 40 },
-  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0082EF', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginTop: 8, shadowColor: '#0082EF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
-  emptyBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#FFFFFF' },
-  deptFilter: { marginBottom: 16 },
-  deptFilterRow: { flexDirection: 'row', gap: 8 },
-  deptChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EBEEF5' },
-  deptChipActive: { backgroundColor: '#0082EF', borderColor: '#0082EF' },
-  deptChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: '#5E6D82' },
-  deptChipTextActive: { color: '#FFFFFF' },
-  // 新的空状态样式
-  emptyStateCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: '#EBEEF5',
-    marginHorizontal: 20,
-  },
-  emptyStateIcon: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#E6F4FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  emptyStateTitle: {
-    fontFamily: 'Inter_800ExtraBold',
-    fontSize: 28,
-    color: '#171A1D',
-    textAlign: 'center',
-    marginBottom: 12,
-    letterSpacing: -0.5,
-  },
-  emptyStateText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 16,
-    color: '#5E6D82',
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
-  },
-  emptyStateActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 32,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0082EF',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    shadowColor: '#0082EF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  primaryButtonText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#EBEEF5',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  secondaryButtonText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 16,
-    color: '#0082EF',
-  },
-  emptyStateFeatures: {
-    flexDirection: 'row',
-    gap: 32,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#EBEEF5',
-  },
-  featureItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  featureText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    color: '#5E6D82',
-  },
 });
