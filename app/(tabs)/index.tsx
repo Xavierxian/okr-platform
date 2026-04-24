@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -143,6 +143,19 @@ function groupKRItemsByObjective(items: AssignedKRItem[]): ObjectiveKRGroup[] {
   return Array.from(map.values());
 }
 
+function formatSourceLabel(names: (string | null | undefined)[]): string {
+  const uniqueNames = Array.from(
+    new Set(
+      names
+        .map(name => (name || '').trim())
+        .filter(Boolean)
+    )
+  );
+  if (uniqueNames.length === 0) return '未知';
+  if (uniqueNames.length === 1) return uniqueNames[0];
+  return `${uniqueNames[0]} 等${uniqueNames.length}人`;
+}
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { objectives, keyResults, departments, assignedKRs, collaboratingKRs, isLoading } = useOKR();
@@ -152,6 +165,7 @@ export default function DashboardScreen() {
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
   const [expandedAssignedObjectives, setExpandedAssignedObjectives] = useState<Record<string, boolean>>({});
   const [expandedCollaboratingObjectives, setExpandedCollaboratingObjectives] = useState<Record<string, boolean>>({});
+  const hasInitializedCycleSelection = useRef(false);
 
   const isSuperAdmin = user?.role === 'super_admin';
 
@@ -173,6 +187,23 @@ export default function DashboardScreen() {
     );
     return uniqueCycles.sort(compareDashboardQuarterCycleDesc).slice(0, 4);
   }, [dashboardObjectives]);
+
+  React.useEffect(() => {
+    if (hasInitializedCycleSelection.current) return;
+    if (recentQuarterCycles.length === 0) return;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+
+    const currentCycle = recentQuarterCycles.find(cycle => {
+      const parsed = parseDashboardQuarterCycle(cycle);
+      return !!parsed && parsed.year === currentYear && parsed.quarter === currentQuarter;
+    });
+
+    setSelectedCycle(currentCycle || recentQuarterCycles[0] || null);
+    hasInitializedCycleSelection.current = true;
+  }, [recentQuarterCycles]);
 
   const cycleScopedObjectives = useMemo(() => {
     if (selectedCycle) {
@@ -400,6 +431,9 @@ export default function DashboardScreen() {
               ) : (
                 assignedObjectiveGroups.map((group, groupIdx) => {
                   const isExpanded = !!expandedAssignedObjectives[group.objectiveId];
+                  const sourceLabel = formatSourceLabel(
+                    group.items.map(item => item.kr.collaboratorName || item.kr.assigneeName)
+                  );
                   return (
                     <View key={group.objectiveId} style={styles.objectiveGroupCard}>
                       <Pressable
@@ -408,7 +442,10 @@ export default function DashboardScreen() {
                       >
                         <View style={styles.objectiveGroupHeaderLeft}>
                           <Ionicons name={isExpanded ? 'chevron-down' : 'chevron-forward'} size={16} color={Colors.textSecondary} />
-                          <Text style={styles.objectiveGroupTitle} numberOfLines={1}>{group.objective.title}</Text>
+                          <View style={styles.objectiveGroupTitleWrap}>
+                            <Text style={styles.objectiveGroupTitle} numberOfLines={1}>{group.objective.title}</Text>
+                            <Text style={styles.objectiveGroupSource} numberOfLines={1}>来源: {sourceLabel}</Text>
+                          </View>
                         </View>
                         <View style={styles.objectiveGroupMeta}>
                           <Text style={styles.objectiveGroupCycle}>{group.objective.cycle}</Text>
@@ -444,6 +481,9 @@ export default function DashboardScreen() {
                 ) : (
                   collaboratingObjectiveGroups.map((group, groupIdx) => {
                     const isExpanded = !!expandedCollaboratingObjectives[group.objectiveId];
+                    const sourceLabel = formatSourceLabel(
+                      group.items.map(item => item.kr.assigneeName || item.kr.collaboratorName)
+                    );
                     return (
                       <View key={group.objectiveId} style={styles.objectiveGroupCard}>
                         <Pressable
@@ -452,7 +492,10 @@ export default function DashboardScreen() {
                         >
                           <View style={styles.objectiveGroupHeaderLeft}>
                             <Ionicons name={isExpanded ? 'chevron-down' : 'chevron-forward'} size={16} color={Colors.textSecondary} />
-                            <Text style={styles.objectiveGroupTitle} numberOfLines={1}>{group.objective.title}</Text>
+                            <View style={styles.objectiveGroupTitleWrap}>
+                              <Text style={styles.objectiveGroupTitle} numberOfLines={1}>{group.objective.title}</Text>
+                              <Text style={styles.objectiveGroupSource} numberOfLines={1}>来源: {sourceLabel}</Text>
+                            </View>
                           </View>
                           <View style={styles.objectiveGroupMeta}>
                             <Text style={styles.objectiveGroupCycle}>{group.objective.cycle}</Text>
@@ -573,7 +616,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   objectiveGroupHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 },
+  objectiveGroupTitleWrap: { flex: 1, minWidth: 0 },
   objectiveGroupTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#171A1D', flexShrink: 1 },
+  objectiveGroupSource: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3', marginTop: 2 },
   objectiveGroupMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   objectiveGroupCycle: { fontFamily: 'Inter_400Regular', fontSize: 11, color: '#8F9BB3' },
   objectiveGroupCountBadge: { backgroundColor: '#F5F6F7', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
