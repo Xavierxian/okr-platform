@@ -65,35 +65,6 @@ export async function deleteDepartment(id: string): Promise<void> {
   await db.delete(departments).where(or(eq(departments.id, id), eq(departments.parentId, id)));
 }
 
-function getUserDeptIds(userDeptId: string | null, allDepts: Department[]): string[] {
-  if (!userDeptId) return [];
-  const scopedIds = new Set<string>();
-  const queue: string[] = [userDeptId];
-
-  // Include self and all descendants.
-  while (queue.length > 0) {
-    const currentId = queue.shift()!;
-    if (scopedIds.has(currentId)) continue;
-    scopedIds.add(currentId);
-    const children = allDepts.filter(d => d.parentId === currentId);
-    children.forEach(child => {
-      if (!scopedIds.has(child.id)) {
-        queue.push(child.id);
-      }
-    });
-  }
-
-  // Include all ancestors so users can still see upper-level center objectives.
-  let parentId = allDepts.find(d => d.id === userDeptId)?.parentId || null;
-  while (parentId) {
-    if (scopedIds.has(parentId)) break;
-    scopedIds.add(parentId);
-    parentId = allDepts.find(d => d.id === parentId)?.parentId || null;
-  }
-
-  return Array.from(scopedIds);
-}
-
 export async function getUsersByDepartment(departmentId: string): Promise<User[]> {
   return db.select().from(users).where(eq(users.departmentId, departmentId));
 }
@@ -126,24 +97,19 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
     });
   };
 
-  if (user.role === "super_admin" || user.role === "vp") {
+  if (user.role === "super_admin" || user.role === "vp" || user.role === "center_head") {
     const objs = await db.select().from(objectives);
     return sortObjs(objs);
   }
 
   const allObjs = sortObjs(await db.select().from(objectives));
-
-  const allDepts = await getDepartments();
   const multiDeptIds = await getUserDepartmentIds(user.id);
-  const allUserDeptIds: string[] = [];
-  const baseDeptIds = multiDeptIds.length > 0 ? multiDeptIds : (user.departmentId ? [user.departmentId] : []);
-  for (const did of baseDeptIds) {
-    const expanded = getUserDeptIds(did, allDepts);
-    expanded.forEach(id => { if (!allUserDeptIds.includes(id)) allUserDeptIds.push(id); });
-  }
+  const baseDeptIds = multiDeptIds.length > 0
+    ? multiDeptIds
+    : (user.departmentId ? [user.departmentId] : []);
 
   return allObjs.filter(obj => {
-    if (allUserDeptIds.includes(obj.departmentId)) return true;
+    if (baseDeptIds.includes(obj.departmentId)) return true;
     return false;
   });
 }
