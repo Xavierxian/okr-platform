@@ -141,6 +141,14 @@ export default function OKRsScreen() {
     return visibleUsers.filter(u => u.displayName.toLowerCase().includes(keyword));
   }, [visibleUsers, userSearchKeyword]);
 
+  const isAllCentersScope = isAdmin && selectedDeptIds.length === 0;
+  const displayedUsers = useMemo(() => {
+    const keyword = userSearchKeyword.trim();
+    if (keyword.length > 0) return searchedUsers;
+    if (isAllCentersScope) return [];
+    return visibleUsers;
+  }, [isAllCentersScope, searchedUsers, userSearchKeyword, visibleUsers]);
+
   const selectedUser = useMemo(() => {
     if (!selectedUserId) return null;
     return visibleUsers.find(u => u.id === selectedUserId) || null;
@@ -481,21 +489,21 @@ export default function OKRsScreen() {
                   )}
                 </View>
 
-                {userSearchKeyword.trim().length === 0 ? (
-                  <Text style={styles.userFilterHintText}>默认不展示全部人员，请先输入姓名搜索</Text>
+                {isAllCentersScope && userSearchKeyword.trim().length === 0 ? (
+                  <Text style={styles.userFilterHintText}>人员数量较大，页面无法完整显示，请输入姓名进行搜索</Text>
                 ) : (
                   <View style={styles.userFilterScrollViewport}>
                     <ScrollView
                       nestedScrollEnabled
-                      showsVerticalScrollIndicator={searchedUsers.length > 8}
+                      showsVerticalScrollIndicator={displayedUsers.length > 8}
                       style={styles.userFilterScroll}
                       contentContainerStyle={styles.userFilterScrollContent}
                     >
-                      {searchedUsers.length === 0 ? (
-                        <Text style={styles.userFilterHintText}>未找到匹配人员</Text>
+                      {displayedUsers.length === 0 ? (
+                        <Text style={styles.userFilterHintText}>{userSearchKeyword.trim().length > 0 ? '未找到匹配人员' : '暂无可选人员'}</Text>
                       ) : (
                         <View style={styles.filterChipsContainer}>
-                          {searchedUsers.map(u => {
+                          {displayedUsers.map(u => {
                             const isActive = selectedUserId === u.id || (selectedUserId === null && !isAdmin && u.id === user?.id);
                             return (
                               <Pressable key={u.id} onPress={() => setSelectedUserId(isActive ? null : u.id)} style={[styles.modernFilterChip, isActive && styles.modernFilterChipUserActive]}>
