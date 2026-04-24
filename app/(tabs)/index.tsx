@@ -67,6 +67,9 @@ function getStatusLabel(status: string): string {
 
 function KRCard({ item, showActions, delay }: { item: AssignedKRItem; showActions: boolean; delay: number }) {
   const { kr, objective } = item;
+  const latestProgressEntry = kr.progressHistory && kr.progressHistory.length > 0
+    ? kr.progressHistory[kr.progressHistory.length - 1]
+    : null;
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)} style={styles.krCard}>
@@ -87,10 +90,10 @@ function KRCard({ item, showActions, delay }: { item: AssignedKRItem; showAction
         </View>
       </View>
 
-      {kr.progressHistory && kr.progressHistory.length > 0 && (
+      {latestProgressEntry && (
         <View style={styles.krLastUpdate}>
           <Ionicons name="time-outline" size={12} color={Colors.textTertiary} />
-          <Text style={styles.krLastUpdateText}>最近更新: {kr.progressHistory[kr.progressHistory.length - 1]?.note || '无说明'}</Text>
+          <Text style={styles.krLastUpdateText}>最近更新: {latestProgressEntry.note || '无说明'}</Text>
         </View>
       )}
 
@@ -111,6 +114,15 @@ function KRCard({ item, showActions, delay }: { item: AssignedKRItem; showAction
             <Ionicons name="create-outline" size={14} color={Colors.primary} />
             <Text style={styles.krActionText}>更新进度</Text>
           </Pressable>
+          {latestProgressEntry && (
+            <Pressable
+              onPress={() => router.push({ pathname: '/update-progress', params: { krId: kr.id, entryId: latestProgressEntry.id } })}
+              style={({ pressed }) => [styles.krActionBtn, { opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="create" size={14} color={Colors.info} />
+              <Text style={styles.krActionText}>编辑记录</Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={() => router.push({ pathname: '/score-kr', params: { krId: kr.id } })}
             style={({ pressed }) => [styles.krActionBtn, { opacity: pressed ? 0.8 : 1 }]}
@@ -762,3 +774,4 @@ const styles = StyleSheet.create({
   krActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#F5F6F7' },
   krActionText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#5E6D82' },
 });
+
