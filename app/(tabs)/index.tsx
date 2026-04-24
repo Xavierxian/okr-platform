@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -256,27 +256,32 @@ export default function DashboardScreen() {
       }));
   }, [isSuperAdmin, keyResults, myObjectives]);
 
+  const isFromOtherUsersObjective = useCallback(
+    (item: AssignedKRItem) => item.objective?.createdBy !== user?.id,
+    [user?.id]
+  );
+
   const cycleFilteredAssignedKRs = useMemo(() => {
     if (selectedCycle) {
-      return assignedKRs.filter(item => item.objective?.cycle === selectedCycle);
+      return assignedKRs.filter(item => item.objective?.cycle === selectedCycle && isFromOtherUsersObjective(item));
     }
     if (recentQuarterCycles.length > 0) {
       const cycleSet = new Set(recentQuarterCycles);
-      return assignedKRs.filter(item => cycleSet.has(item.objective?.cycle));
+      return assignedKRs.filter(item => cycleSet.has(item.objective?.cycle) && isFromOtherUsersObjective(item));
     }
-    return assignedKRs;
-  }, [assignedKRs, recentQuarterCycles, selectedCycle]);
+    return assignedKRs.filter(isFromOtherUsersObjective);
+  }, [assignedKRs, isFromOtherUsersObjective, recentQuarterCycles, selectedCycle]);
 
   const cycleFilteredCollaboratingKRs = useMemo(() => {
     if (selectedCycle) {
-      return collaboratingKRs.filter(item => item.objective?.cycle === selectedCycle);
+      return collaboratingKRs.filter(item => item.objective?.cycle === selectedCycle && isFromOtherUsersObjective(item));
     }
     if (recentQuarterCycles.length > 0) {
       const cycleSet = new Set(recentQuarterCycles);
-      return collaboratingKRs.filter(item => cycleSet.has(item.objective?.cycle));
+      return collaboratingKRs.filter(item => cycleSet.has(item.objective?.cycle) && isFromOtherUsersObjective(item));
     }
-    return collaboratingKRs;
-  }, [collaboratingKRs, recentQuarterCycles, selectedCycle]);
+    return collaboratingKRs.filter(isFromOtherUsersObjective);
+  }, [collaboratingKRs, isFromOtherUsersObjective, recentQuarterCycles, selectedCycle]);
 
   const displayedAssignedKRs = useMemo(
     () => (isSuperAdmin ? allVisibleKRItems : cycleFilteredAssignedKRs),
