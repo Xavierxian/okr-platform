@@ -230,7 +230,7 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
 
 \u8BF7\u7528\u7B80\u6D01\u3001\u4E13\u4E1A\u7684\u4E2D\u6587\u64B0\u5199\uFF0C\u7A81\u51FA\u6570\u636E\u9A71\u52A8\u7684\u6D1E\u5BDF\u3002`;
   const response = await openai.chat.completions.create({
-    model: "DeepSeek-V3.2",
+    model: OKR_ANALYSIS_MODEL,
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: 4096
   });
@@ -307,7 +307,7 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
 
 \u8BF7\u7528\u7B80\u6D01\u3001\u4E13\u4E1A\u7684\u4E2D\u6587\u64B0\u5199\uFF0C\u7A81\u51FA\u6570\u636E\u9A71\u52A8\u7684\u6D1E\u5BDF\u3002`;
   const stream = await openai.chat.completions.create({
-    model: "DeepSeek-V3.2",
+    model: OKR_ANALYSIS_MODEL,
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: 4096,
     stream: true
@@ -319,7 +319,7 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
     }
   }
 }
-var apiKey, baseURL, openai;
+var apiKey, baseURL, openai, OKR_ANALYSIS_MODEL;
 var init_ai_analysis = __esm({
   "server/ai-analysis.ts"() {
     "use strict";
@@ -332,6 +332,7 @@ var init_ai_analysis = __esm({
       apiKey,
       baseURL: baseURL || void 0
     });
+    OKR_ANALYSIS_MODEL = process.env.AI_MODEL_OKR_ANALYSIS || "DeepSeek-V3.2";
   }
 });
 
@@ -382,6 +383,27 @@ init_db();
 init_schema();
 import { eq, or, inArray, and, asc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { createDecipheriv } from "node:crypto";
+var AES_CONFIG_KEY = "Bai%2018Son^9120";
+function decryptAesEcbBase64(value, key = AES_CONFIG_KEY) {
+  try {
+    const decipher = createDecipheriv("aes-128-ecb", Buffer.from(key, "utf8"), null);
+    decipher.setAutoPadding(true);
+    return Buffer.concat([
+      decipher.update(Buffer.from(value, "base64")),
+      decipher.final()
+    ]).toString("utf8");
+  } catch {
+    return value;
+  }
+}
+function getAdminSeedPassword() {
+  const encryptedPassword = process.env.ADMIN_PASSWORD_AES?.trim();
+  if (!encryptedPassword) {
+    throw new Error("ADMIN_PASSWORD_AES environment variable is required to seed or sync the admin password");
+  }
+  return decryptAesEcbBase64(encryptedPassword);
+}
 async function getUser(id) {
   const [user] = await db.select().from(users).where(eq(users.id, id));
   return user;
@@ -429,17 +451,6 @@ async function updateDepartment(id, updates) {
 async function deleteDepartment(id) {
   await db.delete(departments).where(or(eq(departments.id, id), eq(departments.parentId, id)));
 }
-function getUserDeptIds(userDeptId, allDepts) {
-  if (!userDeptId) return [];
-  const ids = [userDeptId];
-  const children = allDepts.filter((d) => d.parentId === userDeptId);
-  children.forEach((c) => ids.push(c.id));
-  const parent = allDepts.find((d) => d.id === userDeptId);
-  if (parent?.parentId) {
-    ids.push(parent.parentId);
-  }
-  return [...new Set(ids)];
-}
 async function getUsersByDepartment(departmentId) {
   return db.select().from(users).where(eq(users.departmentId, departmentId));
 }
@@ -467,31 +478,29 @@ async function getObjectivesForUser(user) {
       return numA - numB;
     });
   };
-  if (user.role === "super_admin" || user.role === "vp") {
+  if (user.role === "super_admin") {
     const objs = await db.select().from(objectives);
     return sortObjs(objs);
   }
+  if (user.role === "vp" || user.role === "center_head") {
+    const allObjs2 = sortObjs(await db.select().from(objectives));
+    const multiDeptIds2 = await getUserDepartmentIds(user.id);
+    const baseDeptIds2 = multiDeptIds2.length > 0 ? multiDeptIds2 : user.departmentId ? [user.departmentId] : [];
+    const ownDeptIdSet = new Set(baseDeptIds2);
+    const leadershipUsers = await db.select().from(users).where(
+      or(eq(users.role, "vp"), eq(users.role, "center_head"))
+    );
+    const leadershipUserIds = new Set(leadershipUsers.map((u) => u.id));
+    return allObjs2.filter((obj) => {
+      if (ownDeptIdSet.has(obj.departmentId)) return true;
+      return !!obj.createdBy && leadershipUserIds.has(obj.createdBy);
+    });
+  }
   const allObjs = sortObjs(await db.select().from(objectives));
-  if (user.role === "center_head") {
-    const allUsers = await getAllUsers();
-    const centerHeadIds = new Set(allUsers.filter((u) => u.role === "center_head").map((u) => u.id));
-    return allObjs.filter((obj) => {
-      if (obj.createdBy && centerHeadIds.has(obj.createdBy)) return true;
-      return false;
-    });
-  }
-  const allDepts = await getDepartments();
   const multiDeptIds = await getUserDepartmentIds(user.id);
-  const allUserDeptIds = [];
   const baseDeptIds = multiDeptIds.length > 0 ? multiDeptIds : user.departmentId ? [user.departmentId] : [];
-  for (const did of baseDeptIds) {
-    const expanded = getUserDeptIds(did, allDepts);
-    expanded.forEach((id) => {
-      if (!allUserDeptIds.includes(id)) allUserDeptIds.push(id);
-    });
-  }
   return allObjs.filter((obj) => {
-    if (allUserDeptIds.includes(obj.departmentId)) return true;
+    if (baseDeptIds.includes(obj.departmentId)) return true;
     return false;
   });
 }
@@ -576,17 +585,32 @@ async function updateKeyResultInDb(id, updates) {
 async function deleteKeyResultInDb(id) {
   await db.delete(keyResults).where(eq(keyResults.id, id));
 }
-async function updateKRProgressInDb(id, progress, note, images) {
+async function updateKRProgressInDb(id, progress, note, images, entryId) {
   const [existing] = await db.select().from(keyResults).where(eq(keyResults.id, id));
   if (!existing) return void 0;
-  const entry = {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    date: (/* @__PURE__ */ new Date()).toISOString(),
-    progress,
-    note,
-    images: images && images.length > 0 ? images : void 0
-  };
-  const history = [...existing.progressHistory || [], entry];
+  const normalizedImages = images && images.length > 0 ? images : void 0;
+  const existingHistory = existing.progressHistory || [];
+  let history;
+  if (entryId) {
+    const historyIndex = existingHistory.findIndex((entry) => entry.id === entryId);
+    if (historyIndex === -1) return void 0;
+    history = existingHistory.map((entry, index) => index === historyIndex ? {
+      ...entry,
+      progress,
+      note,
+      images: normalizedImages
+    } : entry);
+  } else {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      date: (/* @__PURE__ */ new Date()).toISOString(),
+      progress,
+      note,
+      images: normalizedImages
+    };
+    history = [...existingHistory, entry];
+  }
+  const latestProgress = history.length > 0 ? history[history.length - 1]?.progress ?? progress : progress;
   const now = /* @__PURE__ */ new Date();
   const end = new Date(existing.endDate);
   const start = new Date(existing.startDate);
@@ -594,11 +618,11 @@ async function updateKRProgressInDb(id, progress, note, images) {
   const elapsedDays = (now.getTime() - start.getTime()) / (1e3 * 60 * 60 * 24);
   const expectedProgress = Math.min(100, elapsedDays / totalDays * 100);
   let status = "normal";
-  if (progress >= 100) status = "completed";
+  if (latestProgress >= 100) status = "completed";
   else if (now > end) status = "overdue";
-  else if (progress < expectedProgress * 0.8) status = "behind";
+  else if (latestProgress < expectedProgress * 0.8) status = "behind";
   const [kr] = await db.update(keyResults).set({
-    progress,
+    progress: latestProgress,
     status,
     progressHistory: history
   }).where(eq(keyResults.id, id)).returning();
@@ -621,17 +645,21 @@ var DEFAULT_DEPARTMENTS = [
 ];
 async function seedDatabase() {
   const existingAdmin = await getUserByUsername("admin");
+  const adminPassword = getAdminSeedPassword();
   if (!existingAdmin) {
     console.log("Seeding default admin user...");
     await createUser({
       id: "admin_1",
       username: "admin",
-      password: "admin123",
+      password: adminPassword,
       displayName: "\u8D85\u7EA7\u7BA1\u7406\u5458",
       role: "super_admin",
       departmentId: null
     });
-    console.log("Default admin created: admin / admin123");
+    console.log("Default admin created from ADMIN_PASSWORD_AES");
+  } else {
+    await updateUser(existingAdmin.id, { password: adminPassword });
+    console.log("Admin password synced from ADMIN_PASSWORD_AES");
   }
   const existingDepts = await getDepartments();
   if (existingDepts.length === 0) {
@@ -815,17 +843,16 @@ async function getDepartmentDetail(deptId) {
     return null;
   }
 }
-async function getParentDepartmentName(deptId) {
-  console.log(`[DT Dept] getParentDepartmentName called with deptId=${deptId}`);
+async function getCenterDepartmentInfo(deptId) {
+  console.log(`[DT Dept] getCenterDepartmentInfo called with deptId=${deptId}`);
   if (deptId === 1) return null;
   const dept = await getDepartmentDetail(deptId);
   if (!dept) return null;
   console.log(`[DT Dept] deptId=${deptId}, name="${dept.name}", parent_id=${dept.parent_id}`);
-  if (!dept.parent_id || dept.parent_id <= 0) return null;
   const chain = [dept];
   let current = dept;
   for (let i = 0; i < 10; i++) {
-    if (current.parent_id === 1) break;
+    if (!current.parent_id || current.parent_id === 1) break;
     const upper = await getDepartmentDetail(current.parent_id);
     if (!upper) break;
     console.log(`[DT Dept] chain: name="${upper.name}", parent_id=${upper.parent_id}`);
@@ -834,19 +861,17 @@ async function getParentDepartmentName(deptId) {
   }
   const companyIdx = chain.findIndex((d) => d.parent_id === 1);
   if (companyIdx < 0) {
-    console.log(`[DT Dept] -> no company-level dept found, returning "${dept.name}"`);
-    return dept.name;
+    console.log(`[DT Dept] -> no company-level dept found, using current dept "${dept.name}"`);
+    return { companyName: null, centerName: dept.name };
   }
+  const companyName = chain[companyIdx].name;
   const targetIdx = companyIdx - 1;
   if (targetIdx >= 0) {
-    console.log(`[DT Dept] -> company="${chain[companyIdx].name}", returning center="${chain[targetIdx].name}"`);
-    return chain[targetIdx].name;
+    console.log(`[DT Dept] -> company="${companyName}", center="${chain[targetIdx].name}"`);
+    return { companyName, centerName: chain[targetIdx].name };
   }
-  if (companyIdx === 0) {
-    console.log(`[DT Dept] -> dept "${dept.name}" is direct child of root company, returning itself`);
-    return dept.name;
-  }
-  return dept.name;
+  console.log(`[DT Dept] -> dept "${dept.name}" is direct child of root company, treating itself as center under "${companyName}"`);
+  return { companyName, centerName: dept.name };
 }
 async function getUserAccessToken(authCode) {
   const appKey = process.env.DINGTALK_APP_KEY;
@@ -1025,24 +1050,47 @@ async function registerRoutes(app2) {
     if (!dtDeptIdList || dtDeptIdList.length === 0) return;
     try {
       console.log(`[DT Sync] userId=${userId}, dtDeptIdList=${JSON.stringify(dtDeptIdList)}`);
-      const existingDepts = await getDepartments();
-      const parentNames = /* @__PURE__ */ new Set();
+      const knownDepts = [...await getDepartments()];
+      const resolvedDeptIds = /* @__PURE__ */ new Set();
       for (const dtDeptId of dtDeptIdList) {
         console.log(`[DT Sync] Resolving dept_id=${dtDeptId}`);
-        const parentName = await getParentDepartmentName(dtDeptId);
-        console.log(`[DT Sync] dept_id=${dtDeptId} -> parentName=${parentName}`);
-        if (parentName) parentNames.add(parentName);
-      }
-      const localDeptIds = [];
-      for (const name of parentNames) {
-        let dept = existingDepts.find((d) => d.name === name);
-        if (!dept) {
-          dept = await createDepartment({ name, parentId: null, level: 0 });
+        const deptInfo = await getCenterDepartmentInfo(dtDeptId);
+        console.log(`[DT Sync] dept_id=${dtDeptId} -> deptInfo=${JSON.stringify(deptInfo)}`);
+        if (!deptInfo?.centerName) continue;
+        let companyDept = null;
+        if (deptInfo.companyName) {
+          companyDept = knownDepts.find((d) => d.name === deptInfo.companyName && !d.parentId) || null;
+          if (!companyDept) {
+            companyDept = await createDepartment({ name: deptInfo.companyName, parentId: null, level: 0 });
+            knownDepts.push(companyDept);
+          }
         }
-        localDeptIds.push(dept.id);
+        const targetParentId = companyDept?.id || null;
+        const targetLevel = targetParentId ? 1 : 0;
+        let centerDept = knownDepts.find((d) => d.name === deptInfo.centerName && d.parentId === targetParentId);
+        if (!centerDept) {
+          centerDept = knownDepts.find((d) => d.name === deptInfo.centerName) || null;
+          if (centerDept) {
+            await updateDepartment(centerDept.id, { parentId: targetParentId, level: targetLevel });
+            centerDept.parentId = targetParentId;
+            centerDept.level = targetLevel;
+          } else {
+            centerDept = await createDepartment({
+              name: deptInfo.centerName,
+              parentId: targetParentId,
+              level: targetLevel
+            });
+            knownDepts.push(centerDept);
+          }
+        } else if (centerDept.parentId !== targetParentId || centerDept.level !== targetLevel) {
+          await updateDepartment(centerDept.id, { parentId: targetParentId, level: targetLevel });
+          centerDept.parentId = targetParentId;
+          centerDept.level = targetLevel;
+        }
+        resolvedDeptIds.add(centerDept.id);
       }
-      if (localDeptIds.length > 0) {
-        await setUserDepartments(userId, localDeptIds);
+      if (resolvedDeptIds.size > 0) {
+        await setUserDepartments(userId, Array.from(resolvedDeptIds));
       }
     } catch (err) {
       console.error("\u540C\u6B65\u9489\u9489\u7528\u6237\u90E8\u95E8\u5931\u8D25:", err);
@@ -1094,20 +1142,47 @@ async function registerRoutes(app2) {
       let syncedDepts = 0;
       let syncedUsers = 0;
       const deptIdMap = /* @__PURE__ */ new Map();
-      for (const dtDept of dtDepts) {
-        const existing = existingDepts.find((d) => d.name === dtDept.name);
-        if (existing) {
-          deptIdMap.set(dtDept.dept_id, existing.id);
-        } else {
+      const knownDepts = [...existingDepts];
+      const pendingDepts = [...dtDepts];
+      while (pendingDepts.length > 0) {
+        let progressed = false;
+        for (let i = pendingDepts.length - 1; i >= 0; i--) {
+          const dtDept = pendingDepts[i];
           const parentLocalId = dtDept.parent_id > 1 ? deptIdMap.get(dtDept.parent_id) || null : null;
-          const level = parentLocalId ? 1 : 0;
-          const newDept = await createDepartment({
-            name: dtDept.name,
-            parentId: parentLocalId,
-            level
-          });
-          deptIdMap.set(dtDept.dept_id, newDept.id);
-          syncedDepts++;
+          if (dtDept.parent_id > 1 && !parentLocalId) {
+            continue;
+          }
+          const targetLevel = parentLocalId ? 1 : 0;
+          const existing = knownDepts.find((d) => d.name === dtDept.name && d.parentId === parentLocalId);
+          if (existing) {
+            if (existing.level !== targetLevel || existing.parentId !== parentLocalId) {
+              await updateDepartment(existing.id, { parentId: parentLocalId, level: targetLevel });
+            }
+            deptIdMap.set(dtDept.dept_id, existing.id);
+          } else {
+            const fallback = knownDepts.find((d) => d.name === dtDept.name && (!d.parentId || d.parentId !== parentLocalId));
+            if (fallback) {
+              await updateDepartment(fallback.id, { parentId: parentLocalId, level: targetLevel });
+              fallback.parentId = parentLocalId;
+              fallback.level = targetLevel;
+              deptIdMap.set(dtDept.dept_id, fallback.id);
+            } else {
+              const newDept = await createDepartment({
+                name: dtDept.name,
+                parentId: parentLocalId,
+                level: targetLevel
+              });
+              knownDepts.push(newDept);
+              deptIdMap.set(dtDept.dept_id, newDept.id);
+              syncedDepts++;
+            }
+          }
+          pendingDepts.splice(i, 1);
+          progressed = true;
+        }
+        if (!progressed) {
+          console.warn("[DT Sync] Some departments could not be resolved with parent relationships:", pendingDepts.map((d) => ({ dept_id: d.dept_id, name: d.name, parent_id: d.parent_id })));
+          break;
         }
       }
       for (const dtUser of dtUsers) {
@@ -1514,11 +1589,17 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/key-results/:id/progress", requireAuth, async (req, res) => {
     try {
-      const { progress, note, images } = req.body;
+      const { progress, note, images, entryId } = req.body;
       if (!note || !String(note).trim()) {
         return res.status(400).json({ message: "\u6267\u884C\u8BF4\u660E\u4E0D\u80FD\u4E3A\u7A7A" });
       }
-      const kr = await updateKRProgressInDb(req.params.id, progress, note || "", images);
+      const kr = await updateKRProgressInDb(
+        req.params.id,
+        progress,
+        note || "",
+        images,
+        entryId ? String(entryId) : void 0
+      );
       if (!kr) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
       return res.json(kr);
     } catch (err) {
