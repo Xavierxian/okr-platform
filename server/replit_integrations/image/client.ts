@@ -7,6 +7,8 @@ export const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const IMAGE_MODEL = process.env.AI_MODEL_IMAGE || "gpt-image-1";
+
 /**
  * Generate an image and return as Buffer.
  * Uses gpt-image-1 model via Replit AI Integrations.
@@ -16,7 +18,7 @@ export async function generateImageBuffer(
   size: "1024x1024" | "512x512" | "256x256" = "1024x1024"
 ): Promise<Buffer> {
   const response = await openai.images.generate({
-    model: "gpt-image-1",
+    model: IMAGE_MODEL,
     prompt,
     size,
   });
@@ -42,7 +44,7 @@ export async function editImages(
   );
 
   const response = await openai.images.edit({
-    model: "gpt-image-1",
+    model: IMAGE_MODEL,
     image: images,
     prompt,
   });

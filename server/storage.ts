@@ -5,6 +5,30 @@ import {
   type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry, type Cycle, type UserDepartment, type KRComment, type Notification,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
+import { createDecipheriv } from "node:crypto";
+
+const AES_CONFIG_KEY = "Bai%2018Son^9120";
+
+function decryptAesEcbBase64(value: string, key = AES_CONFIG_KEY): string {
+  try {
+    const decipher = createDecipheriv("aes-128-ecb", Buffer.from(key, "utf8"), null);
+    decipher.setAutoPadding(true);
+    return Buffer.concat([
+      decipher.update(Buffer.from(value, "base64")),
+      decipher.final(),
+    ]).toString("utf8");
+  } catch {
+    return value;
+  }
+}
+
+function getAdminSeedPassword(): string {
+  const encryptedPassword = process.env.ADMIN_PASSWORD_AES?.trim();
+  if (!encryptedPassword) {
+    throw new Error("ADMIN_PASSWORD_AES environment variable is required to seed or sync the admin password");
+  }
+  return decryptAesEcbBase64(encryptedPassword);
+}
 
 export async function getUser(id: string): Promise<User | undefined> {
   const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -346,17 +370,21 @@ const DEFAULT_DEPARTMENTS = [
 
 export async function seedDatabase(): Promise<void> {
   const existingAdmin = await getUserByUsername("admin");
+  const adminPassword = getAdminSeedPassword();
   if (!existingAdmin) {
     console.log("Seeding default admin user...");
     await createUser({
       id: "admin_1",
       username: "admin",
-      password: "admin123",
+      password: adminPassword,
       displayName: "超级管理员",
       role: "super_admin",
       departmentId: null,
     });
-    console.log("Default admin created: admin / admin123");
+    console.log("Default admin created from ADMIN_PASSWORD_AES");
+  } else {
+    await updateUser(existingAdmin.id, { password: adminPassword } as any);
+    console.log("Admin password synced from ADMIN_PASSWORD_AES");
   }
 
   const existingDepts = await getDepartments();

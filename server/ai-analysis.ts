@@ -13,6 +13,8 @@ const openai = new OpenAI({
   baseURL: baseURL || undefined,
 });
 
+const OKR_ANALYSIS_MODEL = process.env.AI_MODEL_OKR_ANALYSIS || "DeepSeek-V3.2";
+
 interface OKRDataForAnalysis {
   objectives: any[];
   keyResults: any[];
@@ -99,7 +101,7 @@ ${o.krs.map((kr: any) => `  - ${kr.title}: 进度${kr.progress}%, 状态${kr.sta
 请用简洁、专业的中文撰写，突出数据驱动的洞察。`;
 
   const response = await openai.chat.completions.create({
-    model: "DeepSeek-V3.2",
+    model: OKR_ANALYSIS_MODEL,
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: 4096,
   });
@@ -185,7 +187,7 @@ ${o.krs.map((kr: any) => `  - ${kr.title}: 进度${kr.progress}%, 状态${kr.sta
 请用简洁、专业的中文撰写，突出数据驱动的洞察。`;
 
   const stream = await openai.chat.completions.create({
-    model: "DeepSeek-V3.2",
+    model: OKR_ANALYSIS_MODEL,
     messages: [{ role: "user", content: prompt }],
     max_completion_tokens: 4096,
     stream: true,

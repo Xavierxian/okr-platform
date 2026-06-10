@@ -7,6 +7,8 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const CHAT_MODEL = process.env.AI_MODEL_CHAT || "gpt-5.1";
+
 export function registerChatRoutes(app: Express): void {
   // Get all conversations
   app.get("/api/conversations", async (req: Request, res: Response) => {
@@ -82,7 +84,7 @@ export function registerChatRoutes(app: Express): void {
 
       // Stream response from OpenAI
       const stream = await openai.chat.completions.create({
-        model: "gpt-5.1",
+        model: CHAT_MODEL,
         messages: chatMessages,
         stream: true,
         max_completion_tokens: 8192,

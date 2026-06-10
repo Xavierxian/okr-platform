@@ -4,6 +4,7 @@ import { openai, speechToText, ensureCompatibleFormat } from "./client";
 
 // Body parser with 50MB limit for audio payloads
 const audioBodyParser = express.json({ limit: "50mb" });
+const AUDIO_MODEL = process.env.AI_MODEL_AUDIO || "gpt-audio";
 
 export function registerAudioRoutes(app: Express): void {
   // Get all conversations
@@ -95,7 +96,7 @@ export function registerAudioRoutes(app: Express): void {
 
       // 6. Stream audio response from gpt-audio
       const stream = await openai.chat.completions.create({
-        model: "gpt-audio",
+        model: AUDIO_MODEL,
         modalities: ["text", "audio"],
         audio: { voice, format: "pcm16" },
         messages: chatHistory,

@@ -11,6 +11,9 @@ export const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const AUDIO_MODEL = process.env.AI_MODEL_AUDIO || "gpt-audio";
+const TRANSCRIBE_MODEL = process.env.AI_MODEL_TRANSCRIBE || "gpt-4o-mini-transcribe";
+
 export type AudioFormat = "wav" | "mp3" | "webm" | "mp4" | "ogg" | "unknown";
 
 /**
@@ -118,7 +121,7 @@ export async function voiceChat(
 ): Promise<{ transcript: string; audioResponse: Buffer }> {
   const audioBase64 = audioBuffer.toString("base64");
   const response = await openai.chat.completions.create({
-    model: "gpt-audio",
+    model: AUDIO_MODEL,
     modalities: ["text", "audio"],
     audio: { voice, format: outputFormat },
     messages: [{
@@ -154,7 +157,7 @@ export async function voiceChatStream(
 ): Promise<AsyncIterable<{ type: "transcript" | "audio"; data: string }>> {
   const audioBase64 = audioBuffer.toString("base64");
   const stream = await openai.chat.completions.create({
-    model: "gpt-audio",
+    model: AUDIO_MODEL,
     modalities: ["text", "audio"],
     audio: { voice, format: "pcm16" },
     messages: [{
@@ -190,7 +193,7 @@ export async function textToSpeech(
   format: "wav" | "mp3" | "flac" | "opus" | "pcm16" = "wav"
 ): Promise<Buffer> {
   const response = await openai.chat.completions.create({
-    model: "gpt-audio",
+    model: AUDIO_MODEL,
     modalities: ["text", "audio"],
     audio: { voice, format },
     messages: [
@@ -212,7 +215,7 @@ export async function textToSpeechStream(
   voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy"
 ): Promise<AsyncIterable<string>> {
   const stream = await openai.chat.completions.create({
-    model: "gpt-audio",
+    model: AUDIO_MODEL,
     modalities: ["text", "audio"],
     audio: { voice, format: "pcm16" },
     messages: [
@@ -244,7 +247,7 @@ export async function speechToText(
   const file = await toFile(audioBuffer, `audio.${format}`);
   const response = await openai.audio.transcriptions.create({
     file,
-    model: "gpt-4o-mini-transcribe",
+    model: TRANSCRIBE_MODEL,
   });
   return response.text;
 }
@@ -260,7 +263,7 @@ export async function speechToTextStream(
   const file = await toFile(audioBuffer, `audio.${format}`);
   const stream = await openai.audio.transcriptions.create({
     file,
-    model: "gpt-4o-mini-transcribe",
+    model: TRANSCRIBE_MODEL,
     stream: true,
   });
 

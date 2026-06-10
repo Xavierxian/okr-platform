@@ -39,7 +39,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Authentication & Authorization
 - **Session-based auth**: express-session with PostgreSQL session store
-- **Default super admin**: username=`admin`, password=`admin123`, displayName=`超级管理员`
+- **Default super admin**: username=`admin`, password is read from `ADMIN_PASSWORD_AES` (AES-128-ECB/PKCS7/Base64 using `AESEncryption.configkey`), displayName=`超级管理员`
 - **Roles**: `super_admin` (超级管理员, full access), `vp` (VP, sees all OKRs), `center_head` (中心负责人, sees center_head OKRs), `member` (普通员工, department-scoped)
 - **Middleware**: `requireAuth` for all protected routes, `requireAdmin` for admin-only routes
 - **Multi-center assignment**: Users can belong to multiple centers/departments via `user_departments` junction table; they can create OKRs and import for any of their assigned centers
