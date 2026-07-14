@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
+import { useAuth } from '@/lib/auth-context';
 import { useOKR } from '@/lib/okr-context';
 import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
@@ -11,20 +12,24 @@ const ROLES = [
   { value: 'member', label: '普通员工和部门经理' },
   { value: 'center_head', label: '中心负责人' },
   { value: 'vp', label: 'VP' },
-  { value: 'super_admin', label: '超级管理员' },
 ];
 
 export default function CreateUserScreen() {
+  const { user } = useAuth();
+  if (user?.role !== 'super_admin') return <Redirect href="/" />;
+  return <CreateUserContent />;
+}
+
+function CreateUserContent() {
   const { departments } = useOKR();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [dingtalkUserId, setDingtalkUserId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState('member');
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [deptSearch, setDeptSearch] = useState('');
 
-  const canSave = username.trim() && password.trim() && displayName.trim();
+  const canSave = dingtalkUserId.trim() && displayName.trim();
 
   const toggleDept = (deptId: string) => {
     setSelectedDeptIds(prev =>
@@ -47,8 +52,7 @@ export default function CreateUserScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await apiRequest("POST", "/api/users", {
-        username: username.trim(),
-        password: password.trim(),
+        dingtalkUserId: dingtalkUserId.trim(),
         displayName: displayName.trim(),
         role,
         departmentIds: selectedDeptIds,
@@ -72,26 +76,16 @@ export default function CreateUserScreen() {
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>用户名</Text>
+        <Text style={styles.label}>钉钉用户 ID</Text>
         <TextInput
           style={styles.input}
-          value={username}
-          onChangeText={setUsername}
-          placeholder="登录用户名"
+          value={dingtalkUserId}
+          onChangeText={setDingtalkUserId}
+          placeholder="用于匹配钉钉身份"
           placeholderTextColor={Colors.textTertiary}
           autoCapitalize="none"
           autoCorrect={false}
           autoFocus
-        />
-
-        <Text style={styles.label}>密码</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="登录密码"
-          placeholderTextColor={Colors.textTertiary}
-          secureTextEntry
         />
 
         <Text style={styles.label}>显示名称</Text>
@@ -169,7 +163,7 @@ export default function CreateUserScreen() {
           )}
         </View>
         {selectedDeptIds.length === 0 && !deptSearch.trim() && (
-          <Text style={styles.hint}>未选择中心时为"未分配"</Text>
+          <Text style={styles.hint}>未选择中心时为“未分配”</Text>
         )}
 
         <Pressable

@@ -8,6 +8,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import NotificationBell from '@/components/NotificationBell';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+import { getCsrfToken } from '@/lib/query-client';
 
 function getScoreColor(score: number): string {
   if (score >= 0.7) return Colors.success;
@@ -307,7 +308,9 @@ export default function AnalyticsScreen() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-CSRF-Token': await getCsrfToken(),
         },
+        credentials: 'include',
         body: JSON.stringify({
           cycle: selectedCycle,
           departmentId: selectedDeptId || undefined,

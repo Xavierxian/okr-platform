@@ -118,7 +118,12 @@ async function startMetro(expoPublicDomain) {
     ...process.env,
     EXPO_PUBLIC_DOMAIN: expoPublicDomain,
   };
-  metroProcess = spawn("npm", ["run", "expo:start:static:build"], {
+  const npmCli = process.env.npm_execpath;
+  const npmCommand = npmCli ? process.execPath : "npm";
+  const npmArgs = npmCli
+    ? [npmCli, "run", "expo:start:static:build"]
+    : ["run", "expo:start:static:build"];
+  metroProcess = spawn(npmCommand, npmArgs, {
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
     env,
@@ -506,7 +511,12 @@ async function buildWebExport(domain) {
       ...process.env,
       EXPO_PUBLIC_DOMAIN: domain,
     };
-    const exportProcess = spawn("npx", ["expo", "export", "--platform", "web", "--output-dir", webOutputDir], {
+    const npmCli = process.env.npm_execpath;
+    const exportCommand = npmCli ? process.execPath : "npx";
+    const exportArgs = npmCli
+      ? [npmCli, "exec", "--", "expo", "export", "--platform", "web", "--output-dir", webOutputDir]
+      : ["expo", "export", "--platform", "web", "--output-dir", webOutputDir];
+    const exportProcess = spawn(exportCommand, exportArgs, {
       stdio: ["ignore", "pipe", "pipe"],
       env,
     });

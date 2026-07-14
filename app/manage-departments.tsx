@@ -1,13 +1,20 @@
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, Text, View, FlatList, Pressable, Alert, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
+import { useAuth } from '@/lib/auth-context';
 import { useOKR } from '@/lib/okr-context';
 import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
 export default function ManageDepartmentsScreen() {
+  const { user } = useAuth();
+  if (user?.role !== 'super_admin') return <Redirect href="/" />;
+  return <ManageDepartmentsContent />;
+}
+
+function ManageDepartmentsContent() {
   const { departments, refresh } = useOKR();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');

@@ -1,9 +1,15 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { seedDatabase } from "./storage";
+import { deleteExpiredAuditLogs, seedDatabase } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
+import { X509Certificate } from "node:crypto";
+import helmet from "helmet";
+import { requestIdMiddleware } from "./security";
+import { buildHttpsRedirect, parsePublicHttpsOrigin } from "./tls";
 
 const app = express();
 const log = console.log;
@@ -23,9 +29,13 @@ function setupCors(app: express.Application) {
     }
 
     if (process.env.REPLIT_DOMAINS) {
-      process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
+      process.env.REPLIT_DOMAINS.split(",").forEach((d: string) => {
         origins.add(`https://${d.trim()}`);
       });
+    }
+
+    if (process.env.PUBLIC_HTTPS_ORIGIN) {
+      origins.add(process.env.PUBLIC_HTTPS_ORIGIN.replace(/\/$/, ""));
     }
 
     const origin = req.header("origin");
@@ -35,13 +45,16 @@ function setupCors(app: express.Application) {
       origin?.startsWith("http://localhost:") ||
       origin?.startsWith("http://127.0.0.1:");
 
-    if (origin && (origins.has(origin) || isLocalhost)) {
+    const isAllowed = !origin || origins.has(origin) || (process.env.NODE_ENV !== "production" && isLocalhost);
+    if (!isAllowed) return res.status(403).json({ message: "请求来源不受信任" });
+
+    if (origin) {
       res.header("Access-Control-Allow-Origin", origin);
       res.header(
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, DELETE, OPTIONS",
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type");
+      res.header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Request-Id");
       res.header("Access-Control-Allow-Credentials", "true");
     }
 
@@ -69,31 +82,51 @@ function setupRequestLogging(app: express.Application) {
   app.use((req, res, next) => {
     const start = Date.now();
     const path = req.path;
-    let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
-
-    const originalResJson = res.json;
-    res.json = function (bodyJson, ...args) {
-      capturedJsonResponse = bodyJson;
-      return originalResJson.apply(res, [bodyJson, ...args]);
-    };
-
     res.on("finish", () => {
       if (!path.startsWith("/api")) return;
 
       const duration = Date.now() - start;
-
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+      log(JSON.stringify({
+        level: "info",
+        event: "http_request",
+        requestId: req.requestId,
+        method: req.method,
+        path,
+        statusCode: res.statusCode,
+        durationMs: duration,
+      }));
     });
 
+    next();
+  });
+}
+
+function setupSecurityHeaders(app: express.Application) {
+  const isProd = process.env.NODE_ENV === "production";
+  app.use(helmet({
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https:", "wss:"],
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+      },
+    },
+    hsts: isProd ? { maxAge: 31536000, includeSubDomains: true } : false,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  }));
+  app.use("/api/auth", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  app.use("/api/admin", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
     next();
   });
 }
@@ -252,28 +285,63 @@ function setupErrorHandler(app: express.Application) {
 (async () => {
   app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 
+  app.use(requestIdMiddleware);
+  setupSecurityHeaders(app);
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
 
   configureExpoAndLanding(app);
 
-  const server = await registerRoutes(app);
+  await registerRoutes(app);
 
   await seedDatabase();
 
   setupErrorHandler(app);
 
-  const port = parseInt(process.env.PORT || "5000", 10);
-  const isWindows = process.platform === "win32";
-  server.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      ...(isWindows ? {} : { reusePort: true }),
-    },
-    () => {
-      log(`express server serving on port ${port}`);
-    },
-  );
+  const cleanupTimer = setInterval(() => {
+    deleteExpiredAuditLogs(180).catch((error) => console.error("Audit retention cleanup failed:", error));
+  }, 24 * 60 * 60 * 1000);
+  (cleanupTimer as unknown as NodeJS.Timeout).unref();
+
+  const isProd = process.env.NODE_ENV === "production";
+  if (!isProd) {
+    const port = parseInt(process.env.PORT || "5000", 10);
+    createHttpServer(app).listen({ port, host: "0.0.0.0" }, () => {
+      log(`development HTTP server listening on port ${port}`);
+    });
+    return;
+  }
+
+  const certPath = process.env.HTTPS_CERT_PATH;
+  const keyPath = process.env.HTTPS_KEY_PATH;
+  const publicOrigin = process.env.PUBLIC_HTTPS_ORIGIN;
+  if (!certPath || !keyPath || !publicOrigin) {
+    throw new Error("HTTPS_CERT_PATH, HTTPS_KEY_PATH and PUBLIC_HTTPS_ORIGIN are required in production");
+  }
+  const parsedOrigin = parsePublicHttpsOrigin(publicOrigin);
+  if (process.platform !== "win32" && (fs.statSync(keyPath).mode & 0o077) !== 0) {
+    throw new Error("HTTPS private key must not be readable by group or other users");
+  }
+  const cert = fs.readFileSync(certPath, "utf8");
+  const key = fs.readFileSync(keyPath, "utf8");
+  const certificate = new X509Certificate(cert);
+  const expiresInDays = Math.floor((Date.parse(certificate.validTo) - Date.now()) / (24 * 60 * 60 * 1000));
+  if (expiresInDays <= 0) throw new Error("HTTPS certificate is expired");
+  if (expiresInDays < 30) console.warn(`HTTPS certificate expires in ${expiresInDays} days`);
+
+  const httpsPort = parseInt(process.env.HTTPS_PORT || "5000", 10);
+  const httpPort = parseInt(process.env.HTTP_PORT || "5001", 10);
+  createHttpsServer({ cert, key, minVersion: "TLSv1.2" }, app)
+    .listen({ port: httpsPort, host: "0.0.0.0" }, () => {
+      log(`production HTTPS server listening on port ${httpsPort}`);
+    });
+
+  createHttpServer((req, res) => {
+    const target = buildHttpsRedirect(parsedOrigin, req.url);
+    res.writeHead(308, { Location: target, "Cache-Control": "no-store" });
+    res.end();
+  }).listen({ port: httpPort, host: "0.0.0.0" }, () => {
+    log(`HTTP redirect server listening on port ${httpPort}`);
+  });
 })();

@@ -1,5 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
-import { createServer, type Server } from "node:http";
+import type { Express, Request as ExpressRequest, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
@@ -15,7 +14,8 @@ import {
   getUserDepartmentIds, setUserDepartments, getAllUserDepartments,
   getCommentsForKR, createComment, deleteComment,
   getNotificationsForUser, createNotification, markNotificationRead, markAllNotificationsRead, getUnreadNotificationCount,
-  getUserByDingtalkId,
+  getUserByDingtalkId, getObjective, getKeyResult, getComment, getNotification,
+  getAuditLogs, deleteExpiredAuditLogs,
 } from "./storage";
 import {
   isDingtalkConfigured,
@@ -26,11 +26,95 @@ import {
   getDingtalkAppKey,
   getCenterDepartmentInfo,
 } from "./dingtalk";
+import {
+  canManageObjective,
+  canScoreKeyResult,
+  canUpdateKeyResultProgress,
+  getManageableKeyResult,
+  getManageableObjective,
+  getReadableKeyResult,
+  getReadableObjective,
+} from "./authorization";
+import {
+  changePasswordBodySchema,
+  commentBodySchema,
+  createUserBodySchema,
+  cycleBodySchema,
+  departmentBodySchema,
+  dingtalkLoginBodySchema,
+  keyResultCreateBodySchema,
+  keyResultUpdateBodySchema,
+  loginBodySchema,
+  objectiveCreateBodySchema,
+  objectiveUpdateBodySchema,
+  parseBody,
+  progressBodySchema,
+  reorderBodySchema,
+  scoreBodySchema,
+  updateUserBodySchema,
+} from "./validation";
+import {
+  clearLoginFailures,
+  consumeOauthState,
+  csrfProtection,
+  issueCsrfToken,
+  issueOauthState,
+  loginRateLimit,
+  originGuard,
+  recordLoginFailure,
+  regenerateSession,
+} from "./security";
+import { audit } from "./audit";
+
+type Request = ExpressRequest<Record<string, string>>;
+const DUMMY_PASSWORD_HASH = "$2b$12$C6UzMDM.H6dfI/f/IKcEe.8jNOM7Z5GvHyk1Iko9pZPZfK7w4M1mK";
 
 declare module "express-session" {
   interface SessionData {
     userId: string;
   }
+}
+
+async function readRawBody(req: Request, maxBytes: number): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buffer.length;
+    if (total > maxBytes) {
+      const error = new Error("请求体过大") as Error & { status?: number };
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
+}
+
+function detectImageType(buffer: Buffer): { contentType: string; extension: string } | undefined {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return { contentType: "image/png", extension: "png" };
+  }
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { contentType: "image/jpeg", extension: "jpg" };
+  }
+  if (buffer.length >= 6 && ["GIF87a", "GIF89a"].includes(buffer.subarray(0, 6).toString("ascii"))) {
+    return { contentType: "image/gif", extension: "gif" };
+  }
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") {
+    return { contentType: "image/webp", extension: "webp" };
+  }
+  return undefined;
+}
+
+function routeError(res: Response, error: unknown, fallbackMessage: string) {
+  const status = typeof error === "object" && error && "status" in error
+    ? Number((error as { status?: number }).status)
+    : 500;
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({ message: error instanceof Error ? error.message : fallbackMessage });
+  }
+  return res.status(500).json({ message: fallbackMessage });
 }
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -51,12 +135,12 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<void> {
   const PgStore = connectPgSimple(session);
   const isProd = process.env.NODE_ENV === "production";
-
-  if (isProd) {
-    app.set("trust proxy", 1);
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (isProd && !sessionSecret) {
+    throw new Error("SESSION_SECRET is required in production");
   }
 
   const sessionMiddleware = session({
@@ -64,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       pool: pool as any,
       createTableIfMissing: true,
     }),
-    secret: process.env.SESSION_SECRET || "okr-secret-key",
+    secret: sessionSecret || "development-only-session-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -76,32 +160,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.use("/api", sessionMiddleware);
+  app.use("/api", originGuard);
+  app.get("/api/auth/csrf-token", issueCsrfToken);
+  app.use("/api", csrfProtection);
 
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  app.post("/api/auth/login", loginRateLimit, async (req: Request, res: Response) => {
     try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ message: "请输入用户名和密码" });
-      }
+      const { username, password } = parseBody(loginBodySchema, req.body);
       const user = await getUserByUsername(username);
-      if (!user) {
-        return res.status(401).json({ message: "用户名或密码错误" });
-      }
-      const valid = await verifyPassword(password, user.password);
+      const eligible = !!user?.password && user.authProvider === "local" && user.role === "super_admin";
+      const passwordMatches = await verifyPassword(password, eligible ? user.password! : DUMMY_PASSWORD_HASH);
+      const valid = eligible && passwordMatches;
       if (!valid) {
+        recordLoginFailure(req);
+        await audit(req, { actor: user, action: "auth.login", resourceType: "session", success: false, errorCode: "INVALID_CREDENTIALS" });
         return res.status(401).json({ message: "用户名或密码错误" });
       }
+      await regenerateSession(req);
       req.session.userId = user.id;
+      clearLoginFailures(req);
       const { password: _, ...safeUser } = user;
       const deptIds = await getUserDepartmentIds(user.id);
+      await audit(req, { actor: user, action: "auth.login", resourceType: "session" });
       return res.json({ user: { ...safeUser, departmentIds: deptIds } });
     } catch (err) {
       console.error("Login error:", err);
-      return res.status(500).json({ message: "登录失败" });
+      return routeError(res, err, "登录失败");
     }
   });
 
-  app.get("/api/auth/dingtalk-config", (_req: Request, res: Response) => {
+  app.get("/api/auth/dingtalk-config", (req: Request, res: Response) => {
     if (!isDingtalkConfigured()) {
       return res.json({ enabled: false });
     }
@@ -109,6 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       enabled: true,
       corpId: getDingtalkCorpId(),
       appKey: getDingtalkAppKey(),
+      state: issueOauthState(req),
     });
   });
 
@@ -138,7 +227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let centerDept = knownDepts.find(d => d.name === deptInfo.centerName && d.parentId === targetParentId);
 
         if (!centerDept) {
-          centerDept = knownDepts.find(d => d.name === deptInfo.centerName) || null;
+          centerDept = knownDepts.find(d => d.name === deptInfo.centerName);
           if (centerDept) {
             await updateDepartment(centerDept.id, { parentId: targetParentId, level: targetLevel });
             centerDept.parentId = targetParentId;
@@ -172,18 +261,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!isDingtalkConfigured()) {
         return res.status(400).json({ message: "钉钉登录未配置" });
       }
-      const { authCode } = req.body;
-      if (!authCode) {
-        return res.status(400).json({ message: "缺少钉钉授权码" });
-      }
+      const { authCode } = parseBody(dingtalkLoginBodySchema, req.body);
 
       const dtUser = await getUserInfoByAuthCode(authCode);
       let user = await getUserByDingtalkId(dtUser.userid);
+      if (user?.role === "super_admin") return res.status(403).json({ message: "管理员账号只能使用本地密码登录" });
 
       if (!user) {
         const newUser = await createUser({
           username: `dt_${dtUser.userid}`,
-          password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          password: null,
+          authProvider: "dingtalk",
           displayName: dtUser.name,
           role: "member",
           departmentId: null,
@@ -195,9 +283,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
       }
 
+      await regenerateSession(req);
       req.session.userId = user!.id;
       const { password: _, ...safeUser } = user!;
       const deptIds = await getUserDepartmentIds(user!.id);
+      await audit(req, { actor: user, action: "auth.dingtalk_login", resourceType: "session" });
       return res.json({ user: { ...safeUser, departmentIds: deptIds } });
     } catch (err: any) {
       console.error("DingTalk login error:", err);
@@ -205,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dingtalk/sync-org", requireAdmin, async (_req: Request, res: Response) => {
+  app.post("/api/dingtalk/sync-org", requireAdmin, async (req: Request, res: Response) => {
     try {
       if (!isDingtalkConfigured()) {
         return res.status(400).json({ message: "钉钉未配置" });
@@ -213,6 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const dtDepts = await getDepartmentList();
       const dtUsers = await getAllDingtalkUsers();
+      const actor = await getUser(req.session.userId!);
       const existingDepts = await getDepartments();
       const existingUsers = await getAllUsers();
 
@@ -278,7 +369,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           const newUser = await createUser({
             username: `dt_${dtUser.userid}`,
-            password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            password: null,
+            authProvider: "dingtalk",
             displayName: dtUser.name,
             role: "member",
             departmentId: null,
@@ -289,6 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      await audit(req, { actor, action: "dingtalk.sync_org", resourceType: "organization", changes: { syncedDepts, syncedUsers } });
       return res.json({
         message: `同步完成: 新增 ${syncedDepts} 个部门, ${syncedUsers} 个用户`,
         syncedDepts,
@@ -303,15 +396,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/dingtalk-callback", async (req: Request, res: Response) => {
     try {
       const authCode = req.query.authCode as string || req.query.code as string;
-      if (!authCode || !isDingtalkConfigured()) {
+      const state = typeof req.query.state === "string" ? req.query.state : undefined;
+      if (!authCode || !isDingtalkConfigured() || !consumeOauthState(req, state)) {
         return res.redirect("/?dt_error=1");
       }
       const dtUser = await getUserInfoByAuthCode(authCode);
       let user = await getUserByDingtalkId(dtUser.userid);
+      if (user?.role === "super_admin") return res.redirect("/?dt_error=1");
       if (!user) {
         const newUser = await createUser({
           username: `dt_${dtUser.userid}`,
-          password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          password: null,
+          authProvider: "dingtalk",
           displayName: dtUser.name,
           role: "member",
           departmentId: null,
@@ -322,7 +418,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
       }
+      await regenerateSession(req);
       req.session.userId = user!.id;
+      await audit(req, { actor: user, action: "auth.dingtalk_callback", resourceType: "session" });
       return res.redirect("/");
     } catch (err) {
       console.error("DingTalk callback error:", err);
@@ -330,7 +428,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
+  app.post("/api/auth/logout", async (req: Request, res: Response) => {
+    const user = req.session.userId ? await getUser(req.session.userId) : undefined;
+    await audit(req, { actor: user, action: "auth.logout", resourceType: "session" });
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "退出失败" });
@@ -355,21 +455,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/auth/change-password", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { currentPassword, newPassword } = req.body;
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ message: "请填写当前密码和新密码" });
-      }
-      if (newPassword.length < 6) {
-        return res.status(400).json({ message: "新密码至少6个字符" });
-      }
+      const { currentPassword, newPassword } = parseBody(changePasswordBodySchema, req.body);
       const user = await getUser(req.session.userId!);
       if (!user) return res.status(401).json({ message: "用户不存在" });
+      if (user.authProvider !== "local" || user.role !== "super_admin" || !user.password) {
+        return res.status(403).json({ message: "该账号不支持密码登录" });
+      }
       const valid = await verifyPassword(currentPassword, user.password);
       if (!valid) return res.status(400).json({ message: "当前密码不正确" });
       await updateUser(user.id, { password: newPassword } as any);
+      await audit(req, { actor: user, action: "auth.password_change", resourceType: "user", resourceId: user.id });
       return res.json({ message: "密码修改成功" });
     } catch (err) {
-      return res.status(500).json({ message: "修改密码失败" });
+      return routeError(res, err, "修改密码失败");
     }
   });
 
@@ -380,26 +478,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/departments", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { name, parentId, level } = req.body;
+      const actor = await getUser(req.session.userId!);
+      const { name, parentId, level } = parseBody(departmentBodySchema, req.body);
       const dept = await createDepartment({ name, parentId: parentId || null, level: level || 0 });
+      await audit(req, { actor, action: "department.create", resourceType: "department", resourceId: dept.id, changes: { name, parentId, level } });
       return res.json(dept);
     } catch (err) {
-      return res.status(500).json({ message: "创建部门失败" });
+      return routeError(res, err, "创建部门失败");
     }
   });
 
   app.put("/api/departments/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const dept = await updateDepartment(req.params.id, req.body);
+      const actor = await getUser(req.session.userId!);
+      const updates = parseBody(departmentBodySchema.partial().strict(), req.body);
+      const dept = await updateDepartment(req.params.id, updates);
+      if (!dept) return res.status(404).json({ message: "部门不存在" });
+      await audit(req, { actor, action: "department.update", resourceType: "department", resourceId: dept.id, changes: updates });
       return res.json(dept);
     } catch (err) {
-      return res.status(500).json({ message: "更新部门失败" });
+      return routeError(res, err, "更新部门失败");
     }
   });
 
   app.delete("/api/departments/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
+      const actor = await getUser(req.session.userId!);
       await deleteDepartment(req.params.id);
+      await audit(req, { actor, action: "department.delete", resourceType: "department", resourceId: req.params.id });
       return res.json({ message: "已删除" });
     } catch (err) {
       return res.status(500).json({ message: "删除部门失败" });
@@ -413,33 +519,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/cycles", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { name, sortOrder } = req.body;
-      if (!name?.trim()) return res.status(400).json({ message: "周期名称不能为空" });
-      const cycle = await createCycle(name.trim(), sortOrder ?? 0);
+      const actor = await getUser(req.session.userId!);
+      const { name, sortOrder } = parseBody(cycleBodySchema, req.body);
+      const cycle = await createCycle(name, sortOrder ?? 0);
+      await audit(req, { actor, action: "cycle.create", resourceType: "cycle", resourceId: cycle.id, changes: { name, sortOrder } });
       return res.json(cycle);
     } catch (err: any) {
       if (err?.code === '23505') return res.status(400).json({ message: "该周期名称已存在" });
-      return res.status(500).json({ message: "创建周期失败" });
+      return routeError(res, err, "创建周期失败");
     }
   });
 
   app.put("/api/cycles/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { name, sortOrder } = req.body;
-      const updates: any = {};
-      if (name !== undefined) updates.name = name.trim();
-      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      const actor = await getUser(req.session.userId!);
+      const updates = parseBody(cycleBodySchema.partial().strict(), req.body);
       const cycle = await updateCycle(req.params.id, updates);
+      if (!cycle) return res.status(404).json({ message: "周期不存在" });
+      await audit(req, { actor, action: "cycle.update", resourceType: "cycle", resourceId: cycle.id, changes: updates });
       return res.json(cycle);
     } catch (err: any) {
       if (err?.code === '23505') return res.status(400).json({ message: "该周期名称已存在" });
-      return res.status(500).json({ message: "更新周期失败" });
+      return routeError(res, err, "更新周期失败");
     }
   });
 
   app.delete("/api/cycles/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
+      const actor = await getUser(req.session.userId!);
       await deleteCycle(req.params.id);
+      await audit(req, { actor, action: "cycle.delete", resourceType: "cycle", resourceId: req.params.id });
       return res.json({ message: "已删除" });
     } catch (err) {
       return res.status(500).json({ message: "删除周期失败" });
@@ -458,41 +567,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { username, password, displayName, role, departmentId, departmentIds } = req.body;
-      if (!username || !password || !displayName) {
-        return res.status(400).json({ message: "请填写完整信息" });
-      }
+      const actor = await getUser(req.session.userId!);
+      const { displayName, role, departmentId, departmentIds, dingtalkUserId } = parseBody(createUserBodySchema, req.body);
+      const username = `dt_${dingtalkUserId}`;
       const existing = await getUserByUsername(username);
       if (existing) {
         return res.status(400).json({ message: "用户名已存在" });
       }
       const deptIds: string[] = departmentIds || (departmentId ? [departmentId] : []);
       const primaryDeptId = deptIds.length > 0 ? deptIds[0] : null;
-      const user = await createUser({ username, password, displayName, role: role || "member", departmentId: primaryDeptId });
+      const user = await createUser({ username, password: null, authProvider: "dingtalk", dingtalkUserId, displayName, role, departmentId: primaryDeptId });
       if (deptIds.length > 0) {
         await setUserDepartments(user.id, deptIds);
       }
       const { password: _, ...safeUser } = user;
+      await audit(req, { actor, action: "user.create", resourceType: "user", resourceId: user.id, changes: { username, displayName, role, departmentIds: deptIds, authProvider: "dingtalk" } });
       return res.json({ ...safeUser, departmentIds: deptIds });
     } catch (err) {
-      return res.status(500).json({ message: "创建用户失败" });
+      return routeError(res, err, "创建用户失败");
     }
   });
 
   app.put("/api/users/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const { departmentIds, ...rest } = req.body;
+      const actor = await getUser(req.session.userId!);
+      const { departmentIds, ...rest } = parseBody(updateUserBodySchema, req.body);
+      const userUpdates: Record<string, unknown> = { ...rest };
       if (departmentIds && Array.isArray(departmentIds)) {
-        rest.departmentId = departmentIds.length > 0 ? departmentIds[0] : null;
+        userUpdates.departmentId = departmentIds.length > 0 ? departmentIds[0] : null;
         await setUserDepartments(req.params.id, departmentIds);
       }
-      const user = await updateUser(req.params.id, rest);
+      const user = await updateUser(req.params.id, userUpdates as any);
       if (!user) return res.status(404).json({ message: "用户不存在" });
       const { password: _, ...safeUser } = user;
       const deptIds = departmentIds || await getUserDepartmentIds(user.id);
+      await audit(req, { actor, action: "user.update", resourceType: "user", resourceId: user.id, changes: { ...rest, departmentIds } });
       return res.json({ ...safeUser, departmentIds: deptIds });
     } catch (err) {
-      return res.status(500).json({ message: "更新用户失败" });
+      return routeError(res, err, "更新用户失败");
     }
   });
 
@@ -522,7 +634,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/users/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
+      const actor = await getUser(req.session.userId!);
+      if (req.params.id === req.session.userId) return res.status(400).json({ message: "不能删除当前登录账号" });
       await deleteUser(req.params.id);
+      await audit(req, { actor, action: "user.delete", resourceType: "user", resourceId: req.params.id });
       return res.json({ message: "已删除" });
     } catch (err) {
       return res.status(500).json({ message: "删除用户失败" });
@@ -542,8 +657,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/objectives/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const allObjs = await getAllObjectives();
-      const obj = allObjs.find(o => o.id === req.params.id);
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const obj = await getReadableObjective(user, req.params.id);
       if (!obj) return res.status(404).json({ message: "目标不存在" });
       const krs = await getKeyResultsForObjectives([obj.id]);
       return res.json({ objective: obj, keyResults: krs });
@@ -556,13 +672,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getUser(req.session.userId!);
       if (!user) return res.status(401).json({ message: "用户不存在" });
-      const { title, description, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds, linkedToParent, okrType } = req.body;
+      const { title, description, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds, linkedToParent, okrType } = parseBody(objectiveCreateBodySchema, req.body);
       if (user.role !== "super_admin") {
         const userDeptIds = await getUserDepartmentIds(user.id);
         const allowedDepts = userDeptIds.length > 0 ? userDeptIds : (user.departmentId ? [user.departmentId] : []);
         if (!allowedDepts.includes(departmentId)) {
           return res.status(403).json({ message: "只能为自己所属中心创建目标" });
         }
+      }
+      if (parentObjectiveId && !await getReadableObjective(user, parentObjectiveId)) {
+        return res.status(404).json({ message: "上级目标不存在" });
       }
       const obj = await createObjectiveInDb({
         title,
@@ -577,24 +696,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         linkedToParent: linkedToParent || false,
         okrType: okrType || '承诺型',
       });
+      await audit(req, { actor: user, action: "objective.create", resourceType: "objective", resourceId: obj.id, changes: { title, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds, linkedToParent, okrType } });
       return res.json(obj);
     } catch (err) {
-      return res.status(500).json({ message: "创建目标失败" });
+      return routeError(res, err, "创建目标失败");
     }
   });
 
   app.put("/api/objectives/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const obj = await updateObjectiveInDb(req.params.id, req.body);
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const existing = await getManageableObjective(user, req.params.id);
+      if (!existing) return res.status(404).json({ message: "目标不存在" });
+      const updates = parseBody(objectiveUpdateBodySchema, req.body);
+      if (updates.departmentId && user.role !== "super_admin") {
+        const departmentIds = await getUserDepartmentIds(user.id);
+        const allowed = departmentIds.length ? departmentIds : (user.departmentId ? [user.departmentId] : []);
+        if (!allowed.includes(updates.departmentId)) return res.status(403).json({ message: "不能将目标移动到其他中心" });
+      }
+      if (updates.parentObjectiveId && !await getReadableObjective(user, updates.parentObjectiveId)) {
+        return res.status(404).json({ message: "上级目标不存在" });
+      }
+      const obj = await updateObjectiveInDb(req.params.id, updates);
+      await audit(req, { actor: user, action: "objective.update", resourceType: "objective", resourceId: req.params.id, changes: updates });
       return res.json(obj);
     } catch (err) {
-      return res.status(500).json({ message: "更新目标失败" });
+      return routeError(res, err, "更新目标失败");
     }
   });
 
   app.delete("/api/objectives/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      if (!await getManageableObjective(user, req.params.id)) return res.status(404).json({ message: "目标不存在" });
       await deleteObjectiveInDb(req.params.id);
+      await audit(req, { actor: user, action: "objective.delete", resourceType: "objective", resourceId: req.params.id });
       return res.json({ message: "已删除" });
     } catch (err) {
       return res.status(500).json({ message: "删除目标失败" });
@@ -634,7 +772,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/key-results", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, weight, okrType } = req.body;
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const { objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, weight, okrType } = parseBody(keyResultCreateBodySchema, req.body);
+      if (!await getManageableObjective(user, objectiveId)) return res.status(404).json({ message: "目标不存在" });
       const kr = await createKeyResultInDb({
         objectiveId,
         title,
@@ -648,22 +789,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         weight: weight || 1,
         okrType: okrType || '承诺型',
       });
+      await audit(req, { actor: user, action: "key_result.create", resourceType: "key_result", resourceId: kr.id, changes: { objectiveId, title, assigneeId, collaboratorId, startDate, endDate, weight, okrType } });
       return res.json(kr);
     } catch (err) {
-      return res.status(500).json({ message: "创建关键结果失败" });
+      return routeError(res, err, "创建关键结果失败");
     }
   });
 
   // Objective 排序 API - 必须在 /:id 路由之前定义
   app.put("/api/objectives/reorder", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { orders } = req.body; // [{ id: string, sortOrder: number }, ...]
-      if (!Array.isArray(orders)) {
-        return res.status(400).json({ message: "无效的排序数据" });
-      }
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const { orders } = parseBody(reorderBodySchema, req.body);
       for (const item of orders) {
+        if (!await getManageableObjective(user, item.id)) return res.status(404).json({ message: "目标不存在" });
         await updateObjectiveInDb(item.id, { sortOrder: item.sortOrder });
       }
+      await audit(req, { actor: user, action: "objective.reorder", resourceType: "objective", changes: { count: orders.length } });
       return res.json({ message: "排序已保存" });
     } catch (err: any) {
       console.error("Reorder Objective error:", err);
@@ -674,15 +817,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // KR 排序 API - 必须在 /:id 路由之前定义
   app.put("/api/key-results/reorder", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { orders } = req.body; // [{ id: string, sortOrder: number }, ...]
-      console.log("Reorder request:", orders);
-      if (!Array.isArray(orders)) {
-        return res.status(400).json({ message: "无效的排序数据" });
-      }
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const { orders } = parseBody(reorderBodySchema, req.body);
       for (const item of orders) {
-        console.log("Updating KR:", item.id, "sortOrder:", item.sortOrder);
+        if (!await getManageableKeyResult(user, item.id)) return res.status(404).json({ message: "关键结果不存在" });
         await updateKeyResultInDb(item.id, { sortOrder: item.sortOrder });
       }
+      await audit(req, { actor: user, action: "key_result.reorder", resourceType: "key_result", changes: { count: orders.length } });
       return res.json({ message: "排序已保存" });
     } catch (err: any) {
       console.error("Reorder KR error:", err);
@@ -692,16 +834,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/key-results/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const kr = await updateKeyResultInDb(req.params.id, req.body);
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      if (!await getManageableKeyResult(user, req.params.id)) return res.status(404).json({ message: "关键结果不存在" });
+      const updates = parseBody(keyResultUpdateBodySchema, req.body);
+      const kr = await updateKeyResultInDb(req.params.id, updates);
+      await audit(req, { actor: user, action: "key_result.update", resourceType: "key_result", resourceId: req.params.id, changes: updates });
       return res.json(kr);
     } catch (err) {
-      return res.status(500).json({ message: "更新关键结果失败" });
+      return routeError(res, err, "更新关键结果失败");
     }
   });
 
   app.delete("/api/key-results/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      if (!await getManageableKeyResult(user, req.params.id)) return res.status(404).json({ message: "关键结果不存在" });
       await deleteKeyResultInDb(req.params.id);
+      await audit(req, { actor: user, action: "key_result.delete", resourceType: "key_result", resourceId: req.params.id });
       return res.json({ message: "已删除" });
     } catch (err) {
       return res.status(500).json({ message: "删除关键结果失败" });
@@ -710,10 +861,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/key-results/:id/progress", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { progress, note, images, entryId } = req.body;
-      if (!note || !String(note).trim()) {
-        return res.status(400).json({ message: "执行说明不能为空" });
-      }
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const resource = await getReadableKeyResult(user, req.params.id);
+      if (!resource || !canUpdateKeyResultProgress(user, resource.objective, resource.keyResult)) return res.status(404).json({ message: "关键结果不存在" });
+      const { progress, note, images, entryId } = parseBody(progressBodySchema, req.body);
       const kr = await updateKRProgressInDb(
         req.params.id,
         progress,
@@ -722,20 +874,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entryId ? String(entryId) : undefined
       );
       if (!kr) return res.status(404).json({ message: "关键结果不存在" });
+      await audit(req, { actor: user, action: "key_result.progress", resourceType: "key_result", resourceId: req.params.id, changes: { progress, entryId, imageCount: images?.length || 0 } });
       return res.json(kr);
     } catch (err) {
-      return res.status(500).json({ message: "更新进度失败" });
+      return routeError(res, err, "更新进度失败");
     }
   });
 
   app.put("/api/key-results/:id/score", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { score, note } = req.body;
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const resource = await getReadableKeyResult(user, req.params.id);
+      if (!resource || !canScoreKeyResult(user, resource.objective, resource.keyResult)) return res.status(404).json({ message: "关键结果不存在" });
+      const { score, note } = parseBody(scoreBodySchema, req.body);
       const kr = await scoreKRInDb(req.params.id, score, note || "");
       if (!kr) return res.status(404).json({ message: "关键结果不存在" });
+      await audit(req, { actor: user, action: "key_result.score", resourceType: "key_result", resourceId: req.params.id, changes: { score } });
       return res.json(kr);
     } catch (err) {
-      return res.status(500).json({ message: "评分失败" });
+      return routeError(res, err, "评分失败");
     }
   });
 
@@ -980,6 +1138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=okr_export_${stamp}.xlsx`);
+      await audit(req, { actor: user, action: "okr.export", resourceType: "okr", changes: { objectiveCount: filteredObjectives.length, keyResultCount: filteredKRs.length } });
       return res.send(buf);
     } catch (err) {
       console.error("Export OKR error:", err);
@@ -1028,38 +1187,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/upload/image", requireAuth, async (req: Request, res: Response) => {
     try {
-      const chunks: Buffer[] = [];
-      req.on("data", (chunk: Buffer) => chunks.push(chunk));
-      await new Promise<void>((resolve) => req.on("end", resolve));
-      const buf = Buffer.concat(chunks);
+      const buf = await readRawBody(req, 10 * 1024 * 1024);
 
       if (buf.length === 0) return res.status(400).json({ message: "没有文件数据" });
-      if (buf.length > 10 * 1024 * 1024) return res.status(400).json({ message: "文件大小不能超过10MB" });
+      const detected = detectImageType(buf);
+      if (!detected) return res.status(400).json({ message: "仅支持 PNG、JPEG、GIF 和 WebP 图片" });
+      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${detected.extension}`;
 
-      const contentType = req.headers["content-type"] || "image/png";
-      const ext = contentType.includes("png") ? "png" : contentType.includes("gif") ? "gif" : contentType.includes("webp") ? "webp" : "jpg";
-      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${ext}`;
-
-      const url = await uploadFile(buf, fileName, contentType);
+      const url = await uploadFile(buf, fileName, detected.contentType);
       return res.json({ url });
     } catch (err) {
       console.error("Image upload error:", err);
-      return res.status(500).json({ message: "图片上传失败" });
+      return routeError(res, err, "图片上传失败");
     }
   });
 
   app.post("/api/import/parse-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const XLSX = await import("xlsx");
-      const chunks: Buffer[] = [];
-      req.on("data", (chunk: Buffer) => chunks.push(chunk));
-      await new Promise<void>((resolve) => req.on("end", resolve));
-      const buf = Buffer.concat(chunks);
+      const buf = await readRawBody(req, 10 * 1024 * 1024);
       const wb = XLSX.read(buf, { type: "buffer" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       if (!ws) return res.status(400).json({ message: "文件为空" });
       const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
       if (jsonData.length < 2) return res.status(400).json({ message: "文件为空或只有表头" });
+      if (jsonData.length > 1001) return res.status(400).json({ message: "单次最多导入1000行" });
       const headers = jsonData[0].map((h: any) => String(h).trim());
       if (!headers.includes("目标名称")) {
         return res.status(400).json({ message: "缺少必要列: 目标名称。请使用模板文件。" });
@@ -1075,7 +1227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ rows });
     } catch (err) {
       console.error("Parse excel error:", err);
-      return res.status(400).json({ message: "文件解析失败，请检查文件格式（支持 .xlsx 和 .csv）" });
+      return routeError(res, err, "文件解析失败，请检查文件格式（支持 .xlsx 和 .csv）");
     }
   });
 
@@ -1085,7 +1237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) return res.status(401).json({ message: "用户不存在" });
 
       const { rows } = req.body;
-      if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      if (!rows || !Array.isArray(rows) || rows.length === 0 || rows.length > 1000) {
         return res.status(400).json({ message: "没有可导入的数据" });
       }
 
@@ -1093,7 +1245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allUsers = await getAllUsers();
       const userMultiDepts = await getUserDepartmentIds(user.id);
       let defaultDeptId = userMultiDepts[0] || user.departmentId || "";
-      if (!defaultDeptId && allDepts.length > 0) {
+      if (!defaultDeptId && user.role === "super_admin" && allDepts.length > 0) {
         defaultDeptId = allDepts[0].id;
       }
       if (!defaultDeptId) {
@@ -1112,6 +1264,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
+        if (!row || typeof row !== "object") {
+          errors.push(`第${i + 2}行: 数据格式无效`);
+          continue;
+        }
         const objTitle = row["目标名称"]?.trim();
         const objDesc = "";
         const krTitle = row["KR名称"]?.trim();
@@ -1136,7 +1292,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (deptName) {
           const dept = allDepts.find(d => d.name === deptName);
           if (dept) {
-            deptId = dept.id;
+            const allowedDepts = userMultiDepts.length ? userMultiDepts : (user.departmentId ? [user.departmentId] : []);
+            if (user.role === "super_admin" || allowedDepts.includes(dept.id)) deptId = dept.id;
+            else errors.push(`第${i + 2}行: 无权向部门"${deptName}"导入，使用默认部门`);
           } else {
             errors.push(`第${i + 2}行: 部门"${deptName}"不存在，使用默认部门`);
           }
@@ -1156,8 +1314,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // 根据创建人ID（钉钉ID）查找用户
-        let creatorId: string | null = null;
-        if (creatorDingtalkId) {
+        let creatorId: string | null = user.id;
+        if (user.role === "super_admin" && creatorDingtalkId) {
           const matchCreator = allUsers.find(u => u.dingtalkUserId === creatorDingtalkId);
           if (matchCreator) {
             creatorId = matchCreator.id;
@@ -1204,6 +1362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      await audit(req, { actor: user, action: "okr.import", resourceType: "okr", changes: { importedObjectives, importedKRs, errorCount: errors.length } });
       return res.json({
         message: `导入完成: ${importedObjectives} 个目标, ${importedKRs} 个关键结果`,
         importedObjectives,
@@ -1219,8 +1378,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analytics/department-rankings", requireAuth, async (req: Request, res: Response) => {
     try {
       const cycle = req.query.cycle as string || '';
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
       const allDepts = await getDepartments();
-      const allObjs = await getAllObjectives();
+      const allObjs = await getObjectivesForUser(user);
       const filteredObjs = cycle ? allObjs.filter(o => o.cycle === cycle) : allObjs;
       const objIds = filteredObjs.map(o => o.id);
       const allKRs = objIds.length > 0 ? await getKeyResultsForObjectives(objIds) : [];
@@ -1259,6 +1420,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { cycle, departmentId, stream = false } = req.body;
       if (!cycle) return res.status(400).json({ message: "请选择周期" });
+      if (typeof cycle !== "string" || cycle.length > 300 || (departmentId && typeof departmentId !== "string") || typeof stream !== "boolean") {
+        return res.status(400).json({ message: "请求数据无效" });
+      }
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
 
       // 检查环境变量
       if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
@@ -1271,7 +1437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { generateOKRAnalysis, streamOKRAnalysis } = await import("./ai-analysis");
       const allDepts = await getDepartments();
-      let allObjs = await getAllObjectives();
+      let allObjs = await getObjectivesForUser(user);
       allObjs = allObjs.filter(o => o.cycle === cycle);
       if (departmentId) {
         allObjs = allObjs.filter(o => o.departmentId === departmentId);
@@ -1301,6 +1467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cycle,
         departmentName: deptName,
       };
+      await audit(req, { actor: user, action: "analytics.ai_analysis", resourceType: "analytics", changes: { cycle, departmentId, objectiveCount: allObjs.length, stream } });
 
       if (stream) {
         // 流式响应
@@ -1344,6 +1511,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/kr-comments/:krId", requireAuth, async (req: Request, res: Response) => {
     try {
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      if (!await getReadableKeyResult(user, req.params.krId)) return res.status(404).json({ message: "关键结果不存在" });
       const comments = await getCommentsForKR(req.params.krId);
       return res.json(comments);
     } catch (err) {
@@ -1355,30 +1525,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await getUser(req.session.userId!);
       if (!user) return res.status(401).json({ message: "用户不存在" });
-      const { krId, content, mentionedUserIds } = req.body;
-      if (!krId || !content?.trim()) {
-        return res.status(400).json({ message: "评论内容不能为空" });
-      }
+      const { krId, content, mentionedUserIds } = parseBody(commentBodySchema, req.body);
+      const mentions = mentionedUserIds || [];
+      const resource = await getReadableKeyResult(user, krId);
+      if (!resource) return res.status(404).json({ message: "关键结果不存在" });
       const comment = await createComment({
         krId,
         userId: user.id,
         userName: user.displayName,
-        content: content.trim(),
-        mentionedUserIds: mentionedUserIds || [],
+        content,
+        mentionedUserIds: mentions,
       });
 
-      if (mentionedUserIds && mentionedUserIds.length > 0) {
-        const allKRs = await getAllKeyResults();
-        const kr = allKRs.find(k => k.id === krId);
-        const allObjs = await getAllObjectives();
-        const obj = kr ? allObjs.find(o => o.id === kr.objectiveId) : null;
-        for (const mentionedId of mentionedUserIds) {
+      if (mentions.length > 0) {
+        const obj = resource.objective;
+        for (const mentionedId of mentions) {
           if (mentionedId !== user.id) {
             await createNotification({
               userId: mentionedId,
               type: "comment_mention",
               title: `${user.displayName} 在评论中提到了你`,
-              content: content.trim().substring(0, 100),
+              content: content.substring(0, 100),
               relatedKrId: krId,
               relatedObjectiveId: obj?.id,
               fromUserId: user.id,
@@ -1388,15 +1555,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      await audit(req, { actor: user, action: "comment.create", resourceType: "comment", resourceId: comment.id, changes: { krId, mentionedUserIds: mentions } });
       return res.json(comment);
     } catch (err) {
-      return res.status(500).json({ message: "发送评论失败" });
+      return routeError(res, err, "发送评论失败");
     }
   });
 
   app.delete("/api/kr-comments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const user = await getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "用户不存在" });
+      const comment = await getComment(req.params.id);
+      if (!comment || (comment.userId !== user.id && user.role !== "super_admin")) return res.status(404).json({ message: "评论不存在" });
       await deleteComment(req.params.id);
+      await audit(req, { actor: user, action: "comment.delete", resourceType: "comment", resourceId: req.params.id, changes: { krId: comment.krId } });
       return res.json({ message: "已删除" });
     } catch (err) {
       return res.status(500).json({ message: "删除评论失败" });
@@ -1423,6 +1596,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/notifications/:id/read", requireAuth, async (req: Request, res: Response) => {
     try {
+      const notification = await getNotification(req.params.id);
+      if (!notification || notification.userId !== req.session.userId) return res.status(404).json({ message: "通知不存在" });
       await markNotificationRead(req.params.id);
       return res.json({ message: "已标记已读" });
     } catch (err) {
@@ -1442,6 +1617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 清除所有 OKR 数据（仅超级管理员可用）
   app.delete("/api/okr/clear-all", requireAdmin, async (req: Request, res: Response) => {
     try {
+      const actor = await getUser(req.session.userId!);
       const { keyResults, objectives } = await import("@shared/schema");
       const { db } = await import("./db");
       const { eq } = await import("drizzle-orm");
@@ -1450,6 +1626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const deletedKRs = await db.delete(keyResults).returning();
       // 再删除所有目标
       const deletedObjectives = await db.delete(objectives).returning();
+      await audit(req, { actor, action: "okr.clear_all", resourceType: "okr", changes: { deletedObjectives: deletedObjectives.length, deletedKRs: deletedKRs.length } });
       
       return res.json({ 
         message: `已清除所有 OKR 数据`,
@@ -1462,6 +1639,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  app.get("/api/admin/audit-logs", requireAdmin, async (req: Request, res: Response) => {
+    const logs = await getAuditLogs({
+      actorId: typeof req.query.actorId === "string" ? req.query.actorId : undefined,
+      action: typeof req.query.action === "string" ? req.query.action : undefined,
+      resourceType: typeof req.query.resourceType === "string" ? req.query.resourceType : undefined,
+      success: req.query.success === "true" ? true : req.query.success === "false" ? false : undefined,
+      from: typeof req.query.from === "string" && !Number.isNaN(Date.parse(req.query.from)) ? new Date(req.query.from) : undefined,
+      to: typeof req.query.to === "string" && !Number.isNaN(Date.parse(req.query.to)) ? new Date(req.query.to) : undefined,
+      limit: typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : undefined,
+    });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json(logs);
+  });
+
+  app.get("/api/admin/audit-logs/export", requireAdmin, async (req: Request, res: Response) => {
+    const logs = await getAuditLogs({ limit: 1000 });
+    const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      ["时间", "请求ID", "操作者", "角色", "操作", "资源类型", "资源ID", "IP", "结果", "错误码"],
+      ...logs.map((log) => [log.createdAt?.toISOString(), log.requestId, log.actorUsername, log.actorRole, log.action, log.resourceType, log.resourceId, log.ipAddress, log.success ? "成功" : "失败", log.errorCode]),
+    ];
+    const csv = `\uFEFF${rows.map((row) => row.map(escape).join(",")).join("\r\n")}`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=audit_logs.csv");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(csv);
+  });
+
+  app.post("/api/admin/audit-logs/cleanup", requireAdmin, async (req: Request, res: Response) => {
+    const actor = await getUser(req.session.userId!);
+    const deleted = await deleteExpiredAuditLogs(180);
+    await audit(req, { actor, action: "audit.cleanup", resourceType: "audit_log", changes: { deleted, retentionDays: 180 } });
+    return res.json({ deleted });
+  });
+
 }

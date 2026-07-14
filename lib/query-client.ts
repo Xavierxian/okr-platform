@@ -30,6 +30,31 @@ export function buildUrl(path: string): string {
   return new URL(path, baseUrl).toString();
 }
 
+let cachedCsrfToken: string | null = null;
+let csrfRequest: Promise<string> | null = null;
+
+export async function getCsrfToken(forceRefresh = false): Promise<string> {
+  if (!forceRefresh && cachedCsrfToken) return cachedCsrfToken;
+  if (!forceRefresh && csrfRequest) return csrfRequest;
+  csrfRequest = (async () => {
+    const response = await fetch(buildUrl("/api/auth/csrf-token"), { credentials: "include" });
+    await throwIfResNotOk(response);
+    const data = await response.json() as { csrfToken: string };
+    cachedCsrfToken = data.csrfToken;
+    return data.csrfToken;
+  })();
+  try {
+    return await csrfRequest;
+  } finally {
+    csrfRequest = null;
+  }
+}
+
+export function clearCsrfToken() {
+  cachedCsrfToken = null;
+  csrfRequest = null;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -45,12 +70,20 @@ export async function apiRequest(
   const baseUrl = getApiUrl();
   const url = baseUrl ? new URL(route, baseUrl).toString() : route;
 
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  const isMutation = !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
+  const execute = async (forceToken = false) => {
+    const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+    if (isMutation) headers["X-CSRF-Token"] = await getCsrfToken(forceToken);
+    return fetch(url, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+  };
+
+  let res = await execute();
+  if (isMutation && res.status === 403) res = await execute(true);
 
   await throwIfResNotOk(res);
   return res;

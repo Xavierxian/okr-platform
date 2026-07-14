@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
+import { useAuth } from '@/lib/auth-context';
 import { useOKR } from '@/lib/okr-context';
 import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
 export default function CreateDepartmentScreen() {
+  const { user } = useAuth();
+  if (user?.role !== 'super_admin') return <Redirect href="/" />;
+  return <CreateDepartmentContent />;
+}
+
+function CreateDepartmentContent() {
   const { departments, refresh } = useOKR();
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState<string | null>(null);

@@ -15,7 +15,8 @@ export default function ChangePasswordScreen() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
 
-  const canSave = currentPassword.length > 0 && newPassword.length >= 6 && newPassword === confirmPassword;
+  const passwordClasses = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(pattern => pattern.test(newPassword)).length;
+  const canSave = currentPassword.length > 0 && newPassword.length >= 8 && passwordClasses >= 3 && newPassword === confirmPassword;
 
   const handleSave = async () => {
     if (!canSave || saving) return;

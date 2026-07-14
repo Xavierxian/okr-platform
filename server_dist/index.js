@@ -1,5 +1,10 @@
+"use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
@@ -7,10 +12,27 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc2) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
 // shared/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
+  auditLogs: () => auditLogs,
   cycles: () => cycles,
   departments: () => departments,
   insertUserSchema: () => insertUserSchema,
@@ -22,111 +44,155 @@ __export(schema_exports, {
   userDepartments: () => userDepartments,
   users: () => users
 });
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, real } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
-var users, departments, userDepartments, cycles, objectives, keyResults, krComments, notifications, insertUserSchema, loginSchema;
+var import_drizzle_orm, import_pg_core, import_drizzle_zod, import_zod, users, departments, userDepartments, cycles, objectives, keyResults, krComments, notifications, auditLogs, insertUserSchema, loginSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
-    users = pgTable("users", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      username: text("username").notNull().unique(),
-      password: text("password").notNull(),
-      displayName: text("display_name").notNull(),
-      role: text("role").notNull().default("member"),
-      departmentId: varchar("department_id"),
-      dingtalkUserId: text("dingtalk_user_id"),
-      createdAt: timestamp("created_at").defaultNow()
+    import_drizzle_orm = require("drizzle-orm");
+    import_pg_core = require("drizzle-orm/pg-core");
+    import_drizzle_zod = require("drizzle-zod");
+    import_zod = require("zod");
+    users = (0, import_pg_core.pgTable)("users", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      username: (0, import_pg_core.text)("username").notNull().unique(),
+      password: (0, import_pg_core.text)("password"),
+      authProvider: (0, import_pg_core.text)("auth_provider").notNull().default("dingtalk"),
+      displayName: (0, import_pg_core.text)("display_name").notNull(),
+      role: (0, import_pg_core.text)("role").notNull().default("member"),
+      departmentId: (0, import_pg_core.varchar)("department_id").references(() => departments.id, { onDelete: "set null" }),
+      dingtalkUserId: (0, import_pg_core.text)("dingtalk_user_id").unique(),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    departments = pgTable("departments", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      name: text("name").notNull(),
-      parentId: varchar("parent_id"),
-      level: integer("level").notNull().default(0)
+    departments = (0, import_pg_core.pgTable)("departments", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      name: (0, import_pg_core.text)("name").notNull(),
+      parentId: (0, import_pg_core.varchar)("parent_id"),
+      level: (0, import_pg_core.integer)("level").notNull().default(0)
     });
-    userDepartments = pgTable("user_departments", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      userId: varchar("user_id").notNull(),
-      departmentId: varchar("department_id").notNull()
+    userDepartments = (0, import_pg_core.pgTable)("user_departments", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      departmentId: (0, import_pg_core.varchar)("department_id").notNull().references(() => departments.id, { onDelete: "cascade" })
+    }, (table) => [
+      (0, import_pg_core.uniqueIndex)("user_departments_user_department_unique").on(table.userId, table.departmentId),
+      (0, import_pg_core.index)("user_departments_user_idx").on(table.userId),
+      (0, import_pg_core.index)("user_departments_department_idx").on(table.departmentId)
+    ]);
+    cycles = (0, import_pg_core.pgTable)("cycles", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      name: (0, import_pg_core.text)("name").notNull().unique(),
+      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    cycles = pgTable("cycles", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      name: text("name").notNull().unique(),
-      sortOrder: integer("sort_order").notNull().default(0),
-      createdAt: timestamp("created_at").defaultNow()
-    });
-    objectives = pgTable("objectives", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      title: text("title").notNull(),
-      description: text("description").notNull().default(""),
-      departmentId: varchar("department_id").notNull(),
-      cycle: text("cycle").notNull(),
-      parentObjectiveId: varchar("parent_objective_id"),
-      status: text("status").notNull().default("active"),
-      isCollaborative: boolean("is_collaborative").notNull().default(false),
-      collaborativeDeptIds: jsonb("collaborative_dept_ids").$type().default([]),
-      collaborativeUserIds: jsonb("collaborative_user_ids").$type().default([]),
-      linkedToParent: boolean("linked_to_parent").notNull().default(false),
-      okrType: text("okr_type").notNull().default("\u627F\u8BFA\u578B"),
-      createdBy: varchar("created_by"),
-      sortOrder: integer("sort_order").notNull().default(0),
-      createdAt: timestamp("created_at").defaultNow()
-    });
-    keyResults = pgTable("key_results", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      objectiveId: varchar("objective_id").notNull(),
-      title: text("title").notNull(),
-      description: text("description").notNull().default(""),
-      assigneeId: varchar("assignee_id"),
-      assigneeName: text("assignee_name").notNull().default(""),
-      collaboratorId: varchar("collaborator_id"),
-      collaboratorName: text("collaborator_name").notNull().default(""),
-      startDate: text("start_date").notNull(),
-      endDate: text("end_date").notNull(),
-      progress: integer("progress").notNull().default(0),
-      weight: real("weight").notNull().default(1),
-      status: text("status").notNull().default("normal"),
-      okrType: text("okr_type").notNull().default("\u627F\u8BFA\u578B"),
-      selfScore: real("self_score"),
-      selfScoreNote: text("self_score_note").notNull().default(""),
-      progressHistory: jsonb("progress_history").$type().default([]),
-      sortOrder: integer("sort_order").notNull().default(0),
-      createdAt: timestamp("created_at").defaultNow()
-    });
-    krComments = pgTable("kr_comments", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      krId: varchar("kr_id").notNull(),
-      userId: varchar("user_id").notNull(),
-      userName: text("user_name").notNull(),
-      content: text("content").notNull(),
-      mentionedUserIds: jsonb("mentioned_user_ids").$type().default([]),
-      createdAt: timestamp("created_at").defaultNow()
-    });
-    notifications = pgTable("notifications", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      userId: varchar("user_id").notNull(),
-      type: text("type").notNull().default("comment_mention"),
-      title: text("title").notNull(),
-      content: text("content").notNull(),
-      relatedKrId: varchar("related_kr_id"),
-      relatedObjectiveId: varchar("related_objective_id"),
-      fromUserId: varchar("from_user_id"),
-      fromUserName: text("from_user_name"),
-      isRead: boolean("is_read").notNull().default(false),
-      createdAt: timestamp("created_at").defaultNow()
-    });
-    insertUserSchema = createInsertSchema(users).pick({
+    objectives = (0, import_pg_core.pgTable)("objectives", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      title: (0, import_pg_core.text)("title").notNull(),
+      description: (0, import_pg_core.text)("description").notNull().default(""),
+      departmentId: (0, import_pg_core.varchar)("department_id").notNull().references(() => departments.id, { onDelete: "restrict" }),
+      cycle: (0, import_pg_core.text)("cycle").notNull(),
+      parentObjectiveId: (0, import_pg_core.varchar)("parent_objective_id"),
+      status: (0, import_pg_core.text)("status").notNull().default("active"),
+      isCollaborative: (0, import_pg_core.boolean)("is_collaborative").notNull().default(false),
+      collaborativeDeptIds: (0, import_pg_core.jsonb)("collaborative_dept_ids").$type().default([]),
+      collaborativeUserIds: (0, import_pg_core.jsonb)("collaborative_user_ids").$type().default([]),
+      linkedToParent: (0, import_pg_core.boolean)("linked_to_parent").notNull().default(false),
+      okrType: (0, import_pg_core.text)("okr_type").notNull().default("\u627F\u8BFA\u578B"),
+      createdBy: (0, import_pg_core.varchar)("created_by").references(() => users.id, { onDelete: "set null" }),
+      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    }, (table) => [
+      (0, import_pg_core.index)("objectives_department_idx").on(table.departmentId),
+      (0, import_pg_core.index)("objectives_created_by_idx").on(table.createdBy),
+      (0, import_pg_core.index)("objectives_cycle_idx").on(table.cycle)
+    ]);
+    keyResults = (0, import_pg_core.pgTable)("key_results", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      objectiveId: (0, import_pg_core.varchar)("objective_id").notNull().references(() => objectives.id, { onDelete: "cascade" }),
+      title: (0, import_pg_core.text)("title").notNull(),
+      description: (0, import_pg_core.text)("description").notNull().default(""),
+      assigneeId: (0, import_pg_core.varchar)("assignee_id").references(() => users.id, { onDelete: "set null" }),
+      assigneeName: (0, import_pg_core.text)("assignee_name").notNull().default(""),
+      collaboratorId: (0, import_pg_core.varchar)("collaborator_id").references(() => users.id, { onDelete: "set null" }),
+      collaboratorName: (0, import_pg_core.text)("collaborator_name").notNull().default(""),
+      startDate: (0, import_pg_core.text)("start_date").notNull(),
+      endDate: (0, import_pg_core.text)("end_date").notNull(),
+      progress: (0, import_pg_core.integer)("progress").notNull().default(0),
+      weight: (0, import_pg_core.real)("weight").notNull().default(1),
+      status: (0, import_pg_core.text)("status").notNull().default("normal"),
+      okrType: (0, import_pg_core.text)("okr_type").notNull().default("\u627F\u8BFA\u578B"),
+      selfScore: (0, import_pg_core.real)("self_score"),
+      selfScoreNote: (0, import_pg_core.text)("self_score_note").notNull().default(""),
+      progressHistory: (0, import_pg_core.jsonb)("progress_history").$type().default([]),
+      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    }, (table) => [
+      (0, import_pg_core.index)("key_results_objective_idx").on(table.objectiveId),
+      (0, import_pg_core.index)("key_results_assignee_idx").on(table.assigneeId),
+      (0, import_pg_core.index)("key_results_collaborator_idx").on(table.collaboratorId),
+      (0, import_pg_core.check)("key_results_progress_check", import_drizzle_orm.sql`${table.progress} between 0 and 100`),
+      (0, import_pg_core.check)("key_results_weight_check", import_drizzle_orm.sql`${table.weight} > 0`),
+      (0, import_pg_core.check)("key_results_self_score_check", import_drizzle_orm.sql`${table.selfScore} is null or (${table.selfScore} >= 0 and ${table.selfScore} <= 1)`)
+    ]);
+    krComments = (0, import_pg_core.pgTable)("kr_comments", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      krId: (0, import_pg_core.varchar)("kr_id").notNull().references(() => keyResults.id, { onDelete: "cascade" }),
+      userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      userName: (0, import_pg_core.text)("user_name").notNull(),
+      content: (0, import_pg_core.text)("content").notNull(),
+      mentionedUserIds: (0, import_pg_core.jsonb)("mentioned_user_ids").$type().default([]),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    }, (table) => [
+      (0, import_pg_core.index)("kr_comments_kr_idx").on(table.krId),
+      (0, import_pg_core.index)("kr_comments_user_idx").on(table.userId)
+    ]);
+    notifications = (0, import_pg_core.pgTable)("notifications", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      type: (0, import_pg_core.text)("type").notNull().default("comment_mention"),
+      title: (0, import_pg_core.text)("title").notNull(),
+      content: (0, import_pg_core.text)("content").notNull(),
+      relatedKrId: (0, import_pg_core.varchar)("related_kr_id").references(() => keyResults.id, { onDelete: "set null" }),
+      relatedObjectiveId: (0, import_pg_core.varchar)("related_objective_id").references(() => objectives.id, { onDelete: "set null" }),
+      fromUserId: (0, import_pg_core.varchar)("from_user_id").references(() => users.id, { onDelete: "set null" }),
+      fromUserName: (0, import_pg_core.text)("from_user_name"),
+      isRead: (0, import_pg_core.boolean)("is_read").notNull().default(false),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    }, (table) => [
+      (0, import_pg_core.index)("notifications_user_read_idx").on(table.userId, table.isRead)
+    ]);
+    auditLogs = (0, import_pg_core.pgTable)("audit_logs", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      requestId: (0, import_pg_core.varchar)("request_id").notNull(),
+      actorId: (0, import_pg_core.varchar)("actor_id"),
+      actorUsername: (0, import_pg_core.text)("actor_username"),
+      actorRole: (0, import_pg_core.text)("actor_role"),
+      action: (0, import_pg_core.text)("action").notNull(),
+      resourceType: (0, import_pg_core.text)("resource_type").notNull(),
+      resourceId: (0, import_pg_core.varchar)("resource_id"),
+      ipAddress: (0, import_pg_core.text)("ip_address"),
+      userAgent: (0, import_pg_core.text)("user_agent"),
+      changes: (0, import_pg_core.jsonb)("changes").$type().default({}),
+      success: (0, import_pg_core.boolean)("success").notNull(),
+      errorCode: (0, import_pg_core.text)("error_code"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+    }, (table) => [
+      (0, import_pg_core.index)("audit_logs_created_at_idx").on(table.createdAt),
+      (0, import_pg_core.index)("audit_logs_actor_idx").on(table.actorId),
+      (0, import_pg_core.index)("audit_logs_action_idx").on(table.action),
+      (0, import_pg_core.index)("audit_logs_resource_idx").on(table.resourceType, table.resourceId)
+    ]);
+    insertUserSchema = (0, import_drizzle_zod.createInsertSchema)(users).pick({
       username: true,
       password: true,
       displayName: true,
       role: true,
-      departmentId: true
+      departmentId: true,
+      authProvider: true,
+      dingtalkUserId: true
     });
-    loginSchema = z.object({
-      username: z.string().min(1),
-      password: z.string().min(1)
+    loginSchema = import_zod.z.object({
+      username: import_zod.z.string().min(1),
+      password: import_zod.z.string().min(1)
     });
   }
 });
@@ -137,18 +203,18 @@ __export(db_exports, {
   db: () => db,
   pool: () => pool
 });
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-var pool, db;
+var import_node_postgres, import_pg, pool, db;
 var init_db = __esm({
   "server/db.ts"() {
     "use strict";
+    import_node_postgres = require("drizzle-orm/node-postgres");
+    import_pg = __toESM(require("pg"));
     init_schema();
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL is not set");
     }
-    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-    db = drizzle(pool, { schema: schema_exports });
+    pool = new import_pg.default.Pool({ connectionString: process.env.DATABASE_URL });
+    db = (0, import_node_postgres.drizzle)(pool, { schema: schema_exports });
   }
 });
 
@@ -158,7 +224,6 @@ __export(ai_analysis_exports, {
   generateOKRAnalysis: () => generateOKRAnalysis,
   streamOKRAnalysis: () => streamOKRAnalysis
 });
-import OpenAI from "openai";
 async function generateOKRAnalysis(data) {
   const { objectives: objectives2, keyResults: keyResults2, departments: departments2, cycle, departmentName } = data;
   const totalObj = objectives2.length;
@@ -319,16 +384,17 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
     }
   }
 }
-var apiKey, baseURL, openai, OKR_ANALYSIS_MODEL;
+var import_openai, apiKey, baseURL, openai, OKR_ANALYSIS_MODEL;
 var init_ai_analysis = __esm({
   "server/ai-analysis.ts"() {
     "use strict";
+    import_openai = __toESM(require("openai"));
     apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
     if (!apiKey) {
       throw new Error("AI_INTEGRATIONS_OPENAI_API_KEY \u73AF\u5883\u53D8\u91CF\u672A\u8BBE\u7F6E");
     }
-    openai = new OpenAI({
+    openai = new import_openai.default({
       apiKey,
       baseURL: baseURL || void 0
     });
@@ -337,21 +403,20 @@ var init_ai_analysis = __esm({
 });
 
 // server/index.ts
-import express from "express";
+var import_express = __toESM(require("express"));
 
 // server/routes.ts
+var import_express_session = __toESM(require("express-session"));
+var import_connect_pg_simple = __toESM(require("connect-pg-simple"));
 init_db();
-import { createServer } from "node:http";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
 
 // server/file-upload.ts
-import { Storage } from "@google-cloud/storage";
-import * as fs from "fs";
-import * as path from "path";
+var import_storage = require("@google-cloud/storage");
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
 var bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
 function getStorage() {
-  return new Storage({ apiEndpoint: "https://storage.googleapis.com" });
+  return new import_storage.Storage({ apiEndpoint: "https://storage.googleapis.com" });
 }
 var LOCAL_UPLOAD_DIR = path.resolve(process.cwd(), "assets", "uploads");
 function ensureLocalDir() {
@@ -379,63 +444,161 @@ async function uploadFile(buffer, fileName, contentType) {
 }
 
 // server/storage.ts
+var import_drizzle_orm2 = require("drizzle-orm");
 init_db();
 init_schema();
-import { eq, or, inArray, and, asc } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import { createDecipheriv } from "node:crypto";
-var AES_CONFIG_KEY = "Bai%2018Son^9120";
-function decryptAesEcbBase64(value, key = AES_CONFIG_KEY) {
-  try {
-    const decipher = createDecipheriv("aes-128-ecb", Buffer.from(key, "utf8"), null);
-    decipher.setAutoPadding(true);
-    return Buffer.concat([
-      decipher.update(Buffer.from(value, "base64")),
-      decipher.final()
-    ]).toString("utf8");
-  } catch {
-    return value;
+var import_bcryptjs = __toESM(require("bcryptjs"));
+
+// server/validation.ts
+var import_zod2 = require("zod");
+var id = import_zod2.z.string().min(1).max(128);
+var shortText = import_zod2.z.string().trim().min(1).max(300);
+var optionalText = import_zod2.z.string().trim().max(5e3).optional().default("");
+var isoDate = import_zod2.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u65E5\u671F\u683C\u5F0F\u5FC5\u987B\u4E3A YYYY-MM-DD");
+var role = import_zod2.z.enum(["member", "center_head", "vp", "super_admin"]);
+var okrType = import_zod2.z.enum(["\u627F\u8BFA\u578B", "\u6311\u6218\u578B"]);
+var strongPasswordSchema = import_zod2.z.string().min(8).max(128).refine((value) => {
+  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
+  return classes.filter((pattern) => pattern.test(value)).length >= 3;
+}, "\u5BC6\u7801\u81F3\u5C118\u4F4D\uFF0C\u5E76\u5305\u542B\u5927\u5C0F\u5199\u5B57\u6BCD\u3001\u6570\u5B57\u3001\u7B26\u53F7\u4E2D\u7684\u81F3\u5C11\u4E09\u7C7B");
+var loginBodySchema = import_zod2.z.object({
+  username: import_zod2.z.string().trim().min(1).max(100),
+  password: import_zod2.z.string().min(1).max(128)
+}).strict();
+var dingtalkLoginBodySchema = import_zod2.z.object({ authCode: import_zod2.z.string().min(1).max(2048) }).strict();
+var changePasswordBodySchema = import_zod2.z.object({
+  currentPassword: import_zod2.z.string().min(1).max(128),
+  newPassword: strongPasswordSchema
+}).strict();
+var createUserBodySchema = import_zod2.z.object({
+  displayName: import_zod2.z.string().trim().min(1).max(100),
+  role: role.exclude(["super_admin"]).default("member"),
+  departmentId: id.nullable().optional(),
+  departmentIds: import_zod2.z.array(id).max(50).optional(),
+  dingtalkUserId: import_zod2.z.string().trim().min(1).max(256)
+}).strict();
+var updateUserBodySchema = import_zod2.z.object({
+  displayName: import_zod2.z.string().trim().min(1).max(100).optional(),
+  role: role.exclude(["super_admin"]).optional(),
+  departmentIds: import_zod2.z.array(id).max(50).optional()
+}).strict();
+var departmentBodySchema = import_zod2.z.object({
+  name: shortText,
+  parentId: id.nullable().optional(),
+  level: import_zod2.z.number().int().min(0).max(10).optional()
+}).strict();
+var cycleBodySchema = import_zod2.z.object({
+  name: shortText,
+  sortOrder: import_zod2.z.number().int().min(0).max(1e4).optional()
+}).strict();
+var objectiveCreateBodySchema = import_zod2.z.object({
+  title: shortText,
+  description: optionalText,
+  departmentId: id,
+  cycle: shortText,
+  parentObjectiveId: id.nullable().optional(),
+  isCollaborative: import_zod2.z.boolean().optional().default(false),
+  collaborativeDeptIds: import_zod2.z.array(id).max(100).optional().default([]),
+  collaborativeUserIds: import_zod2.z.array(id).max(100).optional().default([]),
+  linkedToParent: import_zod2.z.boolean().optional().default(false),
+  okrType: okrType.optional().default("\u627F\u8BFA\u578B")
+}).strict();
+var objectiveUpdateBodySchema = objectiveCreateBodySchema.partial().strict();
+var keyResultBodyBaseSchema = import_zod2.z.object({
+  objectiveId: id,
+  title: shortText,
+  description: optionalText,
+  assigneeId: id.nullable().optional(),
+  assigneeName: import_zod2.z.string().trim().max(100).optional().default(""),
+  collaboratorId: id.nullable().optional(),
+  collaboratorName: import_zod2.z.string().trim().max(100).optional().default(""),
+  startDate: isoDate,
+  endDate: isoDate,
+  weight: import_zod2.z.number().positive().max(100).optional().default(1),
+  okrType: okrType.optional().default("\u627F\u8BFA\u578B")
+}).strict();
+var keyResultCreateBodySchema = keyResultBodyBaseSchema.refine((value) => value.startDate <= value.endDate, {
+  message: "\u622A\u6B62\u65E5\u671F\u4E0D\u80FD\u65E9\u4E8E\u5F00\u59CB\u65E5\u671F",
+  path: ["endDate"]
+});
+var keyResultUpdateBodySchema = keyResultBodyBaseSchema.omit({ objectiveId: true }).partial().strict();
+var reorderBodySchema = import_zod2.z.object({
+  orders: import_zod2.z.array(import_zod2.z.object({ id, sortOrder: import_zod2.z.number().int().min(0).max(1e5) }).strict()).max(1e3)
+}).strict();
+var progressBodySchema = import_zod2.z.object({
+  progress: import_zod2.z.number().int().min(0).max(100),
+  note: import_zod2.z.string().trim().min(1).max(5e3),
+  images: import_zod2.z.array(import_zod2.z.string().max(2048)).max(20).optional(),
+  entryId: import_zod2.z.string().max(128).optional()
+}).strict();
+var scoreBodySchema = import_zod2.z.object({
+  score: import_zod2.z.number().min(0).max(1),
+  note: import_zod2.z.string().trim().max(5e3).optional().default("")
+}).strict();
+var commentBodySchema = import_zod2.z.object({
+  krId: id,
+  content: import_zod2.z.string().trim().min(1).max(5e3),
+  mentionedUserIds: import_zod2.z.array(id).max(100).optional().default([])
+}).strict();
+function parseBody(schema, body) {
+  const result = schema.safeParse(body);
+  if (!result.success) {
+    const error = new Error(result.error.issues[0]?.message || "\u8BF7\u6C42\u6570\u636E\u65E0\u6548");
+    error.status = 400;
+    throw error;
   }
+  return result.data;
 }
-function getAdminSeedPassword() {
-  const encryptedPassword = process.env.ADMIN_PASSWORD_AES?.trim();
-  if (!encryptedPassword) {
-    throw new Error("ADMIN_PASSWORD_AES environment variable is required to seed or sync the admin password");
-  }
-  return decryptAesEcbBase64(encryptedPassword);
-}
-async function getUser(id) {
-  const [user] = await db.select().from(users).where(eq(users.id, id));
+
+// server/storage.ts
+async function getUser(id2) {
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.id, id2));
   return user;
 }
 async function getUserByUsername(username) {
-  const [user] = await db.select().from(users).where(eq(users.username, username));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.username, username));
   return user;
 }
 async function getUserByDingtalkId(dingtalkUserId) {
-  const [user] = await db.select().from(users).where(eq(users.dingtalkUserId, dingtalkUserId));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.dingtalkUserId, dingtalkUserId));
   return user;
 }
 async function createUser(data) {
-  const hashed = await bcrypt.hash(data.password, 10);
+  const hashed = data.password ? await import_bcryptjs.default.hash(data.password, 12) : null;
   const [user] = await db.insert(users).values({ ...data, password: hashed }).returning();
   return user;
 }
-async function updateUser(id, updates) {
+async function updateUser(id2, updates) {
   if (updates.password) {
-    updates.password = await bcrypt.hash(updates.password, 10);
+    updates.password = await import_bcryptjs.default.hash(updates.password, 10);
   }
-  const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+  const [user] = await db.update(users).set(updates).where((0, import_drizzle_orm2.eq)(users.id, id2)).returning();
   return user;
 }
-async function deleteUser(id) {
-  await db.delete(users).where(eq(users.id, id));
+async function deleteUser(id2) {
+  await db.delete(users).where((0, import_drizzle_orm2.eq)(users.id, id2));
 }
 async function getAllUsers() {
   return db.select().from(users);
 }
 async function verifyPassword(plaintext, hashed) {
-  return bcrypt.compare(plaintext, hashed);
+  return import_bcryptjs.default.compare(plaintext, hashed);
+}
+async function getObjective(id2) {
+  const [objective] = await db.select().from(objectives).where((0, import_drizzle_orm2.eq)(objectives.id, id2));
+  return objective;
+}
+async function getKeyResult(id2) {
+  const [keyResult] = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.id, id2));
+  return keyResult;
+}
+async function getComment(id2) {
+  const [comment] = await db.select().from(krComments).where((0, import_drizzle_orm2.eq)(krComments.id, id2));
+  return comment;
+}
+async function getNotification(id2) {
+  const [notification] = await db.select().from(notifications).where((0, import_drizzle_orm2.eq)(notifications.id, id2));
+  return notification;
 }
 async function getDepartments() {
   return db.select().from(departments);
@@ -444,22 +607,22 @@ async function createDepartment(data) {
   const [dept] = await db.insert(departments).values(data).returning();
   return dept;
 }
-async function updateDepartment(id, updates) {
-  const [dept] = await db.update(departments).set(updates).where(eq(departments.id, id)).returning();
+async function updateDepartment(id2, updates) {
+  const [dept] = await db.update(departments).set(updates).where((0, import_drizzle_orm2.eq)(departments.id, id2)).returning();
   return dept;
 }
-async function deleteDepartment(id) {
-  await db.delete(departments).where(or(eq(departments.id, id), eq(departments.parentId, id)));
+async function deleteDepartment(id2) {
+  await db.delete(departments).where((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(departments.id, id2), (0, import_drizzle_orm2.eq)(departments.parentId, id2)));
 }
 async function getUsersByDepartment(departmentId) {
-  return db.select().from(users).where(eq(users.departmentId, departmentId));
+  return db.select().from(users).where((0, import_drizzle_orm2.eq)(users.departmentId, departmentId));
 }
 async function getUserDepartmentIds(userId) {
-  const rows = await db.select().from(userDepartments).where(eq(userDepartments.userId, userId));
+  const rows = await db.select().from(userDepartments).where((0, import_drizzle_orm2.eq)(userDepartments.userId, userId));
   return rows.map((r) => r.departmentId);
 }
 async function setUserDepartments(userId, departmentIds) {
-  await db.delete(userDepartments).where(eq(userDepartments.userId, userId));
+  await db.delete(userDepartments).where((0, import_drizzle_orm2.eq)(userDepartments.userId, userId));
   if (departmentIds.length > 0) {
     await db.insert(userDepartments).values(departmentIds.map((deptId) => ({ userId, departmentId: deptId })));
   }
@@ -478,58 +641,44 @@ async function getObjectivesForUser(user) {
       return numA - numB;
     });
   };
-  if (user.role === "super_admin") {
-    const objs = await db.select().from(objectives);
-    return sortObjs(objs);
-  }
-  if (user.role === "vp" || user.role === "center_head") {
-    const allObjs2 = sortObjs(await db.select().from(objectives));
-    const multiDeptIds2 = await getUserDepartmentIds(user.id);
-    const baseDeptIds2 = multiDeptIds2.length > 0 ? multiDeptIds2 : user.departmentId ? [user.departmentId] : [];
-    const ownDeptIdSet = new Set(baseDeptIds2);
-    const leadershipUsers = await db.select().from(users).where(
-      or(eq(users.role, "vp"), eq(users.role, "center_head"))
-    );
-    const leadershipUserIds = new Set(leadershipUsers.map((u) => u.id));
-    return allObjs2.filter((obj) => {
-      if (ownDeptIdSet.has(obj.departmentId)) return true;
-      return !!obj.createdBy && leadershipUserIds.has(obj.createdBy);
-    });
-  }
   const allObjs = sortObjs(await db.select().from(objectives));
+  if (user.role === "super_admin") return allObjs;
   const multiDeptIds = await getUserDepartmentIds(user.id);
   const baseDeptIds = multiDeptIds.length > 0 ? multiDeptIds : user.departmentId ? [user.departmentId] : [];
+  const ownDeptIdSet = new Set(baseDeptIds);
+  const relatedKRs = await db.select({ objectiveId: keyResults.objectiveId }).from(keyResults).where((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(keyResults.assigneeId, user.id), (0, import_drizzle_orm2.eq)(keyResults.collaboratorId, user.id)));
+  const relatedObjectiveIds = new Set(relatedKRs.map((row) => row.objectiveId));
+  let leadershipUserIds = /* @__PURE__ */ new Set();
+  if (user.role === "vp" || user.role === "center_head") {
+    const leadershipUsers = await db.select({ id: users.id }).from(users).where(
+      (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.role, "vp"), (0, import_drizzle_orm2.eq)(users.role, "center_head"))
+    );
+    leadershipUserIds = new Set(leadershipUsers.map((leader) => leader.id));
+  }
   return allObjs.filter((obj) => {
-    if (baseDeptIds.includes(obj.departmentId)) return true;
-    return false;
+    if (obj.createdBy === user.id) return true;
+    if (ownDeptIdSet.has(obj.departmentId)) return true;
+    if ((obj.collaborativeUserIds || []).includes(user.id)) return true;
+    if ((obj.collaborativeDeptIds || []).some((departmentId) => ownDeptIdSet.has(departmentId))) return true;
+    if (relatedObjectiveIds.has(obj.id)) return true;
+    return !!obj.createdBy && leadershipUserIds.has(obj.createdBy);
   });
 }
 async function getKRsAssignedToUser(userId) {
-  const allKRs = await db.select().from(keyResults).where(eq(keyResults.assigneeId, userId));
+  const allKRs = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.assigneeId, userId));
   if (allKRs.length === 0) return [];
   const objIds = [...new Set(allKRs.map((kr) => kr.objectiveId))];
-  const objs = await db.select().from(objectives).where(inArray(objectives.id, objIds));
+  const objs = await db.select().from(objectives).where((0, import_drizzle_orm2.inArray)(objectives.id, objIds));
   const objMap = new Map(objs.map((o) => [o.id, o]));
   return allKRs.filter((kr) => objMap.has(kr.objectiveId)).map((kr) => ({ kr, objective: objMap.get(kr.objectiveId) }));
 }
 async function getKRsCollaboratingUser(userId) {
-  const allKRs = await db.select().from(keyResults).where(eq(keyResults.collaboratorId, userId));
+  const allKRs = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.collaboratorId, userId));
   if (allKRs.length === 0) return [];
   const objIds = [...new Set(allKRs.map((kr) => kr.objectiveId))];
-  const objs = await db.select().from(objectives).where(inArray(objectives.id, objIds));
+  const objs = await db.select().from(objectives).where((0, import_drizzle_orm2.inArray)(objectives.id, objIds));
   const objMap = new Map(objs.map((o) => [o.id, o]));
   return allKRs.filter((kr) => objMap.has(kr.objectiveId)).map((kr) => ({ kr, objective: objMap.get(kr.objectiveId) }));
-}
-async function getAllObjectives() {
-  const objs = await db.select().from(objectives).orderBy(asc(objectives.sortOrder));
-  return objs.sort((a, b) => {
-    if (a.sortOrder !== b.sortOrder) {
-      return a.sortOrder - b.sortOrder;
-    }
-    const numA = parseInt(a.title.match(/O(\d+)/i)?.[1] || "0");
-    const numB = parseInt(b.title.match(/O(\d+)/i)?.[1] || "0");
-    return numA - numB;
-  });
 }
 async function createObjectiveInDb(data) {
   const [obj] = await db.insert(objectives).values({
@@ -538,25 +687,22 @@ async function createObjectiveInDb(data) {
   }).returning();
   return obj;
 }
-async function updateObjectiveInDb(id, updates) {
-  const [obj] = await db.update(objectives).set(updates).where(eq(objectives.id, id)).returning();
+async function updateObjectiveInDb(id2, updates) {
+  const [obj] = await db.update(objectives).set(updates).where((0, import_drizzle_orm2.eq)(objectives.id, id2)).returning();
   return obj;
 }
-async function deleteObjectiveInDb(id) {
-  await db.delete(keyResults).where(eq(keyResults.objectiveId, id));
-  await db.delete(objectives).where(eq(objectives.id, id));
+async function deleteObjectiveInDb(id2) {
+  await db.delete(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.objectiveId, id2));
+  await db.delete(objectives).where((0, import_drizzle_orm2.eq)(objectives.id, id2));
 }
 async function getKeyResultsForObjectives(objectiveIds) {
   if (objectiveIds.length === 0) return [];
-  const results = await db.select().from(keyResults).where(inArray(keyResults.objectiveId, objectiveIds));
+  const results = await db.select().from(keyResults).where((0, import_drizzle_orm2.inArray)(keyResults.objectiveId, objectiveIds));
   return results.sort((a, b) => {
     const numA = parseInt(a.title.match(/KR(\d+)/i)?.[1] || "0");
     const numB = parseInt(b.title.match(/KR(\d+)/i)?.[1] || "0");
     return numA - numB;
   });
-}
-async function getAllKeyResults() {
-  return db.select().from(keyResults);
 }
 async function createKeyResultInDb(data) {
   const [kr] = await db.insert(keyResults).values({
@@ -571,10 +717,10 @@ async function createKeyResultInDb(data) {
   }).returning();
   return kr;
 }
-async function updateKeyResultInDb(id, updates) {
-  console.log("updateKeyResultInDb called:", id, updates);
+async function updateKeyResultInDb(id2, updates) {
+  console.log("updateKeyResultInDb called:", id2, updates);
   try {
-    const [kr] = await db.update(keyResults).set(updates).where(eq(keyResults.id, id)).returning();
+    const [kr] = await db.update(keyResults).set(updates).where((0, import_drizzle_orm2.eq)(keyResults.id, id2)).returning();
     console.log("updateKeyResultInDb success:", kr?.id);
     return kr;
   } catch (err) {
@@ -582,11 +728,11 @@ async function updateKeyResultInDb(id, updates) {
     throw err;
   }
 }
-async function deleteKeyResultInDb(id) {
-  await db.delete(keyResults).where(eq(keyResults.id, id));
+async function deleteKeyResultInDb(id2) {
+  await db.delete(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.id, id2));
 }
-async function updateKRProgressInDb(id, progress, note, images, entryId) {
-  const [existing] = await db.select().from(keyResults).where(eq(keyResults.id, id));
+async function updateKRProgressInDb(id2, progress, note, images, entryId) {
+  const [existing] = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.id, id2));
   if (!existing) return void 0;
   const normalizedImages = images && images.length > 0 ? images : void 0;
   const existingHistory = existing.progressHistory || [];
@@ -594,7 +740,7 @@ async function updateKRProgressInDb(id, progress, note, images, entryId) {
   if (entryId) {
     const historyIndex = existingHistory.findIndex((entry) => entry.id === entryId);
     if (historyIndex === -1) return void 0;
-    history = existingHistory.map((entry, index) => index === historyIndex ? {
+    history = existingHistory.map((entry, index2) => index2 === historyIndex ? {
       ...entry,
       progress,
       note,
@@ -625,14 +771,14 @@ async function updateKRProgressInDb(id, progress, note, images, entryId) {
     progress: latestProgress,
     status,
     progressHistory: history
-  }).where(eq(keyResults.id, id)).returning();
+  }).where((0, import_drizzle_orm2.eq)(keyResults.id, id2)).returning();
   return kr;
 }
-async function scoreKRInDb(id, score, note) {
+async function scoreKRInDb(id2, score, note) {
   const [kr] = await db.update(keyResults).set({
     selfScore: score,
     selfScoreNote: note
-  }).where(eq(keyResults.id, id)).returning();
+  }).where((0, import_drizzle_orm2.eq)(keyResults.id, id2)).returning();
   return kr;
 }
 var DEFAULT_DEPARTMENTS = [
@@ -645,21 +791,33 @@ var DEFAULT_DEPARTMENTS = [
 ];
 async function seedDatabase() {
   const existingAdmin = await getUserByUsername("admin");
-  const adminPassword = getAdminSeedPassword();
   if (!existingAdmin) {
+    const adminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim();
+    if (!adminPassword || !strongPasswordSchema.safeParse(adminPassword).success) {
+      throw new Error("ADMIN_BOOTSTRAP_PASSWORD is required when the admin account does not exist");
+    }
     console.log("Seeding default admin user...");
     await createUser({
-      id: "admin_1",
       username: "admin",
       password: adminPassword,
       displayName: "\u8D85\u7EA7\u7BA1\u7406\u5458",
       role: "super_admin",
-      departmentId: null
+      departmentId: null,
+      authProvider: "local",
+      dingtalkUserId: null
     });
-    console.log("Default admin created from ADMIN_PASSWORD_AES");
+    console.log("Default admin created from the one-time bootstrap secret");
   } else {
-    await updateUser(existingAdmin.id, { password: adminPassword });
-    console.log("Admin password synced from ADMIN_PASSWORD_AES");
+    const updates = {};
+    if (existingAdmin.authProvider !== "local") updates.authProvider = "local";
+    if (!existingAdmin.password) {
+      const adminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim();
+      if (!adminPassword || !strongPasswordSchema.safeParse(adminPassword).success) {
+        throw new Error("ADMIN_BOOTSTRAP_PASSWORD must satisfy the password policy when the admin has no password");
+      }
+      updates.password = adminPassword;
+    }
+    if (Object.keys(updates).length > 0) await updateUser(existingAdmin.id, updates);
   }
   const existingDepts = await getDepartments();
   if (existingDepts.length === 0) {
@@ -687,45 +845,64 @@ async function seedDatabase() {
   }
 }
 async function getCycles() {
-  return db.select().from(cycles).orderBy(asc(cycles.sortOrder));
+  return db.select().from(cycles).orderBy((0, import_drizzle_orm2.asc)(cycles.sortOrder));
 }
 async function createCycle(name, sortOrder) {
   const [cycle] = await db.insert(cycles).values({ name, sortOrder }).returning();
   return cycle;
 }
-async function updateCycle(id, data) {
-  const [cycle] = await db.update(cycles).set(data).where(eq(cycles.id, id)).returning();
+async function updateCycle(id2, data) {
+  const [cycle] = await db.update(cycles).set(data).where((0, import_drizzle_orm2.eq)(cycles.id, id2)).returning();
   return cycle;
 }
-async function deleteCycle(id) {
-  await db.delete(cycles).where(eq(cycles.id, id));
+async function deleteCycle(id2) {
+  await db.delete(cycles).where((0, import_drizzle_orm2.eq)(cycles.id, id2));
 }
 async function getCommentsForKR(krId) {
-  return db.select().from(krComments).where(eq(krComments.krId, krId));
+  return db.select().from(krComments).where((0, import_drizzle_orm2.eq)(krComments.krId, krId));
 }
 async function createComment(data) {
   const [comment] = await db.insert(krComments).values(data).returning();
   return comment;
 }
-async function deleteComment(id) {
-  await db.delete(krComments).where(eq(krComments.id, id));
+async function deleteComment(id2) {
+  await db.delete(krComments).where((0, import_drizzle_orm2.eq)(krComments.id, id2));
 }
 async function getNotificationsForUser(userId) {
-  return db.select().from(notifications).where(eq(notifications.userId, userId));
+  return db.select().from(notifications).where((0, import_drizzle_orm2.eq)(notifications.userId, userId));
 }
 async function createNotification(data) {
   const [notif] = await db.insert(notifications).values(data).returning();
   return notif;
 }
-async function markNotificationRead(id) {
-  await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+async function markNotificationRead(id2) {
+  await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm2.eq)(notifications.id, id2));
 }
 async function markAllNotificationsRead(userId) {
-  await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
+  await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm2.eq)(notifications.userId, userId));
 }
 async function getUnreadNotificationCount(userId) {
-  const rows = await db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+  const rows = await db.select().from(notifications).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(notifications.userId, userId), (0, import_drizzle_orm2.eq)(notifications.isRead, false)));
   return rows.length;
+}
+async function createAuditLog(data) {
+  await db.insert(auditLogs).values(data);
+}
+async function getAuditLogs(filters) {
+  const conditions = [];
+  if (filters.actorId) conditions.push((0, import_drizzle_orm2.eq)(auditLogs.actorId, filters.actorId));
+  if (filters.action) conditions.push((0, import_drizzle_orm2.eq)(auditLogs.action, filters.action));
+  if (filters.resourceType) conditions.push((0, import_drizzle_orm2.eq)(auditLogs.resourceType, filters.resourceType));
+  if (filters.success !== void 0) conditions.push((0, import_drizzle_orm2.eq)(auditLogs.success, filters.success));
+  if (filters.from) conditions.push((0, import_drizzle_orm2.gte)(auditLogs.createdAt, filters.from));
+  if (filters.to) conditions.push((0, import_drizzle_orm2.lte)(auditLogs.createdAt, filters.to));
+  const limit = Math.min(Math.max(filters.limit || 200, 1), 1e3);
+  return db.select().from(auditLogs).where(conditions.length ? (0, import_drizzle_orm2.and)(...conditions) : void 0).orderBy((0, import_drizzle_orm2.desc)(auditLogs.createdAt)).limit(limit);
+}
+async function deleteExpiredAuditLogs(retentionDays = 180) {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1e3);
+  const deleted = await db.delete(auditLogs).where((0, import_drizzle_orm2.lt)(auditLogs.createdAt, cutoff)).returning({ id: auditLogs.id });
+  return deleted.length;
 }
 
 // server/dingtalk.ts
@@ -974,7 +1151,234 @@ function getDingtalkAppKey() {
   return process.env.DINGTALK_APP_KEY || "";
 }
 
+// server/authorization-policy.ts
+function canManageObjective(user, objective) {
+  return user.role === "super_admin" || objective.createdBy === user.id;
+}
+function canManageKeyResult(user, objective) {
+  return canManageObjective(user, objective);
+}
+function canUpdateKeyResultProgress(user, objective, keyResult) {
+  return canManageObjective(user, objective) || keyResult.assigneeId === user.id;
+}
+function canScoreKeyResult(user, objective, keyResult) {
+  return canUpdateKeyResultProgress(user, objective, keyResult);
+}
+
+// server/authorization.ts
+async function getReadableObjective(user, objectiveId) {
+  const visible = await getObjectivesForUser(user);
+  return visible.find((objective) => objective.id === objectiveId);
+}
+async function getManageableObjective(user, objectiveId) {
+  const objective = await getObjective(objectiveId);
+  return objective && canManageObjective(user, objective) ? objective : void 0;
+}
+async function getReadableKeyResult(user, keyResultId) {
+  const keyResult = await getKeyResult(keyResultId);
+  if (!keyResult) return void 0;
+  const objective = await getReadableObjective(user, keyResult.objectiveId);
+  return objective ? { keyResult, objective } : void 0;
+}
+async function getManageableKeyResult(user, keyResultId) {
+  const keyResult = await getKeyResult(keyResultId);
+  if (!keyResult) return void 0;
+  const objective = await getObjective(keyResult.objectiveId);
+  if (!objective || !canManageKeyResult(user, objective)) return void 0;
+  return { keyResult, objective };
+}
+
+// server/security.ts
+var import_node_crypto = require("node:crypto");
+var loginFailures = /* @__PURE__ */ new Map();
+var LOGIN_WINDOW_MS = 15 * 60 * 1e3;
+var LOGIN_BLOCK_MS = 15 * 60 * 1e3;
+var LOGIN_MAX_FAILURES = 5;
+function loginKeys(req) {
+  const username = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "unknown";
+  return [`ip:${req.ip}`, `account:${username}`];
+}
+function cleanupLoginFailures(now) {
+  for (const [key, value] of loginFailures) {
+    if (value.blockedUntil < now && now - value.lastFailure > LOGIN_WINDOW_MS) {
+      loginFailures.delete(key);
+    }
+  }
+}
+function requestIdMiddleware(req, res, next) {
+  const incoming = req.header("x-request-id");
+  req.requestId = incoming && /^[A-Za-z0-9._-]{1,128}$/.test(incoming) ? incoming : (0, import_node_crypto.randomUUID)();
+  res.setHeader("X-Request-Id", req.requestId);
+  next();
+}
+function allowedOrigins() {
+  const origins = /* @__PURE__ */ new Set();
+  const configured = [process.env.PUBLIC_HTTPS_ORIGIN, process.env.EXPO_PUBLIC_ORIGIN].filter((value) => !!value).map((value) => value.replace(/\/$/, ""));
+  configured.forEach((origin) => origins.add(origin));
+  if (process.env.REPLIT_DEV_DOMAIN) origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
+  if (process.env.REPLIT_DOMAINS) {
+    process.env.REPLIT_DOMAINS.split(",").map((value) => value.trim()).filter(Boolean).forEach((domain) => origins.add(`https://${domain}`));
+  }
+  return origins;
+}
+function originGuard(req, res, next) {
+  const origin = req.header("origin");
+  if (!origin) return next();
+  const isDevelopmentLocal = process.env.NODE_ENV !== "production" && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (isDevelopmentLocal || allowedOrigins().has(origin)) return next();
+  return res.status(403).json({ message: "\u8BF7\u6C42\u6765\u6E90\u4E0D\u53D7\u4FE1\u4EFB" });
+}
+function issueCsrfToken(req, res) {
+  if (!req.session.csrfToken) req.session.csrfToken = (0, import_node_crypto.randomBytes)(32).toString("hex");
+  return res.json({ csrfToken: req.session.csrfToken });
+}
+function issueOauthState(req) {
+  const state = (0, import_node_crypto.randomBytes)(32).toString("hex");
+  req.session.oauthState = state;
+  return state;
+}
+function consumeOauthState(req, supplied) {
+  const expected = req.session.oauthState;
+  delete req.session.oauthState;
+  if (!expected || !supplied) return false;
+  const expectedBuffer = Buffer.from(expected);
+  const suppliedBuffer = Buffer.from(supplied);
+  return expectedBuffer.length === suppliedBuffer.length && (0, import_node_crypto.timingSafeEqual)(expectedBuffer, suppliedBuffer);
+}
+function csrfProtection(req, res, next) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+  const expected = req.session.csrfToken;
+  const supplied = req.header("x-csrf-token");
+  if (!expected || !supplied) return res.status(403).json({ message: "CSRF \u6821\u9A8C\u5931\u8D25" });
+  const expectedBuffer = Buffer.from(expected);
+  const suppliedBuffer = Buffer.from(supplied);
+  if (expectedBuffer.length !== suppliedBuffer.length || !(0, import_node_crypto.timingSafeEqual)(expectedBuffer, suppliedBuffer)) {
+    return res.status(403).json({ message: "CSRF \u6821\u9A8C\u5931\u8D25" });
+  }
+  next();
+}
+function loginRateLimit(req, res, next) {
+  const now = Date.now();
+  cleanupLoginFailures(now);
+  const blocked = loginKeys(req).some((key) => (loginFailures.get(key)?.blockedUntil || 0) > now);
+  if (blocked) {
+    res.setHeader("Retry-After", Math.ceil(LOGIN_BLOCK_MS / 1e3));
+    return res.status(429).json({ message: "\u767B\u5F55\u5C1D\u8BD5\u8FC7\u591A\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5" });
+  }
+  next();
+}
+function recordLoginFailure(req) {
+  const now = Date.now();
+  for (const key of loginKeys(req)) {
+    const current = loginFailures.get(key);
+    const count = current && now - current.lastFailure <= LOGIN_WINDOW_MS ? current.count + 1 : 1;
+    loginFailures.set(key, {
+      count,
+      lastFailure: now,
+      blockedUntil: count >= LOGIN_MAX_FAILURES ? now + LOGIN_BLOCK_MS : 0
+    });
+  }
+}
+function clearLoginFailures(req) {
+  loginKeys(req).forEach((key) => loginFailures.delete(key));
+}
+function regenerateSession(req) {
+  const csrfToken = req.session.csrfToken;
+  return new Promise((resolve3, reject) => {
+    req.session.regenerate((error) => {
+      if (error) return reject(error);
+      req.session.csrfToken = csrfToken || (0, import_node_crypto.randomBytes)(32).toString("hex");
+      resolve3();
+    });
+  });
+}
+
+// server/audit.ts
+var SENSITIVE_KEYS = /* @__PURE__ */ new Set([
+  "password",
+  "currentPassword",
+  "newPassword",
+  "csrfToken",
+  "cookie",
+  "session",
+  "secret",
+  "key",
+  "certificate"
+]);
+function sanitize(value) {
+  if (Array.isArray(value)) return value.slice(0, 100).map(sanitize);
+  if (!value || typeof value !== "object") {
+    return typeof value === "string" && value.length > 500 ? `${value.slice(0, 500)}\u2026` : value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !SENSITIVE_KEYS.has(key)).map(([key, entry]) => [key, sanitize(entry)])
+  );
+}
+async function audit(req, data) {
+  try {
+    await createAuditLog({
+      requestId: req.requestId,
+      actorId: data.actor?.id || req.session?.userId || null,
+      actorUsername: data.actor?.username || null,
+      actorRole: data.actor?.role || null,
+      action: data.action,
+      resourceType: data.resourceType,
+      resourceId: data.resourceId || null,
+      ipAddress: req.ip,
+      userAgent: req.header("user-agent") || null,
+      changes: sanitize(data.changes || {}),
+      success: data.success ?? true,
+      errorCode: data.errorCode || null
+    });
+  } catch (error) {
+    console.error(JSON.stringify({
+      level: "error",
+      event: "audit_write_failed",
+      requestId: req.requestId,
+      message: error instanceof Error ? error.message : "unknown"
+    }));
+  }
+}
+
 // server/routes.ts
+var DUMMY_PASSWORD_HASH = "$2b$12$C6UzMDM.H6dfI/f/IKcEe.8jNOM7Z5GvHyk1Iko9pZPZfK7w4M1mK";
+async function readRawBody(req, maxBytes) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buffer.length;
+    if (total > maxBytes) {
+      const error = new Error("\u8BF7\u6C42\u4F53\u8FC7\u5927");
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
+}
+function detectImageType(buffer) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return { contentType: "image/png", extension: "png" };
+  }
+  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) {
+    return { contentType: "image/jpeg", extension: "jpg" };
+  }
+  if (buffer.length >= 6 && ["GIF87a", "GIF89a"].includes(buffer.subarray(0, 6).toString("ascii"))) {
+    return { contentType: "image/gif", extension: "gif" };
+  }
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") {
+    return { contentType: "image/webp", extension: "webp" };
+  }
+  return void 0;
+}
+function routeError(res, error, fallbackMessage) {
+  const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 500;
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({ message: error instanceof Error ? error.message : fallbackMessage });
+  }
+  return res.status(500).json({ message: fallbackMessage });
+}
 function requireAuth(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "\u672A\u767B\u5F55" });
@@ -992,17 +1396,18 @@ async function requireAdmin(req, res, next) {
   next();
 }
 async function registerRoutes(app2) {
-  const PgStore = connectPgSimple(session);
+  const PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
   const isProd = process.env.NODE_ENV === "production";
-  if (isProd) {
-    app2.set("trust proxy", 1);
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (isProd && !sessionSecret) {
+    throw new Error("SESSION_SECRET is required in production");
   }
-  const sessionMiddleware = session({
+  const sessionMiddleware = (0, import_express_session.default)({
     store: new PgStore({
       pool,
       createTableIfMissing: true
     }),
-    secret: process.env.SESSION_SECRET || "okr-secret-key",
+    secret: sessionSecret || "development-only-session-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -1013,37 +1418,42 @@ async function registerRoutes(app2) {
     }
   });
   app2.use("/api", sessionMiddleware);
-  app2.post("/api/auth/login", async (req, res) => {
+  app2.use("/api", originGuard);
+  app2.get("/api/auth/csrf-token", issueCsrfToken);
+  app2.use("/api", csrfProtection);
+  app2.post("/api/auth/login", loginRateLimit, async (req, res) => {
     try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ message: "\u8BF7\u8F93\u5165\u7528\u6237\u540D\u548C\u5BC6\u7801" });
-      }
+      const { username, password } = parseBody(loginBodySchema, req.body);
       const user = await getUserByUsername(username);
-      if (!user) {
-        return res.status(401).json({ message: "\u7528\u6237\u540D\u6216\u5BC6\u7801\u9519\u8BEF" });
-      }
-      const valid = await verifyPassword(password, user.password);
+      const eligible = !!user?.password && user.authProvider === "local" && user.role === "super_admin";
+      const passwordMatches = await verifyPassword(password, eligible ? user.password : DUMMY_PASSWORD_HASH);
+      const valid = eligible && passwordMatches;
       if (!valid) {
+        recordLoginFailure(req);
+        await audit(req, { actor: user, action: "auth.login", resourceType: "session", success: false, errorCode: "INVALID_CREDENTIALS" });
         return res.status(401).json({ message: "\u7528\u6237\u540D\u6216\u5BC6\u7801\u9519\u8BEF" });
       }
+      await regenerateSession(req);
       req.session.userId = user.id;
+      clearLoginFailures(req);
       const { password: _, ...safeUser } = user;
       const deptIds = await getUserDepartmentIds(user.id);
+      await audit(req, { actor: user, action: "auth.login", resourceType: "session" });
       return res.json({ user: { ...safeUser, departmentIds: deptIds } });
     } catch (err) {
       console.error("Login error:", err);
-      return res.status(500).json({ message: "\u767B\u5F55\u5931\u8D25" });
+      return routeError(res, err, "\u767B\u5F55\u5931\u8D25");
     }
   });
-  app2.get("/api/auth/dingtalk-config", (_req, res) => {
+  app2.get("/api/auth/dingtalk-config", (req, res) => {
     if (!isDingtalkConfigured()) {
       return res.json({ enabled: false });
     }
     return res.json({
       enabled: true,
       corpId: getDingtalkCorpId(),
-      appKey: getDingtalkAppKey()
+      appKey: getDingtalkAppKey(),
+      state: issueOauthState(req)
     });
   });
   async function syncDingtalkUserDept(userId, dtDeptIdList) {
@@ -1069,7 +1479,7 @@ async function registerRoutes(app2) {
         const targetLevel = targetParentId ? 1 : 0;
         let centerDept = knownDepts.find((d) => d.name === deptInfo.centerName && d.parentId === targetParentId);
         if (!centerDept) {
-          centerDept = knownDepts.find((d) => d.name === deptInfo.centerName) || null;
+          centerDept = knownDepts.find((d) => d.name === deptInfo.centerName);
           if (centerDept) {
             await updateDepartment(centerDept.id, { parentId: targetParentId, level: targetLevel });
             centerDept.parentId = targetParentId;
@@ -1101,16 +1511,15 @@ async function registerRoutes(app2) {
       if (!isDingtalkConfigured()) {
         return res.status(400).json({ message: "\u9489\u9489\u767B\u5F55\u672A\u914D\u7F6E" });
       }
-      const { authCode } = req.body;
-      if (!authCode) {
-        return res.status(400).json({ message: "\u7F3A\u5C11\u9489\u9489\u6388\u6743\u7801" });
-      }
+      const { authCode } = parseBody(dingtalkLoginBodySchema, req.body);
       const dtUser = await getUserInfoByAuthCode(authCode);
       let user = await getUserByDingtalkId(dtUser.userid);
+      if (user?.role === "super_admin") return res.status(403).json({ message: "\u7BA1\u7406\u5458\u8D26\u53F7\u53EA\u80FD\u4F7F\u7528\u672C\u5730\u5BC6\u7801\u767B\u5F55" });
       if (!user) {
         const newUser = await createUser({
           username: `dt_${dtUser.userid}`,
-          password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          password: null,
+          authProvider: "dingtalk",
           displayName: dtUser.name,
           role: "member",
           departmentId: null,
@@ -1121,22 +1530,25 @@ async function registerRoutes(app2) {
       } else {
         await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
       }
+      await regenerateSession(req);
       req.session.userId = user.id;
       const { password: _, ...safeUser } = user;
       const deptIds = await getUserDepartmentIds(user.id);
+      await audit(req, { actor: user, action: "auth.dingtalk_login", resourceType: "session" });
       return res.json({ user: { ...safeUser, departmentIds: deptIds } });
     } catch (err) {
       console.error("DingTalk login error:", err);
       return res.status(500).json({ message: err?.message || "\u9489\u9489\u767B\u5F55\u5931\u8D25" });
     }
   });
-  app2.post("/api/dingtalk/sync-org", requireAdmin, async (_req, res) => {
+  app2.post("/api/dingtalk/sync-org", requireAdmin, async (req, res) => {
     try {
       if (!isDingtalkConfigured()) {
         return res.status(400).json({ message: "\u9489\u9489\u672A\u914D\u7F6E" });
       }
       const dtDepts = await getDepartmentList();
       const dtUsers = await getAllDingtalkUsers();
+      const actor = await getUser(req.session.userId);
       const existingDepts = await getDepartments();
       const existingUsers = await getAllUsers();
       let syncedDepts = 0;
@@ -1192,7 +1604,8 @@ async function registerRoutes(app2) {
         } else {
           const newUser = await createUser({
             username: `dt_${dtUser.userid}`,
-            password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            password: null,
+            authProvider: "dingtalk",
             displayName: dtUser.name,
             role: "member",
             departmentId: null,
@@ -1202,6 +1615,7 @@ async function registerRoutes(app2) {
           syncedUsers++;
         }
       }
+      await audit(req, { actor, action: "dingtalk.sync_org", resourceType: "organization", changes: { syncedDepts, syncedUsers } });
       return res.json({
         message: `\u540C\u6B65\u5B8C\u6210: \u65B0\u589E ${syncedDepts} \u4E2A\u90E8\u95E8, ${syncedUsers} \u4E2A\u7528\u6237`,
         syncedDepts,
@@ -1215,15 +1629,18 @@ async function registerRoutes(app2) {
   app2.get("/api/auth/dingtalk-callback", async (req, res) => {
     try {
       const authCode = req.query.authCode || req.query.code;
-      if (!authCode || !isDingtalkConfigured()) {
+      const state = typeof req.query.state === "string" ? req.query.state : void 0;
+      if (!authCode || !isDingtalkConfigured() || !consumeOauthState(req, state)) {
         return res.redirect("/?dt_error=1");
       }
       const dtUser = await getUserInfoByAuthCode(authCode);
       let user = await getUserByDingtalkId(dtUser.userid);
+      if (user?.role === "super_admin") return res.redirect("/?dt_error=1");
       if (!user) {
         const newUser = await createUser({
           username: `dt_${dtUser.userid}`,
-          password: `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          password: null,
+          authProvider: "dingtalk",
           displayName: dtUser.name,
           role: "member",
           departmentId: null,
@@ -1234,14 +1651,18 @@ async function registerRoutes(app2) {
       } else {
         await syncDingtalkUserDept(user.id, dtUser.dept_id_list);
       }
+      await regenerateSession(req);
       req.session.userId = user.id;
+      await audit(req, { actor: user, action: "auth.dingtalk_callback", resourceType: "session" });
       return res.redirect("/");
     } catch (err) {
       console.error("DingTalk callback error:", err);
       return res.redirect("/?dt_error=1");
     }
   });
-  app2.post("/api/auth/logout", (req, res) => {
+  app2.post("/api/auth/logout", async (req, res) => {
+    const user = req.session.userId ? await getUser(req.session.userId) : void 0;
+    await audit(req, { actor: user, action: "auth.logout", resourceType: "session" });
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "\u9000\u51FA\u5931\u8D25" });
@@ -1264,21 +1685,19 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/auth/change-password", requireAuth, async (req, res) => {
     try {
-      const { currentPassword, newPassword } = req.body;
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ message: "\u8BF7\u586B\u5199\u5F53\u524D\u5BC6\u7801\u548C\u65B0\u5BC6\u7801" });
-      }
-      if (newPassword.length < 6) {
-        return res.status(400).json({ message: "\u65B0\u5BC6\u7801\u81F3\u5C116\u4E2A\u5B57\u7B26" });
-      }
+      const { currentPassword, newPassword } = parseBody(changePasswordBodySchema, req.body);
       const user = await getUser(req.session.userId);
       if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      if (user.authProvider !== "local" || user.role !== "super_admin" || !user.password) {
+        return res.status(403).json({ message: "\u8BE5\u8D26\u53F7\u4E0D\u652F\u6301\u5BC6\u7801\u767B\u5F55" });
+      }
       const valid = await verifyPassword(currentPassword, user.password);
       if (!valid) return res.status(400).json({ message: "\u5F53\u524D\u5BC6\u7801\u4E0D\u6B63\u786E" });
       await updateUser(user.id, { password: newPassword });
+      await audit(req, { actor: user, action: "auth.password_change", resourceType: "user", resourceId: user.id });
       return res.json({ message: "\u5BC6\u7801\u4FEE\u6539\u6210\u529F" });
     } catch (err) {
-      return res.status(500).json({ message: "\u4FEE\u6539\u5BC6\u7801\u5931\u8D25" });
+      return routeError(res, err, "\u4FEE\u6539\u5BC6\u7801\u5931\u8D25");
     }
   });
   app2.get("/api/departments", requireAuth, async (_req, res) => {
@@ -1287,24 +1706,32 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/departments", requireAdmin, async (req, res) => {
     try {
-      const { name, parentId, level } = req.body;
+      const actor = await getUser(req.session.userId);
+      const { name, parentId, level } = parseBody(departmentBodySchema, req.body);
       const dept = await createDepartment({ name, parentId: parentId || null, level: level || 0 });
+      await audit(req, { actor, action: "department.create", resourceType: "department", resourceId: dept.id, changes: { name, parentId, level } });
       return res.json(dept);
     } catch (err) {
-      return res.status(500).json({ message: "\u521B\u5EFA\u90E8\u95E8\u5931\u8D25" });
+      return routeError(res, err, "\u521B\u5EFA\u90E8\u95E8\u5931\u8D25");
     }
   });
   app2.put("/api/departments/:id", requireAdmin, async (req, res) => {
     try {
-      const dept = await updateDepartment(req.params.id, req.body);
+      const actor = await getUser(req.session.userId);
+      const updates = parseBody(departmentBodySchema.partial().strict(), req.body);
+      const dept = await updateDepartment(req.params.id, updates);
+      if (!dept) return res.status(404).json({ message: "\u90E8\u95E8\u4E0D\u5B58\u5728" });
+      await audit(req, { actor, action: "department.update", resourceType: "department", resourceId: dept.id, changes: updates });
       return res.json(dept);
     } catch (err) {
-      return res.status(500).json({ message: "\u66F4\u65B0\u90E8\u95E8\u5931\u8D25" });
+      return routeError(res, err, "\u66F4\u65B0\u90E8\u95E8\u5931\u8D25");
     }
   });
   app2.delete("/api/departments/:id", requireAdmin, async (req, res) => {
     try {
+      const actor = await getUser(req.session.userId);
       await deleteDepartment(req.params.id);
+      await audit(req, { actor, action: "department.delete", resourceType: "department", resourceId: req.params.id });
       return res.json({ message: "\u5DF2\u5220\u9664" });
     } catch (err) {
       return res.status(500).json({ message: "\u5220\u9664\u90E8\u95E8\u5931\u8D25" });
@@ -1316,31 +1743,34 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/cycles", requireAdmin, async (req, res) => {
     try {
-      const { name, sortOrder } = req.body;
-      if (!name?.trim()) return res.status(400).json({ message: "\u5468\u671F\u540D\u79F0\u4E0D\u80FD\u4E3A\u7A7A" });
-      const cycle = await createCycle(name.trim(), sortOrder ?? 0);
+      const actor = await getUser(req.session.userId);
+      const { name, sortOrder } = parseBody(cycleBodySchema, req.body);
+      const cycle = await createCycle(name, sortOrder ?? 0);
+      await audit(req, { actor, action: "cycle.create", resourceType: "cycle", resourceId: cycle.id, changes: { name, sortOrder } });
       return res.json(cycle);
     } catch (err) {
       if (err?.code === "23505") return res.status(400).json({ message: "\u8BE5\u5468\u671F\u540D\u79F0\u5DF2\u5B58\u5728" });
-      return res.status(500).json({ message: "\u521B\u5EFA\u5468\u671F\u5931\u8D25" });
+      return routeError(res, err, "\u521B\u5EFA\u5468\u671F\u5931\u8D25");
     }
   });
   app2.put("/api/cycles/:id", requireAdmin, async (req, res) => {
     try {
-      const { name, sortOrder } = req.body;
-      const updates = {};
-      if (name !== void 0) updates.name = name.trim();
-      if (sortOrder !== void 0) updates.sortOrder = sortOrder;
+      const actor = await getUser(req.session.userId);
+      const updates = parseBody(cycleBodySchema.partial().strict(), req.body);
       const cycle = await updateCycle(req.params.id, updates);
+      if (!cycle) return res.status(404).json({ message: "\u5468\u671F\u4E0D\u5B58\u5728" });
+      await audit(req, { actor, action: "cycle.update", resourceType: "cycle", resourceId: cycle.id, changes: updates });
       return res.json(cycle);
     } catch (err) {
       if (err?.code === "23505") return res.status(400).json({ message: "\u8BE5\u5468\u671F\u540D\u79F0\u5DF2\u5B58\u5728" });
-      return res.status(500).json({ message: "\u66F4\u65B0\u5468\u671F\u5931\u8D25" });
+      return routeError(res, err, "\u66F4\u65B0\u5468\u671F\u5931\u8D25");
     }
   });
   app2.delete("/api/cycles/:id", requireAdmin, async (req, res) => {
     try {
+      const actor = await getUser(req.session.userId);
       await deleteCycle(req.params.id);
+      await audit(req, { actor, action: "cycle.delete", resourceType: "cycle", resourceId: req.params.id });
       return res.json({ message: "\u5DF2\u5220\u9664" });
     } catch (err) {
       return res.status(500).json({ message: "\u5220\u9664\u5468\u671F\u5931\u8D25" });
@@ -1357,40 +1787,43 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/users", requireAdmin, async (req, res) => {
     try {
-      const { username, password, displayName, role, departmentId, departmentIds } = req.body;
-      if (!username || !password || !displayName) {
-        return res.status(400).json({ message: "\u8BF7\u586B\u5199\u5B8C\u6574\u4FE1\u606F" });
-      }
+      const actor = await getUser(req.session.userId);
+      const { displayName, role: role2, departmentId, departmentIds, dingtalkUserId } = parseBody(createUserBodySchema, req.body);
+      const username = `dt_${dingtalkUserId}`;
       const existing = await getUserByUsername(username);
       if (existing) {
         return res.status(400).json({ message: "\u7528\u6237\u540D\u5DF2\u5B58\u5728" });
       }
       const deptIds = departmentIds || (departmentId ? [departmentId] : []);
       const primaryDeptId = deptIds.length > 0 ? deptIds[0] : null;
-      const user = await createUser({ username, password, displayName, role: role || "member", departmentId: primaryDeptId });
+      const user = await createUser({ username, password: null, authProvider: "dingtalk", dingtalkUserId, displayName, role: role2, departmentId: primaryDeptId });
       if (deptIds.length > 0) {
         await setUserDepartments(user.id, deptIds);
       }
       const { password: _, ...safeUser } = user;
+      await audit(req, { actor, action: "user.create", resourceType: "user", resourceId: user.id, changes: { username, displayName, role: role2, departmentIds: deptIds, authProvider: "dingtalk" } });
       return res.json({ ...safeUser, departmentIds: deptIds });
     } catch (err) {
-      return res.status(500).json({ message: "\u521B\u5EFA\u7528\u6237\u5931\u8D25" });
+      return routeError(res, err, "\u521B\u5EFA\u7528\u6237\u5931\u8D25");
     }
   });
   app2.put("/api/users/:id", requireAdmin, async (req, res) => {
     try {
-      const { departmentIds, ...rest } = req.body;
+      const actor = await getUser(req.session.userId);
+      const { departmentIds, ...rest } = parseBody(updateUserBodySchema, req.body);
+      const userUpdates = { ...rest };
       if (departmentIds && Array.isArray(departmentIds)) {
-        rest.departmentId = departmentIds.length > 0 ? departmentIds[0] : null;
+        userUpdates.departmentId = departmentIds.length > 0 ? departmentIds[0] : null;
         await setUserDepartments(req.params.id, departmentIds);
       }
-      const user = await updateUser(req.params.id, rest);
+      const user = await updateUser(req.params.id, userUpdates);
       if (!user) return res.status(404).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
       const { password: _, ...safeUser } = user;
       const deptIds = departmentIds || await getUserDepartmentIds(user.id);
+      await audit(req, { actor, action: "user.update", resourceType: "user", resourceId: user.id, changes: { ...rest, departmentIds } });
       return res.json({ ...safeUser, departmentIds: deptIds });
     } catch (err) {
-      return res.status(500).json({ message: "\u66F4\u65B0\u7528\u6237\u5931\u8D25" });
+      return routeError(res, err, "\u66F4\u65B0\u7528\u6237\u5931\u8D25");
     }
   });
   app2.get("/api/users/by-department/:deptId", requireAuth, async (req, res) => {
@@ -1417,7 +1850,10 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/users/:id", requireAdmin, async (req, res) => {
     try {
+      const actor = await getUser(req.session.userId);
+      if (req.params.id === req.session.userId) return res.status(400).json({ message: "\u4E0D\u80FD\u5220\u9664\u5F53\u524D\u767B\u5F55\u8D26\u53F7" });
       await deleteUser(req.params.id);
+      await audit(req, { actor, action: "user.delete", resourceType: "user", resourceId: req.params.id });
       return res.json({ message: "\u5DF2\u5220\u9664" });
     } catch (err) {
       return res.status(500).json({ message: "\u5220\u9664\u7528\u6237\u5931\u8D25" });
@@ -1435,8 +1871,9 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/objectives/:id", requireAuth, async (req, res) => {
     try {
-      const allObjs = await getAllObjectives();
-      const obj = allObjs.find((o) => o.id === req.params.id);
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const obj = await getReadableObjective(user, req.params.id);
       if (!obj) return res.status(404).json({ message: "\u76EE\u6807\u4E0D\u5B58\u5728" });
       const krs = await getKeyResultsForObjectives([obj.id]);
       return res.json({ objective: obj, keyResults: krs });
@@ -1448,13 +1885,16 @@ async function registerRoutes(app2) {
     try {
       const user = await getUser(req.session.userId);
       if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
-      const { title, description, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds, linkedToParent, okrType } = req.body;
+      const { title, description, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds, linkedToParent, okrType: okrType2 } = parseBody(objectiveCreateBodySchema, req.body);
       if (user.role !== "super_admin") {
         const userDeptIds = await getUserDepartmentIds(user.id);
         const allowedDepts = userDeptIds.length > 0 ? userDeptIds : user.departmentId ? [user.departmentId] : [];
         if (!allowedDepts.includes(departmentId)) {
           return res.status(403).json({ message: "\u53EA\u80FD\u4E3A\u81EA\u5DF1\u6240\u5C5E\u4E2D\u5FC3\u521B\u5EFA\u76EE\u6807" });
         }
+      }
+      if (parentObjectiveId && !await getReadableObjective(user, parentObjectiveId)) {
+        return res.status(404).json({ message: "\u4E0A\u7EA7\u76EE\u6807\u4E0D\u5B58\u5728" });
       }
       const obj = await createObjectiveInDb({
         title,
@@ -1467,24 +1907,43 @@ async function registerRoutes(app2) {
         collaborativeUserIds: collaborativeUserIds || [],
         createdBy: req.session.userId || null,
         linkedToParent: linkedToParent || false,
-        okrType: okrType || "\u627F\u8BFA\u578B"
+        okrType: okrType2 || "\u627F\u8BFA\u578B"
       });
+      await audit(req, { actor: user, action: "objective.create", resourceType: "objective", resourceId: obj.id, changes: { title, departmentId, cycle, parentObjectiveId, isCollaborative, collaborativeDeptIds, collaborativeUserIds, linkedToParent, okrType: okrType2 } });
       return res.json(obj);
     } catch (err) {
-      return res.status(500).json({ message: "\u521B\u5EFA\u76EE\u6807\u5931\u8D25" });
+      return routeError(res, err, "\u521B\u5EFA\u76EE\u6807\u5931\u8D25");
     }
   });
   app2.put("/api/objectives/:id", requireAuth, async (req, res) => {
     try {
-      const obj = await updateObjectiveInDb(req.params.id, req.body);
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const existing = await getManageableObjective(user, req.params.id);
+      if (!existing) return res.status(404).json({ message: "\u76EE\u6807\u4E0D\u5B58\u5728" });
+      const updates = parseBody(objectiveUpdateBodySchema, req.body);
+      if (updates.departmentId && user.role !== "super_admin") {
+        const departmentIds = await getUserDepartmentIds(user.id);
+        const allowed = departmentIds.length ? departmentIds : user.departmentId ? [user.departmentId] : [];
+        if (!allowed.includes(updates.departmentId)) return res.status(403).json({ message: "\u4E0D\u80FD\u5C06\u76EE\u6807\u79FB\u52A8\u5230\u5176\u4ED6\u4E2D\u5FC3" });
+      }
+      if (updates.parentObjectiveId && !await getReadableObjective(user, updates.parentObjectiveId)) {
+        return res.status(404).json({ message: "\u4E0A\u7EA7\u76EE\u6807\u4E0D\u5B58\u5728" });
+      }
+      const obj = await updateObjectiveInDb(req.params.id, updates);
+      await audit(req, { actor: user, action: "objective.update", resourceType: "objective", resourceId: req.params.id, changes: updates });
       return res.json(obj);
     } catch (err) {
-      return res.status(500).json({ message: "\u66F4\u65B0\u76EE\u6807\u5931\u8D25" });
+      return routeError(res, err, "\u66F4\u65B0\u76EE\u6807\u5931\u8D25");
     }
   });
   app2.delete("/api/objectives/:id", requireAuth, async (req, res) => {
     try {
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      if (!await getManageableObjective(user, req.params.id)) return res.status(404).json({ message: "\u76EE\u6807\u4E0D\u5B58\u5728" });
       await deleteObjectiveInDb(req.params.id);
+      await audit(req, { actor: user, action: "objective.delete", resourceType: "objective", resourceId: req.params.id });
       return res.json({ message: "\u5DF2\u5220\u9664" });
     } catch (err) {
       return res.status(500).json({ message: "\u5220\u9664\u76EE\u6807\u5931\u8D25" });
@@ -1520,7 +1979,10 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/key-results", requireAuth, async (req, res) => {
     try {
-      const { objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, weight, okrType } = req.body;
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const { objectiveId, title, description, assigneeId, assigneeName, collaboratorId, collaboratorName, startDate, endDate, weight, okrType: okrType2 } = parseBody(keyResultCreateBodySchema, req.body);
+      if (!await getManageableObjective(user, objectiveId)) return res.status(404).json({ message: "\u76EE\u6807\u4E0D\u5B58\u5728" });
       const kr = await createKeyResultInDb({
         objectiveId,
         title,
@@ -1532,22 +1994,24 @@ async function registerRoutes(app2) {
         startDate,
         endDate,
         weight: weight || 1,
-        okrType: okrType || "\u627F\u8BFA\u578B"
+        okrType: okrType2 || "\u627F\u8BFA\u578B"
       });
+      await audit(req, { actor: user, action: "key_result.create", resourceType: "key_result", resourceId: kr.id, changes: { objectiveId, title, assigneeId, collaboratorId, startDate, endDate, weight, okrType: okrType2 } });
       return res.json(kr);
     } catch (err) {
-      return res.status(500).json({ message: "\u521B\u5EFA\u5173\u952E\u7ED3\u679C\u5931\u8D25" });
+      return routeError(res, err, "\u521B\u5EFA\u5173\u952E\u7ED3\u679C\u5931\u8D25");
     }
   });
   app2.put("/api/objectives/reorder", requireAuth, async (req, res) => {
     try {
-      const { orders } = req.body;
-      if (!Array.isArray(orders)) {
-        return res.status(400).json({ message: "\u65E0\u6548\u7684\u6392\u5E8F\u6570\u636E" });
-      }
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const { orders } = parseBody(reorderBodySchema, req.body);
       for (const item of orders) {
+        if (!await getManageableObjective(user, item.id)) return res.status(404).json({ message: "\u76EE\u6807\u4E0D\u5B58\u5728" });
         await updateObjectiveInDb(item.id, { sortOrder: item.sortOrder });
       }
+      await audit(req, { actor: user, action: "objective.reorder", resourceType: "objective", changes: { count: orders.length } });
       return res.json({ message: "\u6392\u5E8F\u5DF2\u4FDD\u5B58" });
     } catch (err) {
       console.error("Reorder Objective error:", err);
@@ -1556,15 +2020,14 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/key-results/reorder", requireAuth, async (req, res) => {
     try {
-      const { orders } = req.body;
-      console.log("Reorder request:", orders);
-      if (!Array.isArray(orders)) {
-        return res.status(400).json({ message: "\u65E0\u6548\u7684\u6392\u5E8F\u6570\u636E" });
-      }
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const { orders } = parseBody(reorderBodySchema, req.body);
       for (const item of orders) {
-        console.log("Updating KR:", item.id, "sortOrder:", item.sortOrder);
+        if (!await getManageableKeyResult(user, item.id)) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
         await updateKeyResultInDb(item.id, { sortOrder: item.sortOrder });
       }
+      await audit(req, { actor: user, action: "key_result.reorder", resourceType: "key_result", changes: { count: orders.length } });
       return res.json({ message: "\u6392\u5E8F\u5DF2\u4FDD\u5B58" });
     } catch (err) {
       console.error("Reorder KR error:", err);
@@ -1573,15 +2036,24 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/key-results/:id", requireAuth, async (req, res) => {
     try {
-      const kr = await updateKeyResultInDb(req.params.id, req.body);
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      if (!await getManageableKeyResult(user, req.params.id)) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
+      const updates = parseBody(keyResultUpdateBodySchema, req.body);
+      const kr = await updateKeyResultInDb(req.params.id, updates);
+      await audit(req, { actor: user, action: "key_result.update", resourceType: "key_result", resourceId: req.params.id, changes: updates });
       return res.json(kr);
     } catch (err) {
-      return res.status(500).json({ message: "\u66F4\u65B0\u5173\u952E\u7ED3\u679C\u5931\u8D25" });
+      return routeError(res, err, "\u66F4\u65B0\u5173\u952E\u7ED3\u679C\u5931\u8D25");
     }
   });
   app2.delete("/api/key-results/:id", requireAuth, async (req, res) => {
     try {
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      if (!await getManageableKeyResult(user, req.params.id)) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
       await deleteKeyResultInDb(req.params.id);
+      await audit(req, { actor: user, action: "key_result.delete", resourceType: "key_result", resourceId: req.params.id });
       return res.json({ message: "\u5DF2\u5220\u9664" });
     } catch (err) {
       return res.status(500).json({ message: "\u5220\u9664\u5173\u952E\u7ED3\u679C\u5931\u8D25" });
@@ -1589,10 +2061,11 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/key-results/:id/progress", requireAuth, async (req, res) => {
     try {
-      const { progress, note, images, entryId } = req.body;
-      if (!note || !String(note).trim()) {
-        return res.status(400).json({ message: "\u6267\u884C\u8BF4\u660E\u4E0D\u80FD\u4E3A\u7A7A" });
-      }
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const resource = await getReadableKeyResult(user, req.params.id);
+      if (!resource || !canUpdateKeyResultProgress(user, resource.objective, resource.keyResult)) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
+      const { progress, note, images, entryId } = parseBody(progressBodySchema, req.body);
       const kr = await updateKRProgressInDb(
         req.params.id,
         progress,
@@ -1601,19 +2074,25 @@ async function registerRoutes(app2) {
         entryId ? String(entryId) : void 0
       );
       if (!kr) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
+      await audit(req, { actor: user, action: "key_result.progress", resourceType: "key_result", resourceId: req.params.id, changes: { progress, entryId, imageCount: images?.length || 0 } });
       return res.json(kr);
     } catch (err) {
-      return res.status(500).json({ message: "\u66F4\u65B0\u8FDB\u5EA6\u5931\u8D25" });
+      return routeError(res, err, "\u66F4\u65B0\u8FDB\u5EA6\u5931\u8D25");
     }
   });
   app2.put("/api/key-results/:id/score", requireAuth, async (req, res) => {
     try {
-      const { score, note } = req.body;
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const resource = await getReadableKeyResult(user, req.params.id);
+      if (!resource || !canScoreKeyResult(user, resource.objective, resource.keyResult)) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
+      const { score, note } = parseBody(scoreBodySchema, req.body);
       const kr = await scoreKRInDb(req.params.id, score, note || "");
       if (!kr) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
+      await audit(req, { actor: user, action: "key_result.score", resourceType: "key_result", resourceId: req.params.id, changes: { score } });
       return res.json(kr);
     } catch (err) {
-      return res.status(500).json({ message: "\u8BC4\u5206\u5931\u8D25" });
+      return routeError(res, err, "\u8BC4\u5206\u5931\u8D25");
     }
   });
   app2.get("/api/export/okr", requireAuth, async (req, res) => {
@@ -1627,7 +2106,7 @@ async function registerRoutes(app2) {
       const visibleObjectiveIds = allVisibleObjectives.map((objective) => objective.id);
       const allVisibleKRs = visibleObjectiveIds.length > 0 ? await getKeyResultsForObjectives(visibleObjectiveIds) : [];
       const myDeptIds = await getUserDepartmentIds(user.id);
-      const selectedDeptIds = typeof req.query.departmentIds === "string" && req.query.departmentIds ? req.query.departmentIds.split(",").map((id) => id.trim()).filter(Boolean) : [];
+      const selectedDeptIds = typeof req.query.departmentIds === "string" && req.query.departmentIds ? req.query.departmentIds.split(",").map((id2) => id2.trim()).filter(Boolean) : [];
       const selectedUserId = typeof req.query.userId === "string" && req.query.userId ? req.query.userId : null;
       const selectedCycle = typeof req.query.cycle === "string" && req.query.cycle ? req.query.cycle : null;
       const userRole = user.role || "member";
@@ -1823,6 +2302,7 @@ async function registerRoutes(app2) {
       const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=okr_export_${stamp}.xlsx`);
+      await audit(req, { actor: user, action: "okr.export", resourceType: "okr", changes: { objectiveCount: filteredObjectives.length, keyResultCount: filteredKRs.length } });
       return res.send(buf);
     } catch (err) {
       console.error("Export OKR error:", err);
@@ -1869,34 +2349,28 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/upload/image", requireAuth, async (req, res) => {
     try {
-      const chunks = [];
-      req.on("data", (chunk) => chunks.push(chunk));
-      await new Promise((resolve3) => req.on("end", resolve3));
-      const buf = Buffer.concat(chunks);
+      const buf = await readRawBody(req, 10 * 1024 * 1024);
       if (buf.length === 0) return res.status(400).json({ message: "\u6CA1\u6709\u6587\u4EF6\u6570\u636E" });
-      if (buf.length > 10 * 1024 * 1024) return res.status(400).json({ message: "\u6587\u4EF6\u5927\u5C0F\u4E0D\u80FD\u8D85\u8FC710MB" });
-      const contentType = req.headers["content-type"] || "image/png";
-      const ext = contentType.includes("png") ? "png" : contentType.includes("gif") ? "gif" : contentType.includes("webp") ? "webp" : "jpg";
-      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${ext}`;
-      const url = await uploadFile(buf, fileName, contentType);
+      const detected = detectImageType(buf);
+      if (!detected) return res.status(400).json({ message: "\u4EC5\u652F\u6301 PNG\u3001JPEG\u3001GIF \u548C WebP \u56FE\u7247" });
+      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${detected.extension}`;
+      const url = await uploadFile(buf, fileName, detected.contentType);
       return res.json({ url });
     } catch (err) {
       console.error("Image upload error:", err);
-      return res.status(500).json({ message: "\u56FE\u7247\u4E0A\u4F20\u5931\u8D25" });
+      return routeError(res, err, "\u56FE\u7247\u4E0A\u4F20\u5931\u8D25");
     }
   });
   app2.post("/api/import/parse-excel", requireAuth, async (req, res) => {
     try {
       const XLSX = await import("xlsx");
-      const chunks = [];
-      req.on("data", (chunk) => chunks.push(chunk));
-      await new Promise((resolve3) => req.on("end", resolve3));
-      const buf = Buffer.concat(chunks);
+      const buf = await readRawBody(req, 10 * 1024 * 1024);
       const wb = XLSX.read(buf, { type: "buffer" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       if (!ws) return res.status(400).json({ message: "\u6587\u4EF6\u4E3A\u7A7A" });
       const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
       if (jsonData.length < 2) return res.status(400).json({ message: "\u6587\u4EF6\u4E3A\u7A7A\u6216\u53EA\u6709\u8868\u5934" });
+      if (jsonData.length > 1001) return res.status(400).json({ message: "\u5355\u6B21\u6700\u591A\u5BFC\u51651000\u884C" });
       const headers = jsonData[0].map((h) => String(h).trim());
       if (!headers.includes("\u76EE\u6807\u540D\u79F0")) {
         return res.status(400).json({ message: "\u7F3A\u5C11\u5FC5\u8981\u5217: \u76EE\u6807\u540D\u79F0\u3002\u8BF7\u4F7F\u7528\u6A21\u677F\u6587\u4EF6\u3002" });
@@ -1914,7 +2388,7 @@ async function registerRoutes(app2) {
       return res.json({ rows });
     } catch (err) {
       console.error("Parse excel error:", err);
-      return res.status(400).json({ message: "\u6587\u4EF6\u89E3\u6790\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u6587\u4EF6\u683C\u5F0F\uFF08\u652F\u6301 .xlsx \u548C .csv\uFF09" });
+      return routeError(res, err, "\u6587\u4EF6\u89E3\u6790\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u6587\u4EF6\u683C\u5F0F\uFF08\u652F\u6301 .xlsx \u548C .csv\uFF09");
     }
   });
   app2.post("/api/import/okr", requireAuth, async (req, res) => {
@@ -1922,14 +2396,14 @@ async function registerRoutes(app2) {
       const user = await getUser(req.session.userId);
       if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
       const { rows } = req.body;
-      if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      if (!rows || !Array.isArray(rows) || rows.length === 0 || rows.length > 1e3) {
         return res.status(400).json({ message: "\u6CA1\u6709\u53EF\u5BFC\u5165\u7684\u6570\u636E" });
       }
       const allDepts = await getDepartments();
       const allUsers = await getAllUsers();
       const userMultiDepts = await getUserDepartmentIds(user.id);
       let defaultDeptId = userMultiDepts[0] || user.departmentId || "";
-      if (!defaultDeptId && allDepts.length > 0) {
+      if (!defaultDeptId && user.role === "super_admin" && allDepts.length > 0) {
         defaultDeptId = allDepts[0].id;
       }
       if (!defaultDeptId) {
@@ -1945,11 +2419,15 @@ async function registerRoutes(app2) {
       let importedKRs = 0;
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
+        if (!row || typeof row !== "object") {
+          errors.push(`\u7B2C${i + 2}\u884C: \u6570\u636E\u683C\u5F0F\u65E0\u6548`);
+          continue;
+        }
         const objTitle = row["\u76EE\u6807\u540D\u79F0"]?.trim();
         const objDesc = "";
         const krTitle = row["KR\u540D\u79F0"]?.trim();
         const krDesc = "";
-        const okrType = row["OKR\u7C7B\u578B"]?.trim() || "\u627F\u8BFA\u578B";
+        const okrType2 = row["OKR\u7C7B\u578B"]?.trim() || "\u627F\u8BFA\u578B";
         const linkedToParentStr = row["\u5173\u8054\u4E0A\u7EA7"]?.trim() || "\u5426";
         const linkedToParent = linkedToParentStr === "\u662F";
         const assigneeName = row["\u6267\u884C\u4EBA"]?.trim() || "";
@@ -1967,7 +2445,9 @@ async function registerRoutes(app2) {
         if (deptName) {
           const dept = allDepts.find((d) => d.name === deptName);
           if (dept) {
-            deptId = dept.id;
+            const allowedDepts = userMultiDepts.length ? userMultiDepts : user.departmentId ? [user.departmentId] : [];
+            if (user.role === "super_admin" || allowedDepts.includes(dept.id)) deptId = dept.id;
+            else errors.push(`\u7B2C${i + 2}\u884C: \u65E0\u6743\u5411\u90E8\u95E8"${deptName}"\u5BFC\u5165\uFF0C\u4F7F\u7528\u9ED8\u8BA4\u90E8\u95E8`);
           } else {
             errors.push(`\u7B2C${i + 2}\u884C: \u90E8\u95E8"${deptName}"\u4E0D\u5B58\u5728\uFF0C\u4F7F\u7528\u9ED8\u8BA4\u90E8\u95E8`);
           }
@@ -1984,8 +2464,8 @@ async function registerRoutes(app2) {
             errors.push(`\u7B2C${i + 2}\u884C: \u6267\u884C\u4EBA"${assigneeName}"\u672A\u5339\u914D\u5230\u7CFB\u7EDF\u7528\u6237`);
           }
         }
-        let creatorId = null;
-        if (creatorDingtalkId) {
+        let creatorId = user.id;
+        if (user.role === "super_admin" && creatorDingtalkId) {
           const matchCreator = allUsers.find((u) => u.dingtalkUserId === creatorDingtalkId);
           if (matchCreator) {
             creatorId = matchCreator.id;
@@ -1995,7 +2475,7 @@ async function registerRoutes(app2) {
         }
         const objKey = `${objTitle}|${deptId}|${cycle}|${creatorId || user.id}`;
         if (!objectiveMap.has(objKey)) {
-          const validOkrType = okrType === "\u6311\u6218\u578B" ? "\u6311\u6218\u578B" : "\u627F\u8BFA\u578B";
+          const validOkrType = okrType2 === "\u6311\u6218\u578B" ? "\u6311\u6218\u578B" : "\u627F\u8BFA\u578B";
           const obj = await createObjectiveInDb({
             title: objTitle,
             description: objDesc,
@@ -2015,7 +2495,7 @@ async function registerRoutes(app2) {
         }
         if (krTitle) {
           const obj = objectiveMap.get(objKey);
-          const validKrType = okrType === "\u6311\u6218\u578B" ? "\u6311\u6218\u578B" : "\u627F\u8BFA\u578B";
+          const validKrType = okrType2 === "\u6311\u6218\u578B" ? "\u6311\u6218\u578B" : "\u627F\u8BFA\u578B";
           await createKeyResultInDb({
             objectiveId: obj.id,
             title: krTitle,
@@ -2030,6 +2510,7 @@ async function registerRoutes(app2) {
           importedKRs++;
         }
       }
+      await audit(req, { actor: user, action: "okr.import", resourceType: "okr", changes: { importedObjectives, importedKRs, errorCount: errors.length } });
       return res.json({
         message: `\u5BFC\u5165\u5B8C\u6210: ${importedObjectives} \u4E2A\u76EE\u6807, ${importedKRs} \u4E2A\u5173\u952E\u7ED3\u679C`,
         importedObjectives,
@@ -2044,8 +2525,10 @@ async function registerRoutes(app2) {
   app2.get("/api/analytics/department-rankings", requireAuth, async (req, res) => {
     try {
       const cycle = req.query.cycle || "";
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
       const allDepts = await getDepartments();
-      const allObjs = await getAllObjectives();
+      const allObjs = await getObjectivesForUser(user);
       const filteredObjs = cycle ? allObjs.filter((o) => o.cycle === cycle) : allObjs;
       const objIds = filteredObjs.map((o) => o.id);
       const allKRs = objIds.length > 0 ? await getKeyResultsForObjectives(objIds) : [];
@@ -2081,6 +2564,11 @@ async function registerRoutes(app2) {
     try {
       const { cycle, departmentId, stream = false } = req.body;
       if (!cycle) return res.status(400).json({ message: "\u8BF7\u9009\u62E9\u5468\u671F" });
+      if (typeof cycle !== "string" || cycle.length > 300 || departmentId && typeof departmentId !== "string" || typeof stream !== "boolean") {
+        return res.status(400).json({ message: "\u8BF7\u6C42\u6570\u636E\u65E0\u6548" });
+      }
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
       if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
         console.error("AI_INTEGRATIONS_OPENAI_API_KEY \u73AF\u5883\u53D8\u91CF\u672A\u8BBE\u7F6E");
         return res.status(500).json({
@@ -2090,7 +2578,7 @@ async function registerRoutes(app2) {
       }
       const { generateOKRAnalysis: generateOKRAnalysis2, streamOKRAnalysis: streamOKRAnalysis2 } = await Promise.resolve().then(() => (init_ai_analysis(), ai_analysis_exports));
       const allDepts = await getDepartments();
-      let allObjs = await getAllObjectives();
+      let allObjs = await getObjectivesForUser(user);
       allObjs = allObjs.filter((o) => o.cycle === cycle);
       if (departmentId) {
         allObjs = allObjs.filter((o) => o.departmentId === departmentId);
@@ -2122,6 +2610,7 @@ async function registerRoutes(app2) {
         cycle,
         departmentName: deptName
       };
+      await audit(req, { actor: user, action: "analytics.ai_analysis", resourceType: "analytics", changes: { cycle, departmentId, objectiveCount: allObjs.length, stream } });
       if (stream) {
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
@@ -2165,6 +2654,9 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/kr-comments/:krId", requireAuth, async (req, res) => {
     try {
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      if (!await getReadableKeyResult(user, req.params.krId)) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
       const comments = await getCommentsForKR(req.params.krId);
       return res.json(comments);
     } catch (err) {
@@ -2175,29 +2667,26 @@ async function registerRoutes(app2) {
     try {
       const user = await getUser(req.session.userId);
       if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
-      const { krId, content, mentionedUserIds } = req.body;
-      if (!krId || !content?.trim()) {
-        return res.status(400).json({ message: "\u8BC4\u8BBA\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" });
-      }
+      const { krId, content, mentionedUserIds } = parseBody(commentBodySchema, req.body);
+      const mentions = mentionedUserIds || [];
+      const resource = await getReadableKeyResult(user, krId);
+      if (!resource) return res.status(404).json({ message: "\u5173\u952E\u7ED3\u679C\u4E0D\u5B58\u5728" });
       const comment = await createComment({
         krId,
         userId: user.id,
         userName: user.displayName,
-        content: content.trim(),
-        mentionedUserIds: mentionedUserIds || []
+        content,
+        mentionedUserIds: mentions
       });
-      if (mentionedUserIds && mentionedUserIds.length > 0) {
-        const allKRs = await getAllKeyResults();
-        const kr = allKRs.find((k) => k.id === krId);
-        const allObjs = await getAllObjectives();
-        const obj = kr ? allObjs.find((o) => o.id === kr.objectiveId) : null;
-        for (const mentionedId of mentionedUserIds) {
+      if (mentions.length > 0) {
+        const obj = resource.objective;
+        for (const mentionedId of mentions) {
           if (mentionedId !== user.id) {
             await createNotification({
               userId: mentionedId,
               type: "comment_mention",
               title: `${user.displayName} \u5728\u8BC4\u8BBA\u4E2D\u63D0\u5230\u4E86\u4F60`,
-              content: content.trim().substring(0, 100),
+              content: content.substring(0, 100),
               relatedKrId: krId,
               relatedObjectiveId: obj?.id,
               fromUserId: user.id,
@@ -2206,14 +2695,20 @@ async function registerRoutes(app2) {
           }
         }
       }
+      await audit(req, { actor: user, action: "comment.create", resourceType: "comment", resourceId: comment.id, changes: { krId, mentionedUserIds: mentions } });
       return res.json(comment);
     } catch (err) {
-      return res.status(500).json({ message: "\u53D1\u9001\u8BC4\u8BBA\u5931\u8D25" });
+      return routeError(res, err, "\u53D1\u9001\u8BC4\u8BBA\u5931\u8D25");
     }
   });
   app2.delete("/api/kr-comments/:id", requireAuth, async (req, res) => {
     try {
+      const user = await getUser(req.session.userId);
+      if (!user) return res.status(401).json({ message: "\u7528\u6237\u4E0D\u5B58\u5728" });
+      const comment = await getComment(req.params.id);
+      if (!comment || comment.userId !== user.id && user.role !== "super_admin") return res.status(404).json({ message: "\u8BC4\u8BBA\u4E0D\u5B58\u5728" });
       await deleteComment(req.params.id);
+      await audit(req, { actor: user, action: "comment.delete", resourceType: "comment", resourceId: req.params.id, changes: { krId: comment.krId } });
       return res.json({ message: "\u5DF2\u5220\u9664" });
     } catch (err) {
       return res.status(500).json({ message: "\u5220\u9664\u8BC4\u8BBA\u5931\u8D25" });
@@ -2237,6 +2732,8 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
     try {
+      const notification = await getNotification(req.params.id);
+      if (!notification || notification.userId !== req.session.userId) return res.status(404).json({ message: "\u901A\u77E5\u4E0D\u5B58\u5728" });
       await markNotificationRead(req.params.id);
       return res.json({ message: "\u5DF2\u6807\u8BB0\u5DF2\u8BFB" });
     } catch (err) {
@@ -2253,11 +2750,13 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/okr/clear-all", requireAdmin, async (req, res) => {
     try {
+      const actor = await getUser(req.session.userId);
       const { keyResults: keyResults2, objectives: objectives2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { eq: eq2 } = await import("drizzle-orm");
       const deletedKRs = await db2.delete(keyResults2).returning();
       const deletedObjectives = await db2.delete(objectives2).returning();
+      await audit(req, { actor, action: "okr.clear_all", resourceType: "okr", changes: { deletedObjectives: deletedObjectives.length, deletedKRs: deletedKRs.length } });
       return res.json({
         message: `\u5DF2\u6E05\u9664\u6240\u6709 OKR \u6570\u636E`,
         deletedObjectives: deletedObjectives.length,
@@ -2268,14 +2767,63 @@ async function registerRoutes(app2) {
       return res.status(500).json({ message: "\u6E05\u9664\u5931\u8D25" });
     }
   });
-  const httpServer = createServer(app2);
-  return httpServer;
+  app2.get("/api/admin/audit-logs", requireAdmin, async (req, res) => {
+    const logs = await getAuditLogs({
+      actorId: typeof req.query.actorId === "string" ? req.query.actorId : void 0,
+      action: typeof req.query.action === "string" ? req.query.action : void 0,
+      resourceType: typeof req.query.resourceType === "string" ? req.query.resourceType : void 0,
+      success: req.query.success === "true" ? true : req.query.success === "false" ? false : void 0,
+      from: typeof req.query.from === "string" && !Number.isNaN(Date.parse(req.query.from)) ? new Date(req.query.from) : void 0,
+      to: typeof req.query.to === "string" && !Number.isNaN(Date.parse(req.query.to)) ? new Date(req.query.to) : void 0,
+      limit: typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : void 0
+    });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json(logs);
+  });
+  app2.get("/api/admin/audit-logs/export", requireAdmin, async (req, res) => {
+    const logs = await getAuditLogs({ limit: 1e3 });
+    const escape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      ["\u65F6\u95F4", "\u8BF7\u6C42ID", "\u64CD\u4F5C\u8005", "\u89D2\u8272", "\u64CD\u4F5C", "\u8D44\u6E90\u7C7B\u578B", "\u8D44\u6E90ID", "IP", "\u7ED3\u679C", "\u9519\u8BEF\u7801"],
+      ...logs.map((log2) => [log2.createdAt?.toISOString(), log2.requestId, log2.actorUsername, log2.actorRole, log2.action, log2.resourceType, log2.resourceId, log2.ipAddress, log2.success ? "\u6210\u529F" : "\u5931\u8D25", log2.errorCode])
+    ];
+    const csv = `\uFEFF${rows.map((row) => row.map(escape).join(",")).join("\r\n")}`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=audit_logs.csv");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(csv);
+  });
+  app2.post("/api/admin/audit-logs/cleanup", requireAdmin, async (req, res) => {
+    const actor = await getUser(req.session.userId);
+    const deleted = await deleteExpiredAuditLogs(180);
+    await audit(req, { actor, action: "audit.cleanup", resourceType: "audit_log", changes: { deleted, retentionDays: 180 } });
+    return res.json({ deleted });
+  });
 }
 
 // server/index.ts
-import * as fs2 from "fs";
-import * as path2 from "path";
-var app = express();
+var fs2 = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+var import_node_http = require("node:http");
+var import_node_https = require("node:https");
+var import_node_crypto2 = require("node:crypto");
+var import_helmet = __toESM(require("helmet"));
+
+// server/tls.ts
+function parsePublicHttpsOrigin(value) {
+  const origin = new URL(value);
+  if (origin.protocol !== "https:" || origin.pathname !== "/" || origin.search || origin.hash || origin.username || origin.password) {
+    throw new Error("PUBLIC_HTTPS_ORIGIN must be an HTTPS origin without path, query, fragment or credentials");
+  }
+  return origin;
+}
+function buildHttpsRedirect(publicOrigin, requestUrl) {
+  const requestTarget = new URL(requestUrl || "/", "http://invalid.local");
+  return new URL(`${requestTarget.pathname}${requestTarget.search}`, publicOrigin).toString();
+}
+
+// server/index.ts
+var app = (0, import_express.default)();
 var log = console.log;
 function setupCors(app2) {
   app2.use((req, res, next) => {
@@ -2288,15 +2836,20 @@ function setupCors(app2) {
         origins.add(`https://${d.trim()}`);
       });
     }
+    if (process.env.PUBLIC_HTTPS_ORIGIN) {
+      origins.add(process.env.PUBLIC_HTTPS_ORIGIN.replace(/\/$/, ""));
+    }
     const origin = req.header("origin");
     const isLocalhost = origin?.startsWith("http://localhost:") || origin?.startsWith("http://127.0.0.1:");
-    if (origin && (origins.has(origin) || isLocalhost)) {
+    const isAllowed = !origin || origins.has(origin) || process.env.NODE_ENV !== "production" && isLocalhost;
+    if (!isAllowed) return res.status(403).json({ message: "\u8BF7\u6C42\u6765\u6E90\u4E0D\u53D7\u4FE1\u4EFB" });
+    if (origin) {
       res.header("Access-Control-Allow-Origin", origin);
       res.header(
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, DELETE, OPTIONS"
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type");
+      res.header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Request-Id");
       res.header("Access-Control-Allow-Credentials", "true");
     }
     if (req.method === "OPTIONS") {
@@ -2307,36 +2860,60 @@ function setupCors(app2) {
 }
 function setupBodyParsing(app2) {
   app2.use(
-    express.json({
+    import_express.default.json({
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       }
     })
   );
-  app2.use(express.urlencoded({ extended: false }));
+  app2.use(import_express.default.urlencoded({ extended: false }));
 }
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
     const start = Date.now();
     const path3 = req.path;
-    let capturedJsonResponse = void 0;
-    const originalResJson = res.json;
-    res.json = function(bodyJson, ...args) {
-      capturedJsonResponse = bodyJson;
-      return originalResJson.apply(res, [bodyJson, ...args]);
-    };
     res.on("finish", () => {
       if (!path3.startsWith("/api")) return;
       const duration = Date.now() - start;
-      let logLine = `${req.method} ${path3} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "\u2026";
-      }
-      log(logLine);
+      log(JSON.stringify({
+        level: "info",
+        event: "http_request",
+        requestId: req.requestId,
+        method: req.method,
+        path: path3,
+        statusCode: res.statusCode,
+        durationMs: duration
+      }));
     });
+    next();
+  });
+}
+function setupSecurityHeaders(app2) {
+  const isProd = process.env.NODE_ENV === "production";
+  app2.use((0, import_helmet.default)({
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https:", "wss:"],
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"]
+      }
+    },
+    hsts: isProd ? { maxAge: 31536e3, includeSubDomains: true } : false,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" }
+  }));
+  app2.use("/api/auth", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  app2.use("/api/admin", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
     next();
   });
 }
@@ -2420,10 +2997,10 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", express.static(path2.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", express.static(path2.resolve(process.cwd(), "uploads")));
+  app2.use("/assets", import_express.default.static(path2.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", import_express.default.static(path2.resolve(process.cwd(), "uploads")));
   if (webBuildExists) {
-    app2.use(express.static(webBuildDir));
+    app2.use(import_express.default.static(webBuildDir));
     app2.get("/{*splat}", (req, res, next) => {
       if (req.path.startsWith("/api")) return next();
       const platform = req.header("expo-platform");
@@ -2436,7 +3013,7 @@ function configureExpoAndLanding(app2) {
     });
     log("Serving Expo Web build from static-build/web");
   }
-  app2.use(express.static(path2.resolve(process.cwd(), "static-build")));
+  app2.use(import_express.default.static(path2.resolve(process.cwd(), "static-build")));
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 function setupErrorHandler(app2) {
@@ -2453,23 +3030,53 @@ function setupErrorHandler(app2) {
 }
 (async () => {
   app.get("/healthz", (_req, res) => res.status(200).send("ok"));
+  app.use(requestIdMiddleware);
+  setupSecurityHeaders(app);
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
   configureExpoAndLanding(app);
-  const server = await registerRoutes(app);
+  await registerRoutes(app);
   await seedDatabase();
   setupErrorHandler(app);
-  const port = parseInt(process.env.PORT || "5000", 10);
-  const isWindows = process.platform === "win32";
-  server.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      ...isWindows ? {} : { reusePort: true }
-    },
-    () => {
-      log(`express server serving on port ${port}`);
-    }
-  );
+  const cleanupTimer = setInterval(() => {
+    deleteExpiredAuditLogs(180).catch((error) => console.error("Audit retention cleanup failed:", error));
+  }, 24 * 60 * 60 * 1e3);
+  cleanupTimer.unref();
+  const isProd = process.env.NODE_ENV === "production";
+  if (!isProd) {
+    const port = parseInt(process.env.PORT || "5000", 10);
+    (0, import_node_http.createServer)(app).listen({ port, host: "0.0.0.0" }, () => {
+      log(`development HTTP server listening on port ${port}`);
+    });
+    return;
+  }
+  const certPath = process.env.HTTPS_CERT_PATH;
+  const keyPath = process.env.HTTPS_KEY_PATH;
+  const publicOrigin = process.env.PUBLIC_HTTPS_ORIGIN;
+  if (!certPath || !keyPath || !publicOrigin) {
+    throw new Error("HTTPS_CERT_PATH, HTTPS_KEY_PATH and PUBLIC_HTTPS_ORIGIN are required in production");
+  }
+  const parsedOrigin = parsePublicHttpsOrigin(publicOrigin);
+  if (process.platform !== "win32" && (fs2.statSync(keyPath).mode & 63) !== 0) {
+    throw new Error("HTTPS private key must not be readable by group or other users");
+  }
+  const cert = fs2.readFileSync(certPath, "utf8");
+  const key = fs2.readFileSync(keyPath, "utf8");
+  const certificate = new import_node_crypto2.X509Certificate(cert);
+  const expiresInDays = Math.floor((Date.parse(certificate.validTo) - Date.now()) / (24 * 60 * 60 * 1e3));
+  if (expiresInDays <= 0) throw new Error("HTTPS certificate is expired");
+  if (expiresInDays < 30) console.warn(`HTTPS certificate expires in ${expiresInDays} days`);
+  const httpsPort = parseInt(process.env.HTTPS_PORT || "5000", 10);
+  const httpPort = parseInt(process.env.HTTP_PORT || "5001", 10);
+  (0, import_node_https.createServer)({ cert, key, minVersion: "TLSv1.2" }, app).listen({ port: httpsPort, host: "0.0.0.0" }, () => {
+    log(`production HTTPS server listening on port ${httpsPort}`);
+  });
+  (0, import_node_http.createServer)((req, res) => {
+    const target = buildHttpsRedirect(parsedOrigin, req.url);
+    res.writeHead(308, { Location: target, "Cache-Control": "no-store" });
+    res.end();
+  }).listen({ port: httpPort, host: "0.0.0.0" }, () => {
+    log(`HTTP redirect server listening on port ${httpPort}`);
+  });
 })();

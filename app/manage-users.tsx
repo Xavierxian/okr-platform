@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, FlatList, Pressable, Alert, ActivityIndicator, Platform, Modal, TextInput, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
+import { useAuth } from '@/lib/auth-context';
 import { useOKR } from '@/lib/okr-context';
 import { apiRequest } from '@/lib/query-client';
 import Colors from '@/constants/colors';
@@ -35,10 +36,15 @@ const ROLE_OPTIONS = [
   { value: 'member', label: '普通员工和部门经理' },
   { value: 'center_head', label: '中心负责人' },
   { value: 'vp', label: 'VP' },
-  { value: 'super_admin', label: '超级管理员' },
 ];
 
 export default function ManageUsersScreen() {
+  const { user: currentUser } = useAuth();
+  if (currentUser?.role !== 'super_admin') return <Redirect href="/" />;
+  return <ManageUsersContent />;
+}
+
+function ManageUsersContent() {
   const { departments } = useOKR();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,34 +1,11 @@
-import { eq, or, inArray, and, asc } from "drizzle-orm";
+import { eq, or, inArray, and, asc, desc, gte, lte, lt } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, departments, objectives, keyResults, cycles, userDepartments, krComments, notifications,
-  type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry, type Cycle, type UserDepartment, type KRComment, type Notification,
+  users, departments, objectives, keyResults, cycles, userDepartments, krComments, notifications, auditLogs,
+  type User, type InsertUser, type Department, type Objective, type KeyResult, type ProgressEntry, type Cycle, type UserDepartment, type KRComment, type Notification, type AuditLog,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
-import { createDecipheriv } from "node:crypto";
-
-const AES_CONFIG_KEY = "Bai%2018Son^9120";
-
-function decryptAesEcbBase64(value: string, key = AES_CONFIG_KEY): string {
-  try {
-    const decipher = createDecipheriv("aes-128-ecb", Buffer.from(key, "utf8"), null);
-    decipher.setAutoPadding(true);
-    return Buffer.concat([
-      decipher.update(Buffer.from(value, "base64")),
-      decipher.final(),
-    ]).toString("utf8");
-  } catch {
-    return value;
-  }
-}
-
-function getAdminSeedPassword(): string {
-  const encryptedPassword = process.env.ADMIN_PASSWORD_AES?.trim();
-  if (!encryptedPassword) {
-    throw new Error("ADMIN_PASSWORD_AES environment variable is required to seed or sync the admin password");
-  }
-  return decryptAesEcbBase64(encryptedPassword);
-}
+import { strongPasswordSchema } from "./validation";
 
 export async function getUser(id: string): Promise<User | undefined> {
   const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -46,7 +23,7 @@ export async function getUserByDingtalkId(dingtalkUserId: string): Promise<User 
 }
 
 export async function createUser(data: InsertUser): Promise<User> {
-  const hashed = await bcrypt.hash(data.password, 10);
+  const hashed = data.password ? await bcrypt.hash(data.password, 12) : null;
   const [user] = await db.insert(users).values({ ...data, password: hashed }).returning();
   return user;
 }
@@ -69,6 +46,26 @@ export async function getAllUsers(): Promise<User[]> {
 
 export async function verifyPassword(plaintext: string, hashed: string): Promise<boolean> {
   return bcrypt.compare(plaintext, hashed);
+}
+
+export async function getObjective(id: string): Promise<Objective | undefined> {
+  const [objective] = await db.select().from(objectives).where(eq(objectives.id, id));
+  return objective;
+}
+
+export async function getKeyResult(id: string): Promise<KeyResult | undefined> {
+  const [keyResult] = await db.select().from(keyResults).where(eq(keyResults.id, id));
+  return keyResult;
+}
+
+export async function getComment(id: string): Promise<KRComment | undefined> {
+  const [comment] = await db.select().from(krComments).where(eq(krComments.id, id));
+  return comment;
+}
+
+export async function getNotification(id: string): Promise<Notification | undefined> {
+  const [notification] = await db.select().from(notifications).where(eq(notifications.id, id));
+  return notification;
 }
 
 export async function getDepartments(): Promise<Department[]> {
@@ -121,39 +118,34 @@ export async function getObjectivesForUser(user: User): Promise<Objective[]> {
     });
   };
 
-  if (user.role === "super_admin") {
-    const objs = await db.select().from(objectives);
-    return sortObjs(objs);
-  }
-
-  if (user.role === "vp" || user.role === "center_head") {
-    const allObjs = sortObjs(await db.select().from(objectives));
-    const multiDeptIds = await getUserDepartmentIds(user.id);
-    const baseDeptIds = multiDeptIds.length > 0
-      ? multiDeptIds
-      : (user.departmentId ? [user.departmentId] : []);
-    const ownDeptIdSet = new Set(baseDeptIds);
-
-    const leadershipUsers = await db.select().from(users).where(
-      or(eq(users.role, "vp"), eq(users.role, "center_head"))
-    );
-    const leadershipUserIds = new Set(leadershipUsers.map(u => u.id));
-
-    return allObjs.filter(obj => {
-      if (ownDeptIdSet.has(obj.departmentId)) return true;
-      return !!obj.createdBy && leadershipUserIds.has(obj.createdBy);
-    });
-  }
-
   const allObjs = sortObjs(await db.select().from(objectives));
+  if (user.role === "super_admin") return allObjs;
+
   const multiDeptIds = await getUserDepartmentIds(user.id);
   const baseDeptIds = multiDeptIds.length > 0
     ? multiDeptIds
     : (user.departmentId ? [user.departmentId] : []);
+  const ownDeptIdSet = new Set(baseDeptIds);
+  const relatedKRs = await db.select({ objectiveId: keyResults.objectiveId })
+    .from(keyResults)
+    .where(or(eq(keyResults.assigneeId, user.id), eq(keyResults.collaboratorId, user.id)));
+  const relatedObjectiveIds = new Set(relatedKRs.map((row) => row.objectiveId));
+
+  let leadershipUserIds = new Set<string>();
+  if (user.role === "vp" || user.role === "center_head") {
+    const leadershipUsers = await db.select({ id: users.id }).from(users).where(
+      or(eq(users.role, "vp"), eq(users.role, "center_head")),
+    );
+    leadershipUserIds = new Set(leadershipUsers.map((leader) => leader.id));
+  }
 
   return allObjs.filter(obj => {
-    if (baseDeptIds.includes(obj.departmentId)) return true;
-    return false;
+    if (obj.createdBy === user.id) return true;
+    if (ownDeptIdSet.has(obj.departmentId)) return true;
+    if ((obj.collaborativeUserIds || []).includes(user.id)) return true;
+    if ((obj.collaborativeDeptIds || []).some((departmentId) => ownDeptIdSet.has(departmentId))) return true;
+    if (relatedObjectiveIds.has(obj.id)) return true;
+    return !!obj.createdBy && leadershipUserIds.has(obj.createdBy);
   });
 }
 
@@ -370,21 +362,33 @@ const DEFAULT_DEPARTMENTS = [
 
 export async function seedDatabase(): Promise<void> {
   const existingAdmin = await getUserByUsername("admin");
-  const adminPassword = getAdminSeedPassword();
   if (!existingAdmin) {
+    const adminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim();
+    if (!adminPassword || !strongPasswordSchema.safeParse(adminPassword).success) {
+      throw new Error("ADMIN_BOOTSTRAP_PASSWORD is required when the admin account does not exist");
+    }
     console.log("Seeding default admin user...");
     await createUser({
-      id: "admin_1",
       username: "admin",
       password: adminPassword,
       displayName: "超级管理员",
       role: "super_admin",
       departmentId: null,
+      authProvider: "local",
+      dingtalkUserId: null,
     });
-    console.log("Default admin created from ADMIN_PASSWORD_AES");
+    console.log("Default admin created from the one-time bootstrap secret");
   } else {
-    await updateUser(existingAdmin.id, { password: adminPassword } as any);
-    console.log("Admin password synced from ADMIN_PASSWORD_AES");
+    const updates: Partial<InsertUser> = {};
+    if (existingAdmin.authProvider !== "local") updates.authProvider = "local";
+    if (!existingAdmin.password) {
+      const adminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim();
+      if (!adminPassword || !strongPasswordSchema.safeParse(adminPassword).success) {
+        throw new Error("ADMIN_BOOTSTRAP_PASSWORD must satisfy the password policy when the admin has no password");
+      }
+      updates.password = adminPassword;
+    }
+    if (Object.keys(updates).length > 0) await updateUser(existingAdmin.id, updates);
   }
 
   const existingDepts = await getDepartments();
@@ -480,4 +484,52 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
 export async function getUnreadNotificationCount(userId: string): Promise<number> {
   const rows = await db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
   return rows.length;
+}
+
+export interface AuditLogInput {
+  requestId: string;
+  actorId?: string | null;
+  actorUsername?: string | null;
+  actorRole?: string | null;
+  action: string;
+  resourceType: string;
+  resourceId?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  changes?: Record<string, unknown>;
+  success: boolean;
+  errorCode?: string | null;
+}
+
+export async function createAuditLog(data: AuditLogInput): Promise<void> {
+  await db.insert(auditLogs).values(data);
+}
+
+export async function getAuditLogs(filters: {
+  actorId?: string;
+  action?: string;
+  resourceType?: string;
+  success?: boolean;
+  from?: Date;
+  to?: Date;
+  limit?: number;
+}): Promise<AuditLog[]> {
+  const conditions = [];
+  if (filters.actorId) conditions.push(eq(auditLogs.actorId, filters.actorId));
+  if (filters.action) conditions.push(eq(auditLogs.action, filters.action));
+  if (filters.resourceType) conditions.push(eq(auditLogs.resourceType, filters.resourceType));
+  if (filters.success !== undefined) conditions.push(eq(auditLogs.success, filters.success));
+  if (filters.from) conditions.push(gte(auditLogs.createdAt, filters.from));
+  if (filters.to) conditions.push(lte(auditLogs.createdAt, filters.to));
+  const limit = Math.min(Math.max(filters.limit || 200, 1), 1000);
+  return db.select().from(auditLogs)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit);
+}
+
+export async function deleteExpiredAuditLogs(retentionDays = 180): Promise<number> {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  const deleted = await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff)).returning({ id: auditLogs.id });
+  return deleted.length;
 }

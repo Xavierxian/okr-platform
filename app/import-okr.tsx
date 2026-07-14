@@ -4,15 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
 import { useAuth } from '@/lib/auth-context';
-import { apiRequest, buildUrl } from '@/lib/query-client';
+import { apiRequest, buildUrl, getCsrfToken } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
 const COLUMNS = ['部门', '目标名称', 'KR名称', '执行人', '周期', 'OKR类型', '关联上级', '权重', '创建人ID', '上传人'];
 
 function WebFileInput({ onFileSelected }: { onFileSelected: (file: File) => void }) {
-  if (Platform.OS !== 'web') return null;
   const inputRef = useRef<HTMLInputElement | null>(null);
+  if (Platform.OS !== 'web') return null;
 
   const handleClick = () => {
     if (inputRef.current) inputRef.current.click();
@@ -89,19 +89,19 @@ export default function ImportOKRScreen() {
         const arrayBuffer = await file.arrayBuffer();
         response = await fetch(buildUrl('/api/import/parse-excel'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream' },
+          headers: { 'Content-Type': 'application/octet-stream', 'X-CSRF-Token': await getCsrfToken() },
           credentials: 'include',
           body: arrayBuffer,
         });
       } else {
         const FileSystem = await import('expo-file-system');
-        const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 });
+        const base64 = await new FileSystem.File(file.uri).base64();
         const binary = atob(base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         response = await fetch(buildUrl('/api/import/parse-excel'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream' },
+          headers: { 'Content-Type': 'application/octet-stream', 'X-CSRF-Token': await getCsrfToken() },
           credentials: 'include',
           body: bytes.buffer,
         });

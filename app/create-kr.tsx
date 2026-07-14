@@ -132,7 +132,7 @@ export default function CreateKRScreen() {
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (isEditMode) {
+    if (isEditMode && existingKR) {
       await editKeyResult(existingKR.id, {
         title: title.trim(),
         description: '',
@@ -144,7 +144,7 @@ export default function CreateKRScreen() {
         weight: parseFloat(weight) || 1,
         okrType,
       });
-    } else {
+    } else if (!isEditMode) {
       await addKeyResult({
         objectiveId: effectiveObjectiveId,
         title: title.trim(),

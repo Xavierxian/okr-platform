@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
-import { apiRequest, getApiUrl } from './query-client';
+import { apiRequest, clearCsrfToken } from './query-client';
 
 export interface AuthUser {
   id: string;
   username: string;
   displayName: string;
   role: string;
+  authProvider: 'local' | 'dingtalk';
+  dingtalkUserId?: string | null;
   departmentId: string | null;
   departmentIds?: string[];
   createdAt: string;
@@ -73,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch {}
+    clearCsrfToken();
     setUser(null);
   }, []);
 

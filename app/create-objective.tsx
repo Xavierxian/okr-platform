@@ -119,9 +119,9 @@ export default function CreateObjectiveScreen() {
       collaborativeUserIds: isCollaborative ? collabUserIds : [],
     };
 
-    if (isEditMode) {
+    if (isEditMode && existingObj) {
       await editObjective(existingObj.id, payload);
-    } else {
+    } else if (!isEditMode) {
       await addObjective(payload);
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

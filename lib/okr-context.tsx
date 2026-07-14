@@ -20,7 +20,10 @@ export interface Objective {
   isCollaborative: boolean;
   collaborativeDeptIds: string[];
   collaborativeUserIds: string[];
+  linkedToParent: boolean;
+  okrType: string;
   createdBy: string | null;
+  sortOrder: number;
   createdAt: string;
 }
 
@@ -38,9 +41,11 @@ export interface KeyResult {
   progress: number;
   weight: number;
   status: string;
+  okrType: string;
   selfScore: number | null;
   selfScoreNote: string;
   progressHistory: { id: string; date: string; progress: number; note: string; images?: string[] }[];
+  sortOrder: number;
   createdAt: string;
 }
 

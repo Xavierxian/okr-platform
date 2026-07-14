@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, TextInput, Pressable, ScrollView, Image, Activi
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOKR } from '@/lib/okr-context';
-import { buildUrl } from '@/lib/query-client';
+import { buildUrl, getCsrfToken } from '@/lib/query-client';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -56,7 +56,7 @@ export default function UpdateProgressScreen() {
       const uploadUrl = buildUrl('/api/upload/image');
       const resp = await expoFetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': mimeType || 'image/jpeg' },
+        headers: { 'Content-Type': mimeType || 'image/jpeg', 'X-CSRF-Token': await getCsrfToken() },
         body: file,
         credentials: 'include',
       });
@@ -81,7 +81,7 @@ export default function UpdateProgressScreen() {
       console.log('Uploading to:', uploadUrl);
       const resp = await fetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type || 'image/png' },
+        headers: { 'Content-Type': blob.type || 'image/png', 'X-CSRF-Token': await getCsrfToken() },
         body: blob,
         credentials: 'include',
       });

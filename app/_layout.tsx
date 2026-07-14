@@ -132,6 +132,7 @@ function RootLayoutNav() {
           contentStyle: { backgroundColor: "#FFFFFF" },
         }}
       />
+      <Stack.Screen name="audit-logs" options={{ headerShown: false }} />
       <Stack.Screen
         name="import-okr"
         options={{

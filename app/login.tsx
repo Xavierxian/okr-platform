@@ -45,7 +45,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [dtEnabled, setDtEnabled] = useState(false);
   const [dtLoading, setDtLoading] = useState(false);
-  const [dtConfig, setDtConfig] = useState<{ corpId: string; appKey: string } | null>(null);
+  const [dtConfig, setDtConfig] = useState<{ corpId: string; appKey: string; state: string } | null>(null);
   const dtAttemptedRef = useRef(false);
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
@@ -56,7 +56,7 @@ export default function LoginScreen() {
       try {
         const params = new URLSearchParams(window.location.search);
         if (params.get('dt_error') === '1') {
-          setError('钉钉登录失败，请使用账号密码登录');
+          setError('钉钉登录失败，请重试或联系管理员');
           window.history.replaceState({}, '', window.location.pathname);
         }
       } catch {}
@@ -67,7 +67,7 @@ export default function LoginScreen() {
         const data = await res.json();
         if (data.enabled) {
           setDtEnabled(true);
-          setDtConfig({ corpId: data.corpId, appKey: data.appKey });
+          setDtConfig({ corpId: data.corpId, appKey: data.appKey, state: data.state });
         }
       } catch {}
     })();
@@ -88,7 +88,7 @@ export default function LoginScreen() {
       const dd = (window as any).dd;
       if (!dd?.runtime?.permission?.requestAuthCode) {
         const redirectUri = encodeURIComponent(window.location.origin + '/api/auth/dingtalk-callback');
-        const url = `https://login.dingtalk.com/oauth2/auth?response_type=code&client_id=${dtConfig.appKey}&redirect_uri=${redirectUri}&scope=openid&prompt=consent`;
+          const url = `https://login.dingtalk.com/oauth2/auth?response_type=code&client_id=${dtConfig.appKey}&redirect_uri=${redirectUri}&scope=openid&prompt=consent&state=${encodeURIComponent(dtConfig.state)}`;
         window.location.href = url;
         return;
       }
@@ -107,13 +107,13 @@ export default function LoginScreen() {
         },
         onFail: (err: any) => {
           console.error('DingTalk auth failed:', err);
-          setError('钉钉授权失败，请使用账号密码登录');
+          setError('钉钉授权失败，请重试或联系管理员');
           setDtLoading(false);
         },
       });
     } catch (err) {
       const redirectUri = encodeURIComponent(window.location.origin + '/api/auth/dingtalk-callback');
-      const url = `https://login.dingtalk.com/oauth2/auth?response_type=code&client_id=${dtConfig.appKey}&redirect_uri=${redirectUri}&scope=openid&prompt=consent`;
+      const url = `https://login.dingtalk.com/oauth2/auth?response_type=code&client_id=${dtConfig.appKey}&redirect_uri=${redirectUri}&scope=openid&prompt=consent&state=${encodeURIComponent(dtConfig.state)}`;
       window.location.href = url;
     }
   };
@@ -121,7 +121,7 @@ export default function LoginScreen() {
   const handleDingtalkWebLogin = () => {
     if (!dtConfig) return;
     const redirectUri = encodeURIComponent(window.location.origin + '/api/auth/dingtalk-callback');
-    const url = `https://login.dingtalk.com/oauth2/auth?response_type=code&client_id=${dtConfig.appKey}&redirect_uri=${redirectUri}&scope=openid&prompt=consent`;
+    const url = `https://login.dingtalk.com/oauth2/auth?response_type=code&client_id=${dtConfig.appKey}&redirect_uri=${redirectUri}&scope=openid&prompt=consent&state=${encodeURIComponent(dtConfig.state)}`;
     window.location.href = url;
   };
 
@@ -176,7 +176,7 @@ export default function LoginScreen() {
               style={styles.input}
               value={username}
               onChangeText={setUsername}
-              placeholder="用户名"
+              placeholder="管理员用户名"
               placeholderTextColor={Colors.textTertiary}
               autoCapitalize="none"
               autoCorrect={false}
@@ -211,7 +211,7 @@ export default function LoginScreen() {
             ) : (
               <>
                 <Ionicons name="log-in-outline" size={20} color={Colors.white} />
-                <Text style={styles.loginBtnText}>登 录</Text>
+                <Text style={styles.loginBtnText}>管理员登录</Text>
               </>
             )}
           </Pressable>
