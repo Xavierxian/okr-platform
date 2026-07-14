@@ -2822,6 +2822,9 @@ function setupCors(app2) {
     if (process.env.PUBLIC_HTTPS_ORIGIN) {
       origins.add(process.env.PUBLIC_HTTPS_ORIGIN.replace(/\/$/, ""));
     }
+    if (process.env.EXPO_PUBLIC_ORIGIN) {
+      origins.add(process.env.EXPO_PUBLIC_ORIGIN.replace(/\/$/, ""));
+    }
     const origin = req.header("origin");
     const isLocalhost = origin?.startsWith("http://localhost:") || origin?.startsWith("http://127.0.0.1:");
     const isAllowed = !origin || origins.has(origin) || process.env.NODE_ENV !== "production" && isLocalhost;

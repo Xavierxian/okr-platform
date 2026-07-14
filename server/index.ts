@@ -43,6 +43,11 @@ function setupCors(app: express.Application) {
       origins.add(process.env.PUBLIC_HTTPS_ORIGIN.replace(/\/$/, ""));
     }
 
+    // Explicit development or internal-test origin from .env.
+    if (process.env.EXPO_PUBLIC_ORIGIN) {
+      origins.add(process.env.EXPO_PUBLIC_ORIGIN.replace(/\/$/, ""));
+    }
+
     const origin = req.header("origin");
 
     // Allow localhost origins for Expo web development (any port)
