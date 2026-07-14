@@ -3,10 +3,11 @@
 ## Before deployment
 
 1. Back up PostgreSQL outside the Git workspace and verify that the backup can be restored.
-2. Generate a random `SESSION_SECRET` of at least 32 bytes and store it in the process environment.
-3. Place `fullchain.pem` and `privkey.pem` outside the repository. On Linux, set the private key mode to `0600` and ownership to the PM2 service user.
-4. Configure `HTTPS_CERT_PATH`, `HTTPS_KEY_PATH`, `HTTPS_PORT`, `HTTP_PORT`, and `PUBLIC_HTTPS_ORIGIN`.
-5. Set `ADMIN_BOOTSTRAP_PASSWORD` only if the admin account is missing or has no password. Remove it after the first successful start.
+2. Configure `.env` with `NODE_ENV=production`. This activates direct HTTPS; `NODE_ENV=development` is HTTP-only and is intended for local or internal testing.
+3. Generate a random `SESSION_SECRET` of at least 32 bytes and store it in `.env` or the process environment.
+4. Place `fullchain.pem` and `privkey.pem` outside the repository. On Linux, set the private key mode to `0600` and ownership to the PM2 service user.
+5. Configure `HTTPS_CERT_PATH`, `HTTPS_KEY_PATH`, `HTTPS_PORT`, `HTTP_PORT`, and `PUBLIC_HTTPS_ORIGIN`.
+6. Set `ADMIN_BOOTSTRAP_PASSWORD` only if the admin account is missing or has no password. Remove it after the first successful start.
 
 ## Database upgrade
 
@@ -39,4 +40,3 @@ The tracked database dump was removed from the current tree. Rewriting shared Gi
 ## Certificate renewal
 
 Replace the PEM files atomically, confirm the private key remains mode `0600`, and run `pm2 reload okr-platform`. Monitor the startup log for the remaining certificate lifetime and verify the served certificate after reload.
-

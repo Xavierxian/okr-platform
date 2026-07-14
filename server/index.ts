@@ -11,6 +11,11 @@ import helmet from "helmet";
 import { requestIdMiddleware } from "./security";
 import { buildHttpsRedirect, parsePublicHttpsOrigin } from "./tls";
 
+const runtimeMode = (process.env.NODE_ENV || "development").trim();
+if (runtimeMode !== "development" && runtimeMode !== "production") {
+  throw new Error("NODE_ENV must be either development or production");
+}
+
 const app = express();
 const log = console.log;
 
@@ -116,6 +121,8 @@ function setupSecurityHeaders(app: express.Application) {
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
+        // HTTP is supported only for development and internal testing.
+        "upgrade-insecure-requests": isProd ? [] : null,
       },
     },
     hsts: isProd ? { maxAge: 31536000, includeSubDomains: true } : false,

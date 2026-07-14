@@ -1,10 +1,5 @@
-"use strict";
-var __create = Object.create;
 var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
@@ -12,22 +7,6 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
-var __copyProps = (to, from, except, desc2) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
 
 // shared/schema.ts
 var schema_exports = {};
@@ -44,144 +23,144 @@ __export(schema_exports, {
   userDepartments: () => userDepartments,
   users: () => users
 });
-var import_drizzle_orm, import_pg_core, import_drizzle_zod, import_zod, users, departments, userDepartments, cycles, objectives, keyResults, krComments, notifications, auditLogs, insertUserSchema, loginSchema;
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, real, index, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+var users, departments, userDepartments, cycles, objectives, keyResults, krComments, notifications, auditLogs, insertUserSchema, loginSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
-    import_drizzle_orm = require("drizzle-orm");
-    import_pg_core = require("drizzle-orm/pg-core");
-    import_drizzle_zod = require("drizzle-zod");
-    import_zod = require("zod");
-    users = (0, import_pg_core.pgTable)("users", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      username: (0, import_pg_core.text)("username").notNull().unique(),
-      password: (0, import_pg_core.text)("password"),
-      authProvider: (0, import_pg_core.text)("auth_provider").notNull().default("dingtalk"),
-      displayName: (0, import_pg_core.text)("display_name").notNull(),
-      role: (0, import_pg_core.text)("role").notNull().default("member"),
-      departmentId: (0, import_pg_core.varchar)("department_id").references(() => departments.id, { onDelete: "set null" }),
-      dingtalkUserId: (0, import_pg_core.text)("dingtalk_user_id").unique(),
-      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    users = pgTable("users", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      username: text("username").notNull().unique(),
+      password: text("password"),
+      authProvider: text("auth_provider").notNull().default("dingtalk"),
+      displayName: text("display_name").notNull(),
+      role: text("role").notNull().default("member"),
+      departmentId: varchar("department_id").references(() => departments.id, { onDelete: "set null" }),
+      dingtalkUserId: text("dingtalk_user_id").unique(),
+      createdAt: timestamp("created_at").defaultNow()
     });
-    departments = (0, import_pg_core.pgTable)("departments", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      name: (0, import_pg_core.text)("name").notNull(),
-      parentId: (0, import_pg_core.varchar)("parent_id"),
-      level: (0, import_pg_core.integer)("level").notNull().default(0)
+    departments = pgTable("departments", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      name: text("name").notNull(),
+      parentId: varchar("parent_id"),
+      level: integer("level").notNull().default(0)
     });
-    userDepartments = (0, import_pg_core.pgTable)("user_departments", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-      departmentId: (0, import_pg_core.varchar)("department_id").notNull().references(() => departments.id, { onDelete: "cascade" })
+    userDepartments = pgTable("user_departments", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      departmentId: varchar("department_id").notNull().references(() => departments.id, { onDelete: "cascade" })
     }, (table) => [
-      (0, import_pg_core.uniqueIndex)("user_departments_user_department_unique").on(table.userId, table.departmentId),
-      (0, import_pg_core.index)("user_departments_user_idx").on(table.userId),
-      (0, import_pg_core.index)("user_departments_department_idx").on(table.departmentId)
+      uniqueIndex("user_departments_user_department_unique").on(table.userId, table.departmentId),
+      index("user_departments_user_idx").on(table.userId),
+      index("user_departments_department_idx").on(table.departmentId)
     ]);
-    cycles = (0, import_pg_core.pgTable)("cycles", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      name: (0, import_pg_core.text)("name").notNull().unique(),
-      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
-      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    cycles = pgTable("cycles", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      name: text("name").notNull().unique(),
+      sortOrder: integer("sort_order").notNull().default(0),
+      createdAt: timestamp("created_at").defaultNow()
     });
-    objectives = (0, import_pg_core.pgTable)("objectives", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      title: (0, import_pg_core.text)("title").notNull(),
-      description: (0, import_pg_core.text)("description").notNull().default(""),
-      departmentId: (0, import_pg_core.varchar)("department_id").notNull().references(() => departments.id, { onDelete: "restrict" }),
-      cycle: (0, import_pg_core.text)("cycle").notNull(),
-      parentObjectiveId: (0, import_pg_core.varchar)("parent_objective_id"),
-      status: (0, import_pg_core.text)("status").notNull().default("active"),
-      isCollaborative: (0, import_pg_core.boolean)("is_collaborative").notNull().default(false),
-      collaborativeDeptIds: (0, import_pg_core.jsonb)("collaborative_dept_ids").$type().default([]),
-      collaborativeUserIds: (0, import_pg_core.jsonb)("collaborative_user_ids").$type().default([]),
-      linkedToParent: (0, import_pg_core.boolean)("linked_to_parent").notNull().default(false),
-      okrType: (0, import_pg_core.text)("okr_type").notNull().default("\u627F\u8BFA\u578B"),
-      createdBy: (0, import_pg_core.varchar)("created_by").references(() => users.id, { onDelete: "set null" }),
-      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
-      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    objectives = pgTable("objectives", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      title: text("title").notNull(),
+      description: text("description").notNull().default(""),
+      departmentId: varchar("department_id").notNull().references(() => departments.id, { onDelete: "restrict" }),
+      cycle: text("cycle").notNull(),
+      parentObjectiveId: varchar("parent_objective_id"),
+      status: text("status").notNull().default("active"),
+      isCollaborative: boolean("is_collaborative").notNull().default(false),
+      collaborativeDeptIds: jsonb("collaborative_dept_ids").$type().default([]),
+      collaborativeUserIds: jsonb("collaborative_user_ids").$type().default([]),
+      linkedToParent: boolean("linked_to_parent").notNull().default(false),
+      okrType: text("okr_type").notNull().default("\u627F\u8BFA\u578B"),
+      createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+      sortOrder: integer("sort_order").notNull().default(0),
+      createdAt: timestamp("created_at").defaultNow()
     }, (table) => [
-      (0, import_pg_core.index)("objectives_department_idx").on(table.departmentId),
-      (0, import_pg_core.index)("objectives_created_by_idx").on(table.createdBy),
-      (0, import_pg_core.index)("objectives_cycle_idx").on(table.cycle)
+      index("objectives_department_idx").on(table.departmentId),
+      index("objectives_created_by_idx").on(table.createdBy),
+      index("objectives_cycle_idx").on(table.cycle)
     ]);
-    keyResults = (0, import_pg_core.pgTable)("key_results", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      objectiveId: (0, import_pg_core.varchar)("objective_id").notNull().references(() => objectives.id, { onDelete: "cascade" }),
-      title: (0, import_pg_core.text)("title").notNull(),
-      description: (0, import_pg_core.text)("description").notNull().default(""),
-      assigneeId: (0, import_pg_core.varchar)("assignee_id").references(() => users.id, { onDelete: "set null" }),
-      assigneeName: (0, import_pg_core.text)("assignee_name").notNull().default(""),
-      collaboratorId: (0, import_pg_core.varchar)("collaborator_id").references(() => users.id, { onDelete: "set null" }),
-      collaboratorName: (0, import_pg_core.text)("collaborator_name").notNull().default(""),
-      startDate: (0, import_pg_core.text)("start_date").notNull(),
-      endDate: (0, import_pg_core.text)("end_date").notNull(),
-      progress: (0, import_pg_core.integer)("progress").notNull().default(0),
-      weight: (0, import_pg_core.real)("weight").notNull().default(1),
-      status: (0, import_pg_core.text)("status").notNull().default("normal"),
-      okrType: (0, import_pg_core.text)("okr_type").notNull().default("\u627F\u8BFA\u578B"),
-      selfScore: (0, import_pg_core.real)("self_score"),
-      selfScoreNote: (0, import_pg_core.text)("self_score_note").notNull().default(""),
-      progressHistory: (0, import_pg_core.jsonb)("progress_history").$type().default([]),
-      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
-      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    keyResults = pgTable("key_results", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      objectiveId: varchar("objective_id").notNull().references(() => objectives.id, { onDelete: "cascade" }),
+      title: text("title").notNull(),
+      description: text("description").notNull().default(""),
+      assigneeId: varchar("assignee_id").references(() => users.id, { onDelete: "set null" }),
+      assigneeName: text("assignee_name").notNull().default(""),
+      collaboratorId: varchar("collaborator_id").references(() => users.id, { onDelete: "set null" }),
+      collaboratorName: text("collaborator_name").notNull().default(""),
+      startDate: text("start_date").notNull(),
+      endDate: text("end_date").notNull(),
+      progress: integer("progress").notNull().default(0),
+      weight: real("weight").notNull().default(1),
+      status: text("status").notNull().default("normal"),
+      okrType: text("okr_type").notNull().default("\u627F\u8BFA\u578B"),
+      selfScore: real("self_score"),
+      selfScoreNote: text("self_score_note").notNull().default(""),
+      progressHistory: jsonb("progress_history").$type().default([]),
+      sortOrder: integer("sort_order").notNull().default(0),
+      createdAt: timestamp("created_at").defaultNow()
     }, (table) => [
-      (0, import_pg_core.index)("key_results_objective_idx").on(table.objectiveId),
-      (0, import_pg_core.index)("key_results_assignee_idx").on(table.assigneeId),
-      (0, import_pg_core.index)("key_results_collaborator_idx").on(table.collaboratorId),
-      (0, import_pg_core.check)("key_results_progress_check", import_drizzle_orm.sql`${table.progress} between 0 and 100`),
-      (0, import_pg_core.check)("key_results_weight_check", import_drizzle_orm.sql`${table.weight} > 0`),
-      (0, import_pg_core.check)("key_results_self_score_check", import_drizzle_orm.sql`${table.selfScore} is null or (${table.selfScore} >= 0 and ${table.selfScore} <= 1)`)
+      index("key_results_objective_idx").on(table.objectiveId),
+      index("key_results_assignee_idx").on(table.assigneeId),
+      index("key_results_collaborator_idx").on(table.collaboratorId),
+      check("key_results_progress_check", sql`${table.progress} between 0 and 100`),
+      check("key_results_weight_check", sql`${table.weight} > 0`),
+      check("key_results_self_score_check", sql`${table.selfScore} is null or (${table.selfScore} >= 0 and ${table.selfScore} <= 1)`)
     ]);
-    krComments = (0, import_pg_core.pgTable)("kr_comments", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      krId: (0, import_pg_core.varchar)("kr_id").notNull().references(() => keyResults.id, { onDelete: "cascade" }),
-      userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-      userName: (0, import_pg_core.text)("user_name").notNull(),
-      content: (0, import_pg_core.text)("content").notNull(),
-      mentionedUserIds: (0, import_pg_core.jsonb)("mentioned_user_ids").$type().default([]),
-      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    krComments = pgTable("kr_comments", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      krId: varchar("kr_id").notNull().references(() => keyResults.id, { onDelete: "cascade" }),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      userName: text("user_name").notNull(),
+      content: text("content").notNull(),
+      mentionedUserIds: jsonb("mentioned_user_ids").$type().default([]),
+      createdAt: timestamp("created_at").defaultNow()
     }, (table) => [
-      (0, import_pg_core.index)("kr_comments_kr_idx").on(table.krId),
-      (0, import_pg_core.index)("kr_comments_user_idx").on(table.userId)
+      index("kr_comments_kr_idx").on(table.krId),
+      index("kr_comments_user_idx").on(table.userId)
     ]);
-    notifications = (0, import_pg_core.pgTable)("notifications", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-      type: (0, import_pg_core.text)("type").notNull().default("comment_mention"),
-      title: (0, import_pg_core.text)("title").notNull(),
-      content: (0, import_pg_core.text)("content").notNull(),
-      relatedKrId: (0, import_pg_core.varchar)("related_kr_id").references(() => keyResults.id, { onDelete: "set null" }),
-      relatedObjectiveId: (0, import_pg_core.varchar)("related_objective_id").references(() => objectives.id, { onDelete: "set null" }),
-      fromUserId: (0, import_pg_core.varchar)("from_user_id").references(() => users.id, { onDelete: "set null" }),
-      fromUserName: (0, import_pg_core.text)("from_user_name"),
-      isRead: (0, import_pg_core.boolean)("is_read").notNull().default(false),
-      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
+    notifications = pgTable("notifications", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      type: text("type").notNull().default("comment_mention"),
+      title: text("title").notNull(),
+      content: text("content").notNull(),
+      relatedKrId: varchar("related_kr_id").references(() => keyResults.id, { onDelete: "set null" }),
+      relatedObjectiveId: varchar("related_objective_id").references(() => objectives.id, { onDelete: "set null" }),
+      fromUserId: varchar("from_user_id").references(() => users.id, { onDelete: "set null" }),
+      fromUserName: text("from_user_name"),
+      isRead: boolean("is_read").notNull().default(false),
+      createdAt: timestamp("created_at").defaultNow()
     }, (table) => [
-      (0, import_pg_core.index)("notifications_user_read_idx").on(table.userId, table.isRead)
+      index("notifications_user_read_idx").on(table.userId, table.isRead)
     ]);
-    auditLogs = (0, import_pg_core.pgTable)("audit_logs", {
-      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
-      requestId: (0, import_pg_core.varchar)("request_id").notNull(),
-      actorId: (0, import_pg_core.varchar)("actor_id"),
-      actorUsername: (0, import_pg_core.text)("actor_username"),
-      actorRole: (0, import_pg_core.text)("actor_role"),
-      action: (0, import_pg_core.text)("action").notNull(),
-      resourceType: (0, import_pg_core.text)("resource_type").notNull(),
-      resourceId: (0, import_pg_core.varchar)("resource_id"),
-      ipAddress: (0, import_pg_core.text)("ip_address"),
-      userAgent: (0, import_pg_core.text)("user_agent"),
-      changes: (0, import_pg_core.jsonb)("changes").$type().default({}),
-      success: (0, import_pg_core.boolean)("success").notNull(),
-      errorCode: (0, import_pg_core.text)("error_code"),
-      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+    auditLogs = pgTable("audit_logs", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      requestId: varchar("request_id").notNull(),
+      actorId: varchar("actor_id"),
+      actorUsername: text("actor_username"),
+      actorRole: text("actor_role"),
+      action: text("action").notNull(),
+      resourceType: text("resource_type").notNull(),
+      resourceId: varchar("resource_id"),
+      ipAddress: text("ip_address"),
+      userAgent: text("user_agent"),
+      changes: jsonb("changes").$type().default({}),
+      success: boolean("success").notNull(),
+      errorCode: text("error_code"),
+      createdAt: timestamp("created_at").defaultNow().notNull()
     }, (table) => [
-      (0, import_pg_core.index)("audit_logs_created_at_idx").on(table.createdAt),
-      (0, import_pg_core.index)("audit_logs_actor_idx").on(table.actorId),
-      (0, import_pg_core.index)("audit_logs_action_idx").on(table.action),
-      (0, import_pg_core.index)("audit_logs_resource_idx").on(table.resourceType, table.resourceId)
+      index("audit_logs_created_at_idx").on(table.createdAt),
+      index("audit_logs_actor_idx").on(table.actorId),
+      index("audit_logs_action_idx").on(table.action),
+      index("audit_logs_resource_idx").on(table.resourceType, table.resourceId)
     ]);
-    insertUserSchema = (0, import_drizzle_zod.createInsertSchema)(users).pick({
+    insertUserSchema = createInsertSchema(users).pick({
       username: true,
       password: true,
       displayName: true,
@@ -190,9 +169,9 @@ var init_schema = __esm({
       authProvider: true,
       dingtalkUserId: true
     });
-    loginSchema = import_zod.z.object({
-      username: import_zod.z.string().min(1),
-      password: import_zod.z.string().min(1)
+    loginSchema = z.object({
+      username: z.string().min(1),
+      password: z.string().min(1)
     });
   }
 });
@@ -203,18 +182,18 @@ __export(db_exports, {
   db: () => db,
   pool: () => pool
 });
-var import_node_postgres, import_pg, pool, db;
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+var pool, db;
 var init_db = __esm({
   "server/db.ts"() {
     "use strict";
-    import_node_postgres = require("drizzle-orm/node-postgres");
-    import_pg = __toESM(require("pg"));
     init_schema();
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL is not set");
     }
-    pool = new import_pg.default.Pool({ connectionString: process.env.DATABASE_URL });
-    db = (0, import_node_postgres.drizzle)(pool, { schema: schema_exports });
+    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    db = drizzle(pool, { schema: schema_exports });
   }
 });
 
@@ -224,6 +203,7 @@ __export(ai_analysis_exports, {
   generateOKRAnalysis: () => generateOKRAnalysis,
   streamOKRAnalysis: () => streamOKRAnalysis
 });
+import OpenAI from "openai";
 async function generateOKRAnalysis(data) {
   const { objectives: objectives2, keyResults: keyResults2, departments: departments2, cycle, departmentName } = data;
   const totalObj = objectives2.length;
@@ -384,17 +364,16 @@ ${o.krs.map((kr) => `  - ${kr.title}: \u8FDB\u5EA6${kr.progress}%, \u72B6\u6001$
     }
   }
 }
-var import_openai, apiKey, baseURL, openai, OKR_ANALYSIS_MODEL;
+var apiKey, baseURL, openai, OKR_ANALYSIS_MODEL;
 var init_ai_analysis = __esm({
   "server/ai-analysis.ts"() {
     "use strict";
-    import_openai = __toESM(require("openai"));
     apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
     if (!apiKey) {
       throw new Error("AI_INTEGRATIONS_OPENAI_API_KEY \u73AF\u5883\u53D8\u91CF\u672A\u8BBE\u7F6E");
     }
-    openai = new import_openai.default({
+    openai = new OpenAI({
       apiKey,
       baseURL: baseURL || void 0
     });
@@ -403,20 +382,20 @@ var init_ai_analysis = __esm({
 });
 
 // server/index.ts
-var import_express = __toESM(require("express"));
+import express from "express";
 
 // server/routes.ts
-var import_express_session = __toESM(require("express-session"));
-var import_connect_pg_simple = __toESM(require("connect-pg-simple"));
 init_db();
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 
 // server/file-upload.ts
-var import_storage = require("@google-cloud/storage");
-var fs = __toESM(require("fs"));
-var path = __toESM(require("path"));
+import { Storage } from "@google-cloud/storage";
+import * as fs from "fs";
+import * as path from "path";
 var bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
 function getStorage() {
-  return new import_storage.Storage({ apiEndpoint: "https://storage.googleapis.com" });
+  return new Storage({ apiEndpoint: "https://storage.googleapis.com" });
 }
 var LOCAL_UPLOAD_DIR = path.resolve(process.cwd(), "assets", "uploads");
 function ensureLocalDir() {
@@ -444,77 +423,77 @@ async function uploadFile(buffer, fileName, contentType) {
 }
 
 // server/storage.ts
-var import_drizzle_orm2 = require("drizzle-orm");
 init_db();
 init_schema();
-var import_bcryptjs = __toESM(require("bcryptjs"));
+import { eq, or, inArray, and, asc, desc, gte, lte, lt } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 // server/validation.ts
-var import_zod2 = require("zod");
-var id = import_zod2.z.string().min(1).max(128);
-var shortText = import_zod2.z.string().trim().min(1).max(300);
-var optionalText = import_zod2.z.string().trim().max(5e3).optional().default("");
-var isoDate = import_zod2.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u65E5\u671F\u683C\u5F0F\u5FC5\u987B\u4E3A YYYY-MM-DD");
-var role = import_zod2.z.enum(["member", "center_head", "vp", "super_admin"]);
-var okrType = import_zod2.z.enum(["\u627F\u8BFA\u578B", "\u6311\u6218\u578B"]);
-var strongPasswordSchema = import_zod2.z.string().min(8).max(128).refine((value) => {
+import { z as z2 } from "zod";
+var id = z2.string().min(1).max(128);
+var shortText = z2.string().trim().min(1).max(300);
+var optionalText = z2.string().trim().max(5e3).optional().default("");
+var isoDate = z2.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u65E5\u671F\u683C\u5F0F\u5FC5\u987B\u4E3A YYYY-MM-DD");
+var role = z2.enum(["member", "center_head", "vp", "super_admin"]);
+var okrType = z2.enum(["\u627F\u8BFA\u578B", "\u6311\u6218\u578B"]);
+var strongPasswordSchema = z2.string().min(8).max(128).refine((value) => {
   const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
   return classes.filter((pattern) => pattern.test(value)).length >= 3;
 }, "\u5BC6\u7801\u81F3\u5C118\u4F4D\uFF0C\u5E76\u5305\u542B\u5927\u5C0F\u5199\u5B57\u6BCD\u3001\u6570\u5B57\u3001\u7B26\u53F7\u4E2D\u7684\u81F3\u5C11\u4E09\u7C7B");
-var loginBodySchema = import_zod2.z.object({
-  username: import_zod2.z.string().trim().min(1).max(100),
-  password: import_zod2.z.string().min(1).max(128)
+var loginBodySchema = z2.object({
+  username: z2.string().trim().min(1).max(100),
+  password: z2.string().min(1).max(128)
 }).strict();
-var dingtalkLoginBodySchema = import_zod2.z.object({ authCode: import_zod2.z.string().min(1).max(2048) }).strict();
-var changePasswordBodySchema = import_zod2.z.object({
-  currentPassword: import_zod2.z.string().min(1).max(128),
+var dingtalkLoginBodySchema = z2.object({ authCode: z2.string().min(1).max(2048) }).strict();
+var changePasswordBodySchema = z2.object({
+  currentPassword: z2.string().min(1).max(128),
   newPassword: strongPasswordSchema
 }).strict();
-var createUserBodySchema = import_zod2.z.object({
-  displayName: import_zod2.z.string().trim().min(1).max(100),
+var createUserBodySchema = z2.object({
+  displayName: z2.string().trim().min(1).max(100),
   role: role.exclude(["super_admin"]).default("member"),
   departmentId: id.nullable().optional(),
-  departmentIds: import_zod2.z.array(id).max(50).optional(),
-  dingtalkUserId: import_zod2.z.string().trim().min(1).max(256)
+  departmentIds: z2.array(id).max(50).optional(),
+  dingtalkUserId: z2.string().trim().min(1).max(256)
 }).strict();
-var updateUserBodySchema = import_zod2.z.object({
-  displayName: import_zod2.z.string().trim().min(1).max(100).optional(),
+var updateUserBodySchema = z2.object({
+  displayName: z2.string().trim().min(1).max(100).optional(),
   role: role.exclude(["super_admin"]).optional(),
-  departmentIds: import_zod2.z.array(id).max(50).optional()
+  departmentIds: z2.array(id).max(50).optional()
 }).strict();
-var departmentBodySchema = import_zod2.z.object({
+var departmentBodySchema = z2.object({
   name: shortText,
   parentId: id.nullable().optional(),
-  level: import_zod2.z.number().int().min(0).max(10).optional()
+  level: z2.number().int().min(0).max(10).optional()
 }).strict();
-var cycleBodySchema = import_zod2.z.object({
+var cycleBodySchema = z2.object({
   name: shortText,
-  sortOrder: import_zod2.z.number().int().min(0).max(1e4).optional()
+  sortOrder: z2.number().int().min(0).max(1e4).optional()
 }).strict();
-var objectiveCreateBodySchema = import_zod2.z.object({
+var objectiveCreateBodySchema = z2.object({
   title: shortText,
   description: optionalText,
   departmentId: id,
   cycle: shortText,
   parentObjectiveId: id.nullable().optional(),
-  isCollaborative: import_zod2.z.boolean().optional().default(false),
-  collaborativeDeptIds: import_zod2.z.array(id).max(100).optional().default([]),
-  collaborativeUserIds: import_zod2.z.array(id).max(100).optional().default([]),
-  linkedToParent: import_zod2.z.boolean().optional().default(false),
+  isCollaborative: z2.boolean().optional().default(false),
+  collaborativeDeptIds: z2.array(id).max(100).optional().default([]),
+  collaborativeUserIds: z2.array(id).max(100).optional().default([]),
+  linkedToParent: z2.boolean().optional().default(false),
   okrType: okrType.optional().default("\u627F\u8BFA\u578B")
 }).strict();
 var objectiveUpdateBodySchema = objectiveCreateBodySchema.partial().strict();
-var keyResultBodyBaseSchema = import_zod2.z.object({
+var keyResultBodyBaseSchema = z2.object({
   objectiveId: id,
   title: shortText,
   description: optionalText,
   assigneeId: id.nullable().optional(),
-  assigneeName: import_zod2.z.string().trim().max(100).optional().default(""),
+  assigneeName: z2.string().trim().max(100).optional().default(""),
   collaboratorId: id.nullable().optional(),
-  collaboratorName: import_zod2.z.string().trim().max(100).optional().default(""),
+  collaboratorName: z2.string().trim().max(100).optional().default(""),
   startDate: isoDate,
   endDate: isoDate,
-  weight: import_zod2.z.number().positive().max(100).optional().default(1),
+  weight: z2.number().positive().max(100).optional().default(1),
   okrType: okrType.optional().default("\u627F\u8BFA\u578B")
 }).strict();
 var keyResultCreateBodySchema = keyResultBodyBaseSchema.refine((value) => value.startDate <= value.endDate, {
@@ -522,23 +501,23 @@ var keyResultCreateBodySchema = keyResultBodyBaseSchema.refine((value) => value.
   path: ["endDate"]
 });
 var keyResultUpdateBodySchema = keyResultBodyBaseSchema.omit({ objectiveId: true }).partial().strict();
-var reorderBodySchema = import_zod2.z.object({
-  orders: import_zod2.z.array(import_zod2.z.object({ id, sortOrder: import_zod2.z.number().int().min(0).max(1e5) }).strict()).max(1e3)
+var reorderBodySchema = z2.object({
+  orders: z2.array(z2.object({ id, sortOrder: z2.number().int().min(0).max(1e5) }).strict()).max(1e3)
 }).strict();
-var progressBodySchema = import_zod2.z.object({
-  progress: import_zod2.z.number().int().min(0).max(100),
-  note: import_zod2.z.string().trim().min(1).max(5e3),
-  images: import_zod2.z.array(import_zod2.z.string().max(2048)).max(20).optional(),
-  entryId: import_zod2.z.string().max(128).optional()
+var progressBodySchema = z2.object({
+  progress: z2.number().int().min(0).max(100),
+  note: z2.string().trim().min(1).max(5e3),
+  images: z2.array(z2.string().max(2048)).max(20).optional(),
+  entryId: z2.string().max(128).optional()
 }).strict();
-var scoreBodySchema = import_zod2.z.object({
-  score: import_zod2.z.number().min(0).max(1),
-  note: import_zod2.z.string().trim().max(5e3).optional().default("")
+var scoreBodySchema = z2.object({
+  score: z2.number().min(0).max(1),
+  note: z2.string().trim().max(5e3).optional().default("")
 }).strict();
-var commentBodySchema = import_zod2.z.object({
+var commentBodySchema = z2.object({
   krId: id,
-  content: import_zod2.z.string().trim().min(1).max(5e3),
-  mentionedUserIds: import_zod2.z.array(id).max(100).optional().default([])
+  content: z2.string().trim().min(1).max(5e3),
+  mentionedUserIds: z2.array(id).max(100).optional().default([])
 }).strict();
 function parseBody(schema, body) {
   const result = schema.safeParse(body);
@@ -552,52 +531,52 @@ function parseBody(schema, body) {
 
 // server/storage.ts
 async function getUser(id2) {
-  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.id, id2));
+  const [user] = await db.select().from(users).where(eq(users.id, id2));
   return user;
 }
 async function getUserByUsername(username) {
-  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.username, username));
+  const [user] = await db.select().from(users).where(eq(users.username, username));
   return user;
 }
 async function getUserByDingtalkId(dingtalkUserId) {
-  const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.dingtalkUserId, dingtalkUserId));
+  const [user] = await db.select().from(users).where(eq(users.dingtalkUserId, dingtalkUserId));
   return user;
 }
 async function createUser(data) {
-  const hashed = data.password ? await import_bcryptjs.default.hash(data.password, 12) : null;
+  const hashed = data.password ? await bcrypt.hash(data.password, 12) : null;
   const [user] = await db.insert(users).values({ ...data, password: hashed }).returning();
   return user;
 }
 async function updateUser(id2, updates) {
   if (updates.password) {
-    updates.password = await import_bcryptjs.default.hash(updates.password, 10);
+    updates.password = await bcrypt.hash(updates.password, 10);
   }
-  const [user] = await db.update(users).set(updates).where((0, import_drizzle_orm2.eq)(users.id, id2)).returning();
+  const [user] = await db.update(users).set(updates).where(eq(users.id, id2)).returning();
   return user;
 }
 async function deleteUser(id2) {
-  await db.delete(users).where((0, import_drizzle_orm2.eq)(users.id, id2));
+  await db.delete(users).where(eq(users.id, id2));
 }
 async function getAllUsers() {
   return db.select().from(users);
 }
 async function verifyPassword(plaintext, hashed) {
-  return import_bcryptjs.default.compare(plaintext, hashed);
+  return bcrypt.compare(plaintext, hashed);
 }
 async function getObjective(id2) {
-  const [objective] = await db.select().from(objectives).where((0, import_drizzle_orm2.eq)(objectives.id, id2));
+  const [objective] = await db.select().from(objectives).where(eq(objectives.id, id2));
   return objective;
 }
 async function getKeyResult(id2) {
-  const [keyResult] = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.id, id2));
+  const [keyResult] = await db.select().from(keyResults).where(eq(keyResults.id, id2));
   return keyResult;
 }
 async function getComment(id2) {
-  const [comment] = await db.select().from(krComments).where((0, import_drizzle_orm2.eq)(krComments.id, id2));
+  const [comment] = await db.select().from(krComments).where(eq(krComments.id, id2));
   return comment;
 }
 async function getNotification(id2) {
-  const [notification] = await db.select().from(notifications).where((0, import_drizzle_orm2.eq)(notifications.id, id2));
+  const [notification] = await db.select().from(notifications).where(eq(notifications.id, id2));
   return notification;
 }
 async function getDepartments() {
@@ -608,21 +587,21 @@ async function createDepartment(data) {
   return dept;
 }
 async function updateDepartment(id2, updates) {
-  const [dept] = await db.update(departments).set(updates).where((0, import_drizzle_orm2.eq)(departments.id, id2)).returning();
+  const [dept] = await db.update(departments).set(updates).where(eq(departments.id, id2)).returning();
   return dept;
 }
 async function deleteDepartment(id2) {
-  await db.delete(departments).where((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(departments.id, id2), (0, import_drizzle_orm2.eq)(departments.parentId, id2)));
+  await db.delete(departments).where(or(eq(departments.id, id2), eq(departments.parentId, id2)));
 }
 async function getUsersByDepartment(departmentId) {
-  return db.select().from(users).where((0, import_drizzle_orm2.eq)(users.departmentId, departmentId));
+  return db.select().from(users).where(eq(users.departmentId, departmentId));
 }
 async function getUserDepartmentIds(userId) {
-  const rows = await db.select().from(userDepartments).where((0, import_drizzle_orm2.eq)(userDepartments.userId, userId));
+  const rows = await db.select().from(userDepartments).where(eq(userDepartments.userId, userId));
   return rows.map((r) => r.departmentId);
 }
 async function setUserDepartments(userId, departmentIds) {
-  await db.delete(userDepartments).where((0, import_drizzle_orm2.eq)(userDepartments.userId, userId));
+  await db.delete(userDepartments).where(eq(userDepartments.userId, userId));
   if (departmentIds.length > 0) {
     await db.insert(userDepartments).values(departmentIds.map((deptId) => ({ userId, departmentId: deptId })));
   }
@@ -646,12 +625,12 @@ async function getObjectivesForUser(user) {
   const multiDeptIds = await getUserDepartmentIds(user.id);
   const baseDeptIds = multiDeptIds.length > 0 ? multiDeptIds : user.departmentId ? [user.departmentId] : [];
   const ownDeptIdSet = new Set(baseDeptIds);
-  const relatedKRs = await db.select({ objectiveId: keyResults.objectiveId }).from(keyResults).where((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(keyResults.assigneeId, user.id), (0, import_drizzle_orm2.eq)(keyResults.collaboratorId, user.id)));
+  const relatedKRs = await db.select({ objectiveId: keyResults.objectiveId }).from(keyResults).where(or(eq(keyResults.assigneeId, user.id), eq(keyResults.collaboratorId, user.id)));
   const relatedObjectiveIds = new Set(relatedKRs.map((row) => row.objectiveId));
   let leadershipUserIds = /* @__PURE__ */ new Set();
   if (user.role === "vp" || user.role === "center_head") {
     const leadershipUsers = await db.select({ id: users.id }).from(users).where(
-      (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.role, "vp"), (0, import_drizzle_orm2.eq)(users.role, "center_head"))
+      or(eq(users.role, "vp"), eq(users.role, "center_head"))
     );
     leadershipUserIds = new Set(leadershipUsers.map((leader) => leader.id));
   }
@@ -665,18 +644,18 @@ async function getObjectivesForUser(user) {
   });
 }
 async function getKRsAssignedToUser(userId) {
-  const allKRs = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.assigneeId, userId));
+  const allKRs = await db.select().from(keyResults).where(eq(keyResults.assigneeId, userId));
   if (allKRs.length === 0) return [];
   const objIds = [...new Set(allKRs.map((kr) => kr.objectiveId))];
-  const objs = await db.select().from(objectives).where((0, import_drizzle_orm2.inArray)(objectives.id, objIds));
+  const objs = await db.select().from(objectives).where(inArray(objectives.id, objIds));
   const objMap = new Map(objs.map((o) => [o.id, o]));
   return allKRs.filter((kr) => objMap.has(kr.objectiveId)).map((kr) => ({ kr, objective: objMap.get(kr.objectiveId) }));
 }
 async function getKRsCollaboratingUser(userId) {
-  const allKRs = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.collaboratorId, userId));
+  const allKRs = await db.select().from(keyResults).where(eq(keyResults.collaboratorId, userId));
   if (allKRs.length === 0) return [];
   const objIds = [...new Set(allKRs.map((kr) => kr.objectiveId))];
-  const objs = await db.select().from(objectives).where((0, import_drizzle_orm2.inArray)(objectives.id, objIds));
+  const objs = await db.select().from(objectives).where(inArray(objectives.id, objIds));
   const objMap = new Map(objs.map((o) => [o.id, o]));
   return allKRs.filter((kr) => objMap.has(kr.objectiveId)).map((kr) => ({ kr, objective: objMap.get(kr.objectiveId) }));
 }
@@ -688,16 +667,16 @@ async function createObjectiveInDb(data) {
   return obj;
 }
 async function updateObjectiveInDb(id2, updates) {
-  const [obj] = await db.update(objectives).set(updates).where((0, import_drizzle_orm2.eq)(objectives.id, id2)).returning();
+  const [obj] = await db.update(objectives).set(updates).where(eq(objectives.id, id2)).returning();
   return obj;
 }
 async function deleteObjectiveInDb(id2) {
-  await db.delete(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.objectiveId, id2));
-  await db.delete(objectives).where((0, import_drizzle_orm2.eq)(objectives.id, id2));
+  await db.delete(keyResults).where(eq(keyResults.objectiveId, id2));
+  await db.delete(objectives).where(eq(objectives.id, id2));
 }
 async function getKeyResultsForObjectives(objectiveIds) {
   if (objectiveIds.length === 0) return [];
-  const results = await db.select().from(keyResults).where((0, import_drizzle_orm2.inArray)(keyResults.objectiveId, objectiveIds));
+  const results = await db.select().from(keyResults).where(inArray(keyResults.objectiveId, objectiveIds));
   return results.sort((a, b) => {
     const numA = parseInt(a.title.match(/KR(\d+)/i)?.[1] || "0");
     const numB = parseInt(b.title.match(/KR(\d+)/i)?.[1] || "0");
@@ -720,7 +699,7 @@ async function createKeyResultInDb(data) {
 async function updateKeyResultInDb(id2, updates) {
   console.log("updateKeyResultInDb called:", id2, updates);
   try {
-    const [kr] = await db.update(keyResults).set(updates).where((0, import_drizzle_orm2.eq)(keyResults.id, id2)).returning();
+    const [kr] = await db.update(keyResults).set(updates).where(eq(keyResults.id, id2)).returning();
     console.log("updateKeyResultInDb success:", kr?.id);
     return kr;
   } catch (err) {
@@ -729,10 +708,10 @@ async function updateKeyResultInDb(id2, updates) {
   }
 }
 async function deleteKeyResultInDb(id2) {
-  await db.delete(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.id, id2));
+  await db.delete(keyResults).where(eq(keyResults.id, id2));
 }
 async function updateKRProgressInDb(id2, progress, note, images, entryId) {
-  const [existing] = await db.select().from(keyResults).where((0, import_drizzle_orm2.eq)(keyResults.id, id2));
+  const [existing] = await db.select().from(keyResults).where(eq(keyResults.id, id2));
   if (!existing) return void 0;
   const normalizedImages = images && images.length > 0 ? images : void 0;
   const existingHistory = existing.progressHistory || [];
@@ -771,14 +750,14 @@ async function updateKRProgressInDb(id2, progress, note, images, entryId) {
     progress: latestProgress,
     status,
     progressHistory: history
-  }).where((0, import_drizzle_orm2.eq)(keyResults.id, id2)).returning();
+  }).where(eq(keyResults.id, id2)).returning();
   return kr;
 }
 async function scoreKRInDb(id2, score, note) {
   const [kr] = await db.update(keyResults).set({
     selfScore: score,
     selfScoreNote: note
-  }).where((0, import_drizzle_orm2.eq)(keyResults.id, id2)).returning();
+  }).where(eq(keyResults.id, id2)).returning();
   return kr;
 }
 var DEFAULT_DEPARTMENTS = [
@@ -845,44 +824,44 @@ async function seedDatabase() {
   }
 }
 async function getCycles() {
-  return db.select().from(cycles).orderBy((0, import_drizzle_orm2.asc)(cycles.sortOrder));
+  return db.select().from(cycles).orderBy(asc(cycles.sortOrder));
 }
 async function createCycle(name, sortOrder) {
   const [cycle] = await db.insert(cycles).values({ name, sortOrder }).returning();
   return cycle;
 }
 async function updateCycle(id2, data) {
-  const [cycle] = await db.update(cycles).set(data).where((0, import_drizzle_orm2.eq)(cycles.id, id2)).returning();
+  const [cycle] = await db.update(cycles).set(data).where(eq(cycles.id, id2)).returning();
   return cycle;
 }
 async function deleteCycle(id2) {
-  await db.delete(cycles).where((0, import_drizzle_orm2.eq)(cycles.id, id2));
+  await db.delete(cycles).where(eq(cycles.id, id2));
 }
 async function getCommentsForKR(krId) {
-  return db.select().from(krComments).where((0, import_drizzle_orm2.eq)(krComments.krId, krId));
+  return db.select().from(krComments).where(eq(krComments.krId, krId));
 }
 async function createComment(data) {
   const [comment] = await db.insert(krComments).values(data).returning();
   return comment;
 }
 async function deleteComment(id2) {
-  await db.delete(krComments).where((0, import_drizzle_orm2.eq)(krComments.id, id2));
+  await db.delete(krComments).where(eq(krComments.id, id2));
 }
 async function getNotificationsForUser(userId) {
-  return db.select().from(notifications).where((0, import_drizzle_orm2.eq)(notifications.userId, userId));
+  return db.select().from(notifications).where(eq(notifications.userId, userId));
 }
 async function createNotification(data) {
   const [notif] = await db.insert(notifications).values(data).returning();
   return notif;
 }
 async function markNotificationRead(id2) {
-  await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm2.eq)(notifications.id, id2));
+  await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id2));
 }
 async function markAllNotificationsRead(userId) {
-  await db.update(notifications).set({ isRead: true }).where((0, import_drizzle_orm2.eq)(notifications.userId, userId));
+  await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
 }
 async function getUnreadNotificationCount(userId) {
-  const rows = await db.select().from(notifications).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(notifications.userId, userId), (0, import_drizzle_orm2.eq)(notifications.isRead, false)));
+  const rows = await db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
   return rows.length;
 }
 async function createAuditLog(data) {
@@ -890,18 +869,18 @@ async function createAuditLog(data) {
 }
 async function getAuditLogs(filters) {
   const conditions = [];
-  if (filters.actorId) conditions.push((0, import_drizzle_orm2.eq)(auditLogs.actorId, filters.actorId));
-  if (filters.action) conditions.push((0, import_drizzle_orm2.eq)(auditLogs.action, filters.action));
-  if (filters.resourceType) conditions.push((0, import_drizzle_orm2.eq)(auditLogs.resourceType, filters.resourceType));
-  if (filters.success !== void 0) conditions.push((0, import_drizzle_orm2.eq)(auditLogs.success, filters.success));
-  if (filters.from) conditions.push((0, import_drizzle_orm2.gte)(auditLogs.createdAt, filters.from));
-  if (filters.to) conditions.push((0, import_drizzle_orm2.lte)(auditLogs.createdAt, filters.to));
+  if (filters.actorId) conditions.push(eq(auditLogs.actorId, filters.actorId));
+  if (filters.action) conditions.push(eq(auditLogs.action, filters.action));
+  if (filters.resourceType) conditions.push(eq(auditLogs.resourceType, filters.resourceType));
+  if (filters.success !== void 0) conditions.push(eq(auditLogs.success, filters.success));
+  if (filters.from) conditions.push(gte(auditLogs.createdAt, filters.from));
+  if (filters.to) conditions.push(lte(auditLogs.createdAt, filters.to));
   const limit = Math.min(Math.max(filters.limit || 200, 1), 1e3);
-  return db.select().from(auditLogs).where(conditions.length ? (0, import_drizzle_orm2.and)(...conditions) : void 0).orderBy((0, import_drizzle_orm2.desc)(auditLogs.createdAt)).limit(limit);
+  return db.select().from(auditLogs).where(conditions.length ? and(...conditions) : void 0).orderBy(desc(auditLogs.createdAt)).limit(limit);
 }
 async function deleteExpiredAuditLogs(retentionDays = 180) {
   const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1e3);
-  const deleted = await db.delete(auditLogs).where((0, import_drizzle_orm2.lt)(auditLogs.createdAt, cutoff)).returning({ id: auditLogs.id });
+  const deleted = await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff)).returning({ id: auditLogs.id });
   return deleted.length;
 }
 
@@ -1189,7 +1168,7 @@ async function getManageableKeyResult(user, keyResultId) {
 }
 
 // server/security.ts
-var import_node_crypto = require("node:crypto");
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 var loginFailures = /* @__PURE__ */ new Map();
 var LOGIN_WINDOW_MS = 15 * 60 * 1e3;
 var LOGIN_BLOCK_MS = 15 * 60 * 1e3;
@@ -1207,7 +1186,7 @@ function cleanupLoginFailures(now) {
 }
 function requestIdMiddleware(req, res, next) {
   const incoming = req.header("x-request-id");
-  req.requestId = incoming && /^[A-Za-z0-9._-]{1,128}$/.test(incoming) ? incoming : (0, import_node_crypto.randomUUID)();
+  req.requestId = incoming && /^[A-Za-z0-9._-]{1,128}$/.test(incoming) ? incoming : randomUUID();
   res.setHeader("X-Request-Id", req.requestId);
   next();
 }
@@ -1229,11 +1208,11 @@ function originGuard(req, res, next) {
   return res.status(403).json({ message: "\u8BF7\u6C42\u6765\u6E90\u4E0D\u53D7\u4FE1\u4EFB" });
 }
 function issueCsrfToken(req, res) {
-  if (!req.session.csrfToken) req.session.csrfToken = (0, import_node_crypto.randomBytes)(32).toString("hex");
+  if (!req.session.csrfToken) req.session.csrfToken = randomBytes(32).toString("hex");
   return res.json({ csrfToken: req.session.csrfToken });
 }
 function issueOauthState(req) {
-  const state = (0, import_node_crypto.randomBytes)(32).toString("hex");
+  const state = randomBytes(32).toString("hex");
   req.session.oauthState = state;
   return state;
 }
@@ -1243,7 +1222,7 @@ function consumeOauthState(req, supplied) {
   if (!expected || !supplied) return false;
   const expectedBuffer = Buffer.from(expected);
   const suppliedBuffer = Buffer.from(supplied);
-  return expectedBuffer.length === suppliedBuffer.length && (0, import_node_crypto.timingSafeEqual)(expectedBuffer, suppliedBuffer);
+  return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer);
 }
 function csrfProtection(req, res, next) {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
@@ -1252,7 +1231,7 @@ function csrfProtection(req, res, next) {
   if (!expected || !supplied) return res.status(403).json({ message: "CSRF \u6821\u9A8C\u5931\u8D25" });
   const expectedBuffer = Buffer.from(expected);
   const suppliedBuffer = Buffer.from(supplied);
-  if (expectedBuffer.length !== suppliedBuffer.length || !(0, import_node_crypto.timingSafeEqual)(expectedBuffer, suppliedBuffer)) {
+  if (expectedBuffer.length !== suppliedBuffer.length || !timingSafeEqual(expectedBuffer, suppliedBuffer)) {
     return res.status(403).json({ message: "CSRF \u6821\u9A8C\u5931\u8D25" });
   }
   next();
@@ -1287,7 +1266,7 @@ function regenerateSession(req) {
   return new Promise((resolve3, reject) => {
     req.session.regenerate((error) => {
       if (error) return reject(error);
-      req.session.csrfToken = csrfToken || (0, import_node_crypto.randomBytes)(32).toString("hex");
+      req.session.csrfToken = csrfToken || randomBytes(32).toString("hex");
       resolve3();
     });
   });
@@ -1396,13 +1375,13 @@ async function requireAdmin(req, res, next) {
   next();
 }
 async function registerRoutes(app2) {
-  const PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
+  const PgStore = connectPgSimple(session);
   const isProd = process.env.NODE_ENV === "production";
   const sessionSecret = process.env.SESSION_SECRET;
   if (isProd && !sessionSecret) {
     throw new Error("SESSION_SECRET is required in production");
   }
-  const sessionMiddleware = (0, import_express_session.default)({
+  const sessionMiddleware = session({
     store: new PgStore({
       pool,
       createTableIfMissing: true
@@ -2802,12 +2781,12 @@ async function registerRoutes(app2) {
 }
 
 // server/index.ts
-var fs2 = __toESM(require("fs"));
-var path2 = __toESM(require("path"));
-var import_node_http = require("node:http");
-var import_node_https = require("node:https");
-var import_node_crypto2 = require("node:crypto");
-var import_helmet = __toESM(require("helmet"));
+import * as fs2 from "fs";
+import * as path2 from "path";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
+import { X509Certificate } from "node:crypto";
+import helmet from "helmet";
 
 // server/tls.ts
 function parsePublicHttpsOrigin(value) {
@@ -2823,7 +2802,11 @@ function buildHttpsRedirect(publicOrigin, requestUrl) {
 }
 
 // server/index.ts
-var app = (0, import_express.default)();
+var runtimeMode = (process.env.NODE_ENV || "development").trim();
+if (runtimeMode !== "development" && runtimeMode !== "production") {
+  throw new Error("NODE_ENV must be either development or production");
+}
+var app = express();
 var log = console.log;
 function setupCors(app2) {
   app2.use((req, res, next) => {
@@ -2860,13 +2843,13 @@ function setupCors(app2) {
 }
 function setupBodyParsing(app2) {
   app2.use(
-    import_express.default.json({
+    express.json({
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       }
     })
   );
-  app2.use(import_express.default.urlencoded({ extended: false }));
+  app2.use(express.urlencoded({ extended: false }));
 }
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
@@ -2890,7 +2873,7 @@ function setupRequestLogging(app2) {
 }
 function setupSecurityHeaders(app2) {
   const isProd = process.env.NODE_ENV === "production";
-  app2.use((0, import_helmet.default)({
+  app2.use(helmet({
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
       directives: {
@@ -2902,7 +2885,9 @@ function setupSecurityHeaders(app2) {
         fontSrc: ["'self'", "data:"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
-        baseUri: ["'self'"]
+        baseUri: ["'self'"],
+        // HTTP is supported only for development and internal testing.
+        "upgrade-insecure-requests": isProd ? [] : null
       }
     },
     hsts: isProd ? { maxAge: 31536e3, includeSubDomains: true } : false,
@@ -2997,10 +2982,10 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", import_express.default.static(path2.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", import_express.default.static(path2.resolve(process.cwd(), "uploads")));
+  app2.use("/assets", express.static(path2.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", express.static(path2.resolve(process.cwd(), "uploads")));
   if (webBuildExists) {
-    app2.use(import_express.default.static(webBuildDir));
+    app2.use(express.static(webBuildDir));
     app2.get("/{*splat}", (req, res, next) => {
       if (req.path.startsWith("/api")) return next();
       const platform = req.header("expo-platform");
@@ -3013,7 +2998,7 @@ function configureExpoAndLanding(app2) {
     });
     log("Serving Expo Web build from static-build/web");
   }
-  app2.use(import_express.default.static(path2.resolve(process.cwd(), "static-build")));
+  app2.use(express.static(path2.resolve(process.cwd(), "static-build")));
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 function setupErrorHandler(app2) {
@@ -3046,7 +3031,7 @@ function setupErrorHandler(app2) {
   const isProd = process.env.NODE_ENV === "production";
   if (!isProd) {
     const port = parseInt(process.env.PORT || "5000", 10);
-    (0, import_node_http.createServer)(app).listen({ port, host: "0.0.0.0" }, () => {
+    createHttpServer(app).listen({ port, host: "0.0.0.0" }, () => {
       log(`development HTTP server listening on port ${port}`);
     });
     return;
@@ -3063,16 +3048,16 @@ function setupErrorHandler(app2) {
   }
   const cert = fs2.readFileSync(certPath, "utf8");
   const key = fs2.readFileSync(keyPath, "utf8");
-  const certificate = new import_node_crypto2.X509Certificate(cert);
+  const certificate = new X509Certificate(cert);
   const expiresInDays = Math.floor((Date.parse(certificate.validTo) - Date.now()) / (24 * 60 * 60 * 1e3));
   if (expiresInDays <= 0) throw new Error("HTTPS certificate is expired");
   if (expiresInDays < 30) console.warn(`HTTPS certificate expires in ${expiresInDays} days`);
   const httpsPort = parseInt(process.env.HTTPS_PORT || "5000", 10);
   const httpPort = parseInt(process.env.HTTP_PORT || "5001", 10);
-  (0, import_node_https.createServer)({ cert, key, minVersion: "TLSv1.2" }, app).listen({ port: httpsPort, host: "0.0.0.0" }, () => {
+  createHttpsServer({ cert, key, minVersion: "TLSv1.2" }, app).listen({ port: httpsPort, host: "0.0.0.0" }, () => {
     log(`production HTTPS server listening on port ${httpsPort}`);
   });
-  (0, import_node_http.createServer)((req, res) => {
+  createHttpServer((req, res) => {
     const target = buildHttpsRedirect(parsedOrigin, req.url);
     res.writeHead(308, { Location: target, "Cache-Control": "no-store" });
     res.end();
