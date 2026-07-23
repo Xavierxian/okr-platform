@@ -168,7 +168,9 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       const { username, password } = parseBody(loginBodySchema, req.body);
       const user = await getUserByUsername(username);
-      const eligible = !!user?.password && user.authProvider === "local" && user.role === "super_admin";
+      // Any account with a password may use local login. DingTalk-only accounts
+      // have no password and therefore continue to require DingTalk authentication.
+      const eligible = !!user?.password;
       const passwordMatches = await verifyPassword(password, eligible ? user.password! : DUMMY_PASSWORD_HASH);
       const valid = eligible && passwordMatches;
       if (!valid) {

@@ -176,7 +176,7 @@ export default function LoginScreen() {
               style={styles.input}
               value={username}
               onChangeText={setUsername}
-              placeholder="管理员用户名"
+              placeholder="用户名"
               placeholderTextColor={Colors.textTertiary}
               autoCapitalize="none"
               autoCorrect={false}
@@ -211,7 +211,7 @@ export default function LoginScreen() {
             ) : (
               <>
                 <Ionicons name="log-in-outline" size={20} color={Colors.white} />
-                <Text style={styles.loginBtnText}>管理员登录</Text>
+                <Text style={styles.loginBtnText}>账号登录</Text>
               </>
             )}
           </Pressable>

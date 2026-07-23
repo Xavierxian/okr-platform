@@ -23,7 +23,7 @@
 2. Start or reload with `pm2 reload okr-platform --update-env`.
 3. Confirm that the HTTP port returns `308` to the configured public HTTPS origin.
 4. Confirm TLS 1.0 and TLS 1.1 are rejected, the certificate chain is valid, and HSTS/security headers are present.
-5. Log in through DingTalk as a normal user and by local password as the super administrator.
+5. Log in through DingTalk as a normal user, or by local password for any account that has a password configured.
 
 ## Security verification
 
