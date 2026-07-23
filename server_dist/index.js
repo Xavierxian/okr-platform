@@ -1404,7 +1404,7 @@ async function registerRoutes(app2) {
     try {
       const { username, password } = parseBody(loginBodySchema, req.body);
       const user = await getUserByUsername(username);
-      const eligible = !!user?.password && user.authProvider === "local" && user.role === "super_admin";
+      const eligible = !!user?.password;
       const passwordMatches = await verifyPassword(password, eligible ? user.password : DUMMY_PASSWORD_HASH);
       const valid = eligible && passwordMatches;
       if (!valid) {
